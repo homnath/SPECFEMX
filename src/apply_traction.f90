@@ -304,6 +304,37 @@ if(.not.trac_stat)then
   return
 endif
 
+!! Traction defined on the free surface on SEM points.
+!! WARNING: valid only for the FREE SURFACE already determined in the program.
+!if(isfstraction0.and.nnode_fs>0)then
+!  fname=trim(trfspath0)//trim(trfsfile0)//trim(ptail_inp)//'.dis'
+!  open(unit=11,file=trim(fname),status='old',action='read',access='stream', &
+!  form='unformatted',iostat = ios)
+!  if( ios /= 0 ) then
+!    write(errtag,*)'ERROR: file "'//trim(fname)//'" cannot be opened!'
+!    return
+!  endif
+!  
+!  allocate(ufs0(nnode_fs,nndofu))
+!  read(11)char80
+!  read(11)char80
+!  read(11)dumi
+!  read(11)char80
+!  read(11)ufs0
+!  close(11)
+!
+!  do i_node=1,nnode_fs
+!    ignode=gnode_fs(i_node)
+!    do i_dof=1,nndofu
+!      igdof=gdof(idofu(i_dof),ignode)
+!      load(igdof)=load(igdof)+ufs0(i_node,i_dof)
+!    enddo
+!  enddo
+!  
+!  deallocate(ufs0)
+!
+!endif !(isfstraction)
+
 ! Traction defined on the free surface on SEM points.
 ! WARNING: valid only for the FREE SURFACE already determined in the program.
 if(isfstraction0.and.nnode_fs>0)then
@@ -323,12 +354,62 @@ if(isfstraction0.and.nnode_fs>0)then
   read(11)ufs0
   close(11)
 
-  do i_node=1,nnode_fs
-    ignode=gnode_fs(i_node)
-    do i_dof=1,nndofu
-      igdof=gdof(idofu(i_dof),ignode)
-      load(igdof)=load(igdof)+ufs(i_node,i_dof)
+  do i_face=1,nelmt_fs
+    iface=iface_fs(i_face)
+    if(iface==1 .or. iface==3)then
+      nfgll=ngllzx
+      lagrange_gll(1:nfgll,1:nfgll)=lagrange_gll_zx
+      gll_weights(1:nfgll)=gll_weights_zx
+      dshape_quad4(:,:,1:nfgll)=dshape_quad4_zx
+    elseif(iface==2 .or. iface==4)then
+      nfgll=ngllyz
+      lagrange_gll(1:nfgll,1:nfgll)=lagrange_gll_yz
+      gll_weights(1:nfgll)=gll_weights_yz
+      dshape_quad4(:,:,1:nfgll)=dshape_quad4_yz
+    elseif(iface==5 .or. iface==6)then
+      nfgll=ngllzx
+      lagrange_gll(1:nfgll,1:nfgll)=lagrange_gll_xy
+      gll_weights(1:nfgll)=gll_weights_xy
+      dshape_quad4(:,:,1:nfgll)=dshape_quad4_xy
+    else
+      write(errtag,'(a)')'ERROR: wrong face ID for traction!'
+      return
+    endif
+    nfdof=nfgll*ndim
+
+    numf=gnum_fs(:,i_face)
+    coord=g_coord(:,numf)
+    fgdof(1:nfdof)=reshape(gdof(idofu,numf),(/nfdof/))
+    ftracload=zero
+    ! compute numerical integration
+    do i_gll=1,nfgll
+      ifnode=rgnum_fs(i_gll,i_face)
+      q=ufs0(ifnode,:) ! vector of nodal values
+
+      ! compute two vectors dx_dxi and dx_deta
+      dx_dxi=matmul(coord,dshape_quad4(1,:,i_gll))
+      dx_deta=matmul(coord,dshape_quad4(2,:,i_gll))
+
+      ! Normal = (dx_dxi x dx_deta)
+      face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3)
+      face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+      face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+
+      detjac=sqrt(dot_product(face_normal,face_normal))
+      face_normal=hexface_sign(iface)*face_normal/detjac
+
+      ftracload(1:nfdof:3)=ftracload(1:nfdof:3)+ &
+      q(1)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) !*face_normal(1) !only in X direction
+      ftracload(2:nfdof:3)=ftracload(2:nfdof:3)+ &
+      q(2)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) !*face_normal(2) !only in Y direction
+      ftracload(3:nfdof:3)=ftracload(3:nfdof:3)+ &
+      q(3)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) !*face_normal(3) !only in Z direction
+      
+      !ftracload(1:nfdof:3)=q(1)
+      !ftracload(2:nfdof:3)=q(2)
+      !ftracload(3:nfdof:3)=q(3)
     enddo
+    load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
   enddo
   
   deallocate(ufs0)
