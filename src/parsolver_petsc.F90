@@ -800,7 +800,6 @@ endif
 !if(myrank==0)print*,'matrix setting & assembly complete11!'                     
 !call sync_process                                                               
                                                                                  
-!call MatCreateVecs(Amat,vdiag,PETSC_NULL_OBJECT,ierr) <3.8.0 version            
 call MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr)                               
 call MatGetDiagonal(Amat,vdiag,ierr)                                             
 call VecGetLocalSize(vdiag,n,ierr)                                               
@@ -919,7 +918,6 @@ endif
 !if(myrank==0)print*,'matrix setting & assembly complete11!'                     
 !call sync_process                                                               
                                                                                  
-!call MatCreateVecs(Amat,vdiag,PETSC_NULL_OBJECT,ierr) <3.8.0 version            
 call MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr)                               
 call MatGetDiagonal(Amat,vdiag,ierr)                                             
 call VecGetLocalSize(vdiag,n,ierr)                                               
