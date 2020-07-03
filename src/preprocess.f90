@@ -874,7 +874,7 @@ endif
 fname=trim(data_path)//trim(trfile)//trim(ptail_inp)
 open(unit=11,file=trim(fname),status='old',action='read',iostat=ios)
 if (ios /= 0)then
-  write(errtag,'(a)')'ERROR: input file "',trim(fname),'" cannot be opened!'
+  write(errtag,'(a)')'ERROR: input file "'//trim(fname)//'" cannot be opened!'
   return
 endif
 

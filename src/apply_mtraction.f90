@@ -67,7 +67,7 @@ endif
 fname=trim(data_path)//trim(mtrfile)//trim(ptail_inp)
 open(unit=11,file=trim(fname),status='old',action='read',iostat=ios)
 if (ios /= 0)then
-  write(errtag,'(a)')'ERROR: input file "',trim(fname),'" cannot be opened!'
+  write(errtag,'(a)')'ERROR: input file "'//trim(fname)//'" cannot be opened!'
   return
 endif
 
@@ -105,7 +105,7 @@ mtraction: do
     azim=azim*DEG2RAD
     M=M0*magnetic_unitvec(inc,dec,azim)
   else
-    write(errtag,'(a)')'ERROR: mtraction type ',tractype,' not supported!'
+    write(errtag,'(a,i0,a)')'ERROR: mtraction type ',tractype,' not supported!'
     return
   endif
     
@@ -151,7 +151,7 @@ mtraction: do
         Mgll(:,i_gll)=magnetization_elmt(:,hexface(iface)%node(i_gll),ielmt)
       enddo
     else
-      write(errtag,'(a)')'ERROR: unsupported mag_type ',trim(mag_type),'!'
+      write(errtag,'(a)')'ERROR: unsupported mag_type '//trim(mag_type)//'!'
       return
     endif
     nfdofphi=nfgll*nndofphi
