@@ -1,5 +1,4 @@
 !===============================specfem3d.F90===================================
-! include 'license.txt'
 ! REVISION:
 !   HNG, Aug 25,2011; HNG, Jul 14,2011; HNG, Jul 11,2011; Apr 09,2010
 subroutine specfem3d()
