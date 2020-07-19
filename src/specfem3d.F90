@@ -671,14 +671,14 @@ if(trim(devel_example).eq.'axial_rod')then
 endif
 
 ! Note that the stepping starts from 
-!   1 for time domain
-!   0 for frequency domain
+!   1 for time domain.
+!   0 for frequency domain.
 istep0=1
 if(steptype.eq.FREQSTEP)then
   istep0=0
 endif
 
-! angular frequency
+! Angular frequency
 if(steptype.eq.FREQSTEP)then
   if(myrank.eq.0)then
     print*,'timestepping: FREQUENCY'
