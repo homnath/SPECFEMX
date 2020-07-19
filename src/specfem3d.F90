@@ -690,9 +690,11 @@ loop_step: do i_step=istep0,nstep
   !t=dt*real(i_step,kreal)
   step=step0+dstep*real(i_step,kreal)
   if(steptype.eq.TIMESTEP)then
+    ! Time step.
     t=step
     dt=dstep
   elseif(steptype.eq.FREQSTEP)then
+    ! Frequency step.
     freq=step
     if(devel_nondim)then
       ang_freq=TWO*freq*DIM_T
