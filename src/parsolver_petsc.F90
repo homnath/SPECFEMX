@@ -24,8 +24,8 @@ integer,parameter :: SUPERLU=2,MUMPS=3
 PetscInt       ival,icntl
 PetscReal      val
 
-Vec              xvec,bvec,local_vec!,gxvec
-Mat              Amat,Fmat!,AmatT
+Vec              xvec,bvec,local_vec
+Mat              Amat,Fmat
 KSP              ksp
 PC               pc
 PetscReal        mnorm,atol,dtol,rtol
