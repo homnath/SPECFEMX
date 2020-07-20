@@ -15,9 +15,6 @@ use math_library_mpi,only:maxscal,minscal
 use mpi_library,only:check_allocate,sync_process                                 
 use ghost_library_mpi,only:ngpart,gpart                                          
                                                                                  
-!use petscsys                                                                    
-!use petscvec                                                                    
-!use petscmat                                                                    
 use petscksp  
 implicit none
 
