@@ -8,15 +8,7 @@ module parsolver_petsc
 !-------------------------------------------------------------------------------
 !                    Include files
 !-------------------------------------------------------------------------------
-!#include <finclude/petsckspdef.h>
-!#include "petsc/finclude/petscsys.h"
-!#include "petsc/finclude/petscvec.h"
-!#include "petsc/finclude/petscvec.h90"
-!#include "petsc/finclude/petscmat.h"
 #include "petsc/finclude/petscksp.h"
-!#include "petsc/finclude/petscpc.h"
-!#include "petsc/finclude/petscviewer.h"
-!#include "petsc/finclude/petscviewer.h90"
 use ksp_constants                                                                
 use global                                                                       
 use math_library_mpi,only:maxscal,minscal                                          
