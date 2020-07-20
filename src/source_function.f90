@@ -3,6 +3,28 @@ use set_precision
 use math_constants
 contains
 !-------------------------------------------------------------------------------
+real(kind=kreal) function source_frequency_function_complex(freq,hdur)
+
+implicit none
+integer,parameter :: SFTYPE=0
+
+real(kind=kreal),intent(in) :: freq,hdur
+real(kind=kreal) :: omegath
+
+if(SFTYPE==0)then
+  ! Heaviside function
+  source_frequency_function = ONE
+elseif(SFTYPE==1)then
+  omegath=TWO*freq*hdur
+  source_frequency_function = sin(omegath)/omegath 
+else
+  write(*,*)'ERROR: invalid DFTYPE for source frequency function!'
+  stop
+endif
+
+end function source_frequency_function_complex
+!===============================================================================
+
 real(kind=kreal) function source_frequency_function(freq,hdur)
 
 implicit none
