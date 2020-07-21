@@ -3,7 +3,7 @@ use set_precision
 use math_constants
 contains
 !-------------------------------------------------------------------------------
-real(kind=kreal) function source_frequency_function_complex(freq,hdur)
+complex(kind=kreal) function source_frequency_function_complex(freq,hdur)
 
 implicit none
 integer,parameter :: SFTYPE=0
