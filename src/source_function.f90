@@ -18,7 +18,7 @@ elseif(SFTYPE==1)then
   omegath=TWO*freq*hdur
   source_frequency_function_complex = sin(omegath)/omegath 
 else
-  write(*,*)'ERROR: invalid DFTYPE for source frequency function!'
+  write(*,*)'ERROR: invalid SFTYPE for source frequency function!'
   stop
 endif
 
@@ -40,7 +40,7 @@ elseif(SFTYPE==1)then
   omegath=TWO*freq*hdur
   source_frequency_function = sin(omegath)/omegath 
 else
-  write(*,*)'ERROR: invalid DFTYPE for source frequency function!'
+  write(*,*)'ERROR: invalid SFTYPE for source frequency function!'
   stop
 endif
 
