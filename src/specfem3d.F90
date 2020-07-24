@@ -78,18 +78,18 @@ logical :: nl_isconv ! logical variable to check convergence of
 real(kind=kreal) :: G,K
 real(kind=kreal) :: cmat(nst,nst),estrain(nst),dev_strain(nst),  &
 esigma(nst),sigma(nst),vsigma(nst)
-!cmat: elastic matric (Cijkl) in Voigt notation
-!estrain: elastic strain
-!esigma: elastic stress
-!sigma: stress (used in different context than esigma?)
-!vsigma: viscose stress
+! cmat: elastic matric (Cijkl) in Voigt notation
+! estrain: elastic strain
+! esigma: elastic stress
+! sigma: stress (used in different context than esigma?)
+! vsigma: viscose stress
 
-! dynamic arrays
-!num: g_num for particular element.
-!node_valency: number of elements that share each node.
+! Dynamic arrays
+! num: g_num for particular element.
+! node_valency: number of elements that share each node.
 integer,allocatable::num(:),node_valency(:)
 
-! factored parameters. Only for elasto-plastic implementation
+! Factored parameters. Only for elasto-plastic implementation
 real(kind=kreal),allocatable :: cohf(:),nuf(:),phif(:),psif(:),ymf(:)
 
 integer :: nzero_dprecon
