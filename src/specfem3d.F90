@@ -50,12 +50,12 @@ implicit none
 character(len=250) :: myfname=' => specfem3d.f90'
 character(len=500) :: errsrc
 
-!i,j are dummy vars for interation
+! i,j are dummy vars for interation
 integer :: i,j
-!istat: status indicator for allocation (can be used in other contexts)
+! istat: status indicator for allocation (can be used in other contexts)
 integer :: istat
 
-!do-loop indices
+! do-loop indices
 integer :: i_elmt,i_nliter,i_node,i_comp
 integer :: ielmt,imat,idof,iedof!element ID for gdof, node, etc.
 
@@ -68,9 +68,9 @@ real(kind=kreal) :: sfac ! slip factor
 
 ! KSP convergence reason
 integer :: ksp_convreason
-!ksp_iter: conjugate gradient iteration,
-!ksp_tot: total cg interation, nl_iter: nonlinear iteration, nl_tot: total nl
-!iteration
+! ksp_iter: conjugate gradient iteration,
+! ksp_tot: total cg interation, nl_iter: nonlinear iteration, nl_tot: total nl
+! iteration
 integer :: ksp_iter,ksp_tot,nl_iter,nl_tot
 logical :: nl_isconv ! logical variable to check convergence of
 ! nonlinear (NL) iterations
