@@ -14,10 +14,11 @@ real(kind=kreal) :: omegath
 
 if(SFTYPE==0)then
   ! Heaviside function
-  source_frequency_function_complex = ONE
+  source_frequency_function_complex = (ONE,ZERO)
 elseif(SFTYPE==1)then
-  omegath=TWO*freq*hdur
-  source_frequency_function_complex = sin(omegath)/omegath 
+  omegath=(ZERO,TWO*freq*hdur)
+  !source_frequency_function_complex = sin(omegath)/omegath 
+  source_frequency_function_complex = exp(omegath) 
 else
   write(*,*)'ERROR: invalid SFTYPE for source frequency function!'
   stop
