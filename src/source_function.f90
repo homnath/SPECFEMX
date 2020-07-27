@@ -10,17 +10,17 @@ implicit none
 integer,parameter :: SFTYPE=0
 
 real(kind=kreal),intent(in) :: freq,hdur
-real(kind=kreal) :: omegath
+complex(kind=kreal) :: omegath
 
 if(SFTYPE==0)then
   ! Heaviside function
-  source_frequency_function_complex = (ONE,ZERO)
+  source_frequency_function_complex = cmplx(ONE,ZERO)
 elseif(SFTYPE==1)then
-  omegath=(ZERO,TWO*freq*hdur)
+  omegath=cmplx(ZERO,TWO*freq*hdur)
   !source_frequency_function_complex = sin(omegath)/omegath 
   source_frequency_function_complex = exp(omegath) 
 else
-  write(*,*)'ERROR: invalid SFTYPE for source frequency function!'
+  write(*,*)'ERROR: invalid SFTYPE for source_frequency_function_complex!'
   stop
 endif
 
@@ -42,7 +42,7 @@ elseif(SFTYPE==1)then
   omegath=TWO*freq*hdur
   source_frequency_function = sin(omegath)/omegath 
 else
-  write(*,*)'ERROR: invalid SFTYPE for source frequency function!'
+  write(*,*)'ERROR: invalid SFTYPE for source_frequency_function!'
   stop
 endif
 
