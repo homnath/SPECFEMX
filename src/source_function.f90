@@ -30,6 +30,7 @@ end function source_frequency_function_complex
 real(kind=kreal) function source_frequency_function(freq,hdur)
 
 implicit none
+! Type of source function
 integer,parameter :: SFTYPE=0
 
 real(kind=kreal),intent(in) :: freq,hdur
