@@ -1049,8 +1049,8 @@ loop_step: do i_step=istep0,nstep
         write(logunit,*)'computing elemental stress'
         flush(logunit)
       endif
-      ! compute stress
-      ! elastic elements
+      ! Compute stress
+      ! Elastic elements
       ! This part is repeated for the first step. We should change this for
       ! efficiency.
       do i_elmt=1,nelmt_elas
@@ -1059,7 +1059,7 @@ loop_step: do i_step=istep0,nstep
         egdofu=gdof_elmt(edofu,ielmt)
         eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
         bload=ZERO
-        do i=1,ngll ! integration loop
+        do i=1,ngll ! Integration loop
           call compute_cmat_elastic(bulkmod_elmt(i,ielmt), &
           shearmod_elmt(i,ielmt),cmat)
           
@@ -1081,7 +1081,7 @@ loop_step: do i_step=istep0,nstep
       
       if(allelastic)exit nonlinear
 
-      ! viscoelastic elemenets
+      ! Viscoelastic elements
       do i_elmt=1,nelmt_viscoelas
         ielmt=eid_viscoelas(i_elmt)
         imat=mat_id(ielmt)
