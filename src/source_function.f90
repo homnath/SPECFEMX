@@ -1,4 +1,4 @@
-! This module computes source frequency function
+! This module computes source time/frequency function.
 module source_function
 use set_precision
 use math_constants
