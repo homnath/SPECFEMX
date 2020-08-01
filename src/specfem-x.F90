@@ -2,9 +2,9 @@
 ! REVISION:
 !  HNG, Jul 14,2011; HNG, Jul 11,2011; Apr 09,2010
 ! NOTE:
-!  - shear strain components in the strain tensor are engineering strain.
-!  Ordinary shear strain components can be obtained by multiplying the
-!  engineering strain with 0.5 if necessary.
+!  - Shear strain components in the strain tensor are engineering strain.
+!  - Ordinary shear strain components can be obtained by multiplying the
+!    engineering strain with 0.5 if necessary.
 program specfemx
 ! import necessary modules
 use dimensionless
