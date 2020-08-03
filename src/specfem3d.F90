@@ -90,7 +90,7 @@ esigma(nst),sigma(nst),vsigma(nst)
 ! node_valency: number of elements that share each node.
 integer,allocatable::num(:),node_valency(:)
 
-! Factored parameters. Only for elasto-plastic implementation
+! Factored parameters. Only for elasto-plastic implementation.
 real(kind=kreal),allocatable :: cohf(:),nuf(:),phif(:),psif(:),ymf(:)
 
 integer :: nzero_dprecon
@@ -98,7 +98,7 @@ real(kind=kreal),allocatable :: dprecon(:),ndscale(:)
 
 real(kind=kreal),allocatable :: bmat(:,:),coord(:,:),deriv(:,:),    &
 jac(:,:)
-!km: stiffness matrix for each element
+!kmat: stiffness matrix for each element
 !storekmat: stiffness matrix for all elements
 real(kind=kreal),allocatable :: kmat(:,:),storekmat(:,:,:)
 !storemmat: mass matrix for all elements
@@ -107,7 +107,7 @@ real(kind=kreal),allocatable :: storemmat(:)
 !uerr: used to check convergence
 !umax: max of displacement magnitude, uxmax: max of displacement components
 real(kind=kreal) :: uerr,maxu,maxdu
-!du: incremental soln
+!du: incremental solution
 !u: solution (summed over du)
 real(kind=kreal),allocatable :: du(:),u(:)
 
