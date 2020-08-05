@@ -149,13 +149,13 @@ real(kind=kreal),allocatable :: nodalB(:,:)
 integer,allocatable :: egdof(:),egdofu(:)
 ! placeholder array. holds values of gdof_elmt for a given element.
 
-! frequency
+! Frequency
 logical :: isscale_freq2=.true.
 real(kind=kreal) :: freq,ang_freq,scale_ang_freq2
 
 logical :: isgravity,ispseudoeq ! gravity load and pseudostatic load
 
-! viscoelastic parameters
+! Viscoelastic parameters
 integer :: mdomain
 integer :: ielmt_elas,ielmt_viscoelas,imatve,iviscoelas,nelmt_elas,            &
 nelmt_viscoelas
@@ -164,13 +164,13 @@ integer :: tot_nelmt_viscoelas,max_nelmt_viscoelas,min_nelmt_viscoelas
 integer :: nmatblk_elas
 real(kind=kreal) :: min_relaxtime,max_relaxtime
 
-! time at current time step
+! Time at current time step
 real(kind=kreal) :: t
 integer :: i_step,istep
 integer :: istep0 !first step
 real(kind=kreal) :: step !current step (t or f)
 
-!factor for time unit conversion
+!Factor for time unit conversion
 real(kind=kreal) :: tunitfac
 real(kind=kreal) :: cpu_tstart,cpu_tend,telap,max_telap,mean_telap
 character(len=20) :: format_str
