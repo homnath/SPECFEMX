@@ -105,7 +105,8 @@ real(kind=kreal),allocatable :: kmat(:,:),storekmat(:,:,:)
 real(kind=kreal),allocatable :: storemmat(:)
 
 !uerr: used to check convergence
-!umax: max of displacement magnitude, uxmax: max of displacement components
+!umax: max of displacement magnitude
+!uxmax: max of displacement components
 real(kind=kreal) :: uerr,maxu,maxdu
 !du: incremental solution
 !u: solution (summed over du)
@@ -687,6 +688,7 @@ if(steptype.eq.FREQSTEP)then
   endif
 endif
 
+! Starting time/frequency loop.
 loop_step: do i_step=istep0,nstep
   !t=dt*real(i_step,kreal)
   step=step0+dstep*real(i_step,kreal)
