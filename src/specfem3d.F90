@@ -1496,7 +1496,7 @@ loop_step: do i_step=istep0,nstep
     write(logunit,*)' ' 
     flush(logunit)
   endif
-enddo loop_step ! i_step time stepping loop
+enddo loop_step ! i_step time/frequency stepping loop
 if(savedata%strain)then
   close(77)
   deallocate(strain_elmt,strain_nodal)
