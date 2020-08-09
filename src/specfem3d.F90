@@ -1439,9 +1439,9 @@ loop_step: do i_step=istep0,nstep
       endif
     endif
     
-    ! gravitational
+    ! Gravitational
     if(savedata%agrav)then
-      ! compute acceleration due to gravity
+      ! Compute acceleration due to gravity
       call compute_gradient_of_scalar(nodalphi,nodalg)
       if(nproc.gt.1)then
         call assemble_ghosts_nodal_vector(nodalg,nodalg)
@@ -1450,7 +1450,7 @@ loop_step: do i_step=istep0,nstep
       do i_comp=1,ndim
         nodalg(i_comp,:)=nodalg(i_comp,:)/real(node_valency,kreal)
       enddo
-      ! plot gravity accelration
+      ! Plot gravity accelration
       if(savedata%agrav)then
         call write_vector_to_file(nnode,DIM_G*nodalg,ext='grav',istep=i_step)
         ! On the free surface
@@ -1477,7 +1477,7 @@ loop_step: do i_step=istep0,nstep
       enddo
       ! Multiply by \mu_0
       nodalB=MAG_CONS*nodalB
-      ! plot magnetic field
+      ! Plot magnetic field
       if(savedata%magb)then
         call write_vector_to_file(nnode,DIM_B*nodalB,ext='magb',istep=i_step)
         ! On the free surface
