@@ -1464,18 +1464,18 @@ loop_step: do i_step=istep0,nstep
         endif
       endif
     endif
-    ! magnetic
+    ! Magnetic
     if(savedata%magb)then
-      ! compute magnetic field
+      ! Compute magnetic field
       call compute_premagnetic_field(nodalphi,nodalB)
       if(nproc.gt.1)then
         call assemble_ghosts_nodal_vector(nodalB,nodalB)
       endif
-      ! compute average on the sharing nodes
+      ! Compute average on the sharing nodes
       do i_comp=1,ndim
         nodalB(i_comp,:)=nodalB(i_comp,:)/real(node_valency,kreal)
       enddo
-      ! multiply by \mu_0
+      ! Multiply by \mu_0
       nodalB=MAG_CONS*nodalB
       ! plot magnetic field
       if(savedata%magb)then
