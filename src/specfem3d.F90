@@ -3,7 +3,7 @@
 !   HNG, Aug 25,2011; HNG, Jul 14,2011; HNG, Jul 11,2011; Apr 09,2010
 !-------------------------------------------------------------------------------
 subroutine specfem3d()
-! Import necessary libraries
+! Import necessary modules
 use dimensionless
 use global
 use string_library, only : parse_file
