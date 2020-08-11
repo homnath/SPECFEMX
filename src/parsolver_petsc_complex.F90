@@ -51,7 +51,7 @@ subroutine petsc_initialize()
 implicit none
 errsrc=trim(myfname)//' => petsc_initialize'
 
-! initialize petsc
+! Initialize petsc
 call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
 
 end subroutine petsc_initialize
@@ -63,13 +63,13 @@ IS global_is,local_is
 
 errsrc=trim(myfname)//' => petsc_create_vector'
 
-! create vector objects
+! Create vector objects
 call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,ngdof,xvec,ierr)
 CHKERRA(ierr)
 call VecDuplicate(xvec,bvec,ierr)
 CHKERRA(ierr)
 
-! local vector
+! Local vector
 call VecCreateSeq(PETSC_COMM_SELF,neq,local_vec,ierr)
 CHKERRA(ierr)
 
