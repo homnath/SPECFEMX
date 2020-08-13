@@ -18,7 +18,7 @@ use ghost_library_mpi,only:ngpart,gpart
 use petscksp  
 implicit none
 
-PetscBool      flg,flg_ch,flg_lu,flg_ilu,mat_symmetry
+PetscBool      flg_ch,flg_lu,flg_ilu,mat_symmetry
 PetscInt       petsc_solver_type
 integer,parameter :: SUPERLU=2,MUMPS=3
 PetscInt       ival,icntl
@@ -34,7 +34,6 @@ PetscInt         iter,maxiter
 VecScatter             vscat!,pscat,vscat_all
 ! Stores l2g map info 
 ISLocalToGlobalMapping l2gmap                    
-!PetscBool        flg
 
 PetscInt :: nzeros_max,nzeros_min,nzerosoff_max
 PetscInt :: ngdof_part
@@ -607,7 +606,7 @@ elseif(petsc_solver_type.eq.SUPERLU)then
     flush(logunit)
   endif
   flg_ilu = PETSC_FALSE;
-  flg_lu     = PETSC_FALSE;
+  flg_lu  = PETSC_FALSE;
   ! version < 3.8.0
   ! call PetscOptionsGetBool(PETSC_NULL_CHARACTER,"-use_superlu_lu",flg_lu,flg,ierr);
   call PetscOptionsGetBool(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &
