@@ -6,7 +6,7 @@
 !-------------------------------------------------------------------------------
 module parsolver_petsc_complex
 !-------------------------------------------------------------------------------
-!                    Include PETSc header files
+! Include PETSc header files
 !-------------------------------------------------------------------------------
 #include "petsc/finclude/petscksp.h"
 use ksp_constants                                                                
@@ -31,7 +31,7 @@ PC               pc
 PetscReal        mnorm,atol,dtol,rtol
 PetscInt         iter,maxiter
 ! For communications from local to global   
-VecScatter             vscat!,pscat,,vscat_all
+VecScatter             vscat!,pscat,vscat_all
 ! Stores l2g map info 
 ISLocalToGlobalMapping l2gmap                    
 !PetscBool        flg
