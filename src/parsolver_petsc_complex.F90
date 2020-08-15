@@ -6,7 +6,7 @@
 !-------------------------------------------------------------------------------
 module parsolver_petsc_complex
 !-------------------------------------------------------------------------------
-! Include PETSc header files
+! Include PETSc header files and import modules.
 !-------------------------------------------------------------------------------
 #include "petsc/finclude/petscksp.h"
 use ksp_constants                                                                
