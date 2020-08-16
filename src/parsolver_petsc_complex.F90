@@ -18,7 +18,7 @@ use ghost_library_mpi,only:ngpart,gpart
 use petscksp  
 implicit none
 
-PetscBool      flg_ch,flg_lu,flg_ilu,mat_symmetry
+PetscBool      flg_ch,flg_lu,flg_ilu,flg,mat_symmetry
 PetscInt       petsc_solver_type
 integer,parameter :: SUPERLU=2,MUMPS=3
 PetscInt       ival,icntl
@@ -813,7 +813,8 @@ use math_library_mpi,only:sumscal
 use ieee_arithmetic
 implicit none
 
-real(kind=kreal),intent(in) :: storekmat(:,:,:),storemmat(:,:)
+real(kind=kreal),intent(in) :: storemmat(:,:)
+complex(kind=kreal),intent(in) :: storekmat(:,:,:)
 integer :: i,i_elmt,ielmt,j,n,ndzero                                             
 integer :: ggdof_elmt(NEDOF)                                   
 
