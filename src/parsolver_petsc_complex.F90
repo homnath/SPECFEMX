@@ -824,7 +824,8 @@ PetscBool         isscale_freq2
 PetscInt irow,jcol                                                               
 Vec   vdiag                                                                      
 PetscScalar rval  
-PetscReal  kmat(NEDOF,NEDOF),mdiag(NEDOFU)
+PetscComplex  kmat(NEDOF,NEDOF)
+PetscReal  mdiag(NEDOFU)
 PetscScalar,pointer :: diag_array(:)                                             
                                                                                  
 real(kind=8) :: xval
