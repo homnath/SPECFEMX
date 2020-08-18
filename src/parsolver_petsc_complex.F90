@@ -309,7 +309,8 @@ do i=2,nsparse
   ir=krow_sparse(i)
   ic=kcol_sparse(i)
   if(l2gdof(ir).ne.igr.or.l2gdof(ic).ne.igc)then
-    write(logunit,'(a,i0,1x,i0,1x,i0,1x,i0)')'strange error in l2gdof: ',l2gdof(ir),igr,l2gdof(ic),igc
+    write(logunit,'(a,i0,1x,i0,1x,i0,1x,i0)')'strange error in l2gdof: ',      &
+    l2gdof(ir),igr,l2gdof(ic),igc
     flush(logunit)
     stop
   endif
