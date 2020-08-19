@@ -852,7 +852,7 @@ do i_elmt=1,nelmt
     else                                                                         
       mdiag=freq*freq*mdiag                                                      
     endif                                                                        
-    ! mass matrix has NEDOFU elements NOT NEDOF                                  
+    ! Mass matrix has NEDOFU elements NOT NEDOF                                  
     do i=1,NEDOFU                                                                
       kmat(i,i)=kmat(i,i)-mdiag(i)                                               
     enddo                                                                        
@@ -942,7 +942,7 @@ zero=0.0
 call VecSet(bvec,zero,ierr)
 call VecSetValues(bvec,neq,l2gdof(1:),rload(1:),ADD_VALUES,ierr);
 
-! Assemble vector
+! Assemble vector.
 call VecAssemblyBegin(bvec,ierr)
 call VecAssemblyEnd(bvec,ierr)
 
