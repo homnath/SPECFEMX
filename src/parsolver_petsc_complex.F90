@@ -840,9 +840,9 @@ CHKERRA(ierr)
 call sync_process
 rval=1.0
 
-! Entirely in solid                                                              
-do i_elmt=1,nelmt                                                                
-  ielmt=i_elmt                           
+! Entirely in solid.
+do i_elmt=1,nelmt
+  ielmt=i_elmt
 
   kmat=storekmat(:,:,ielmt)                                                      
   if(steptype.eq.FREQSTEP)then                                                   
@@ -852,7 +852,7 @@ do i_elmt=1,nelmt
     else                                                                         
       mdiag=freq*freq*mdiag                                                      
     endif                                                                        
-    ! Mass matrix has NEDOFU elements NOT NEDOF                                  
+    ! Mass matrix has NEDOFU elements NOT NEDOF.                                  
     do i=1,NEDOFU                                                                
       kmat(i,i)=kmat(i,i)-mdiag(i)                                               
     enddo                                                                        
