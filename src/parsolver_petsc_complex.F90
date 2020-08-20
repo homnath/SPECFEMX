@@ -68,22 +68,22 @@ CHKERRA(ierr)
 call VecDuplicate(xvec,bvec,ierr)
 CHKERRA(ierr)
 
-! Local vector
+! Local vector.
 call VecCreateSeq(PETSC_COMM_SELF,neq,local_vec,ierr)
 CHKERRA(ierr)
 
-! objects needed for global vector scattering to local vector
-! create local and global IS (index set) objects from the array of local and
-! global indices
+! Objects needed for global vector scattering to local vector.
+! Create local and global IS (index set) objects from the array of local and
+! global indices.
 call ISCreateGeneral(PETSC_COMM_WORLD,neq,l2gdof(1:),PETSC_COPY_VALUES,global_is,ierr)
 CHKERRA(ierr)
 call ISCreateStride(PETSC_COMM_SELF,neq,0,1,local_is,ierr);
 CHKERRA(ierr)
-! create VecScatter object which is needed to scatter PETSc parallel vectors
+! Create VecScatter object which is needed to scatter PETSc parallel vectors.
 call VecScatterCreate(bvec,global_is,local_vec,local_is,vscat,ierr)
 CHKERRA(ierr)
-call ISDestroy(global_is,ierr) ! no longer necessary
-call ISDestroy(local_is,ierr)  ! no longer necessary
+call ISDestroy(global_is,ierr) ! No longer necessary
+call ISDestroy(local_is,ierr)  ! No longer necessary
 
 end subroutine petsc_create_vector_complex
 !===============================================================================
