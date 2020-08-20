@@ -30,9 +30,9 @@ KSP              ksp
 PC               pc
 PetscReal        mnorm,atol,dtol,rtol
 PetscInt         iter,maxiter
-! For communications from local to global   
+! For communications from local to global.   
 VecScatter             vscat!,pscat,vscat_all
-! Stores l2g map info 
+! Stores l2g map info. 
 ISLocalToGlobalMapping l2gmap                    
 
 PetscInt :: nzeros_max,nzeros_min,nzerosoff_max
@@ -50,7 +50,7 @@ subroutine petsc_initialize()
 implicit none
 errsrc=trim(myfname)//' => petsc_initialize'
 
-! Initialize petsc
+! Initialize petsc.
 call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
 
 end subroutine petsc_initialize
@@ -62,7 +62,7 @@ IS global_is,local_is
 
 errsrc=trim(myfname)//' => petsc_create_vector'
 
-! Create vector objects
+! Create vector objects.
 call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,ngdof,xvec,ierr)
 CHKERRA(ierr)
 call VecDuplicate(xvec,bvec,ierr)
