@@ -82,8 +82,9 @@ CHKERRA(ierr)
 ! Create VecScatter object which is needed to scatter PETSc parallel vectors.
 call VecScatterCreate(bvec,global_is,local_vec,local_is,vscat,ierr)
 CHKERRA(ierr)
-call ISDestroy(global_is,ierr) ! No longer necessary
-call ISDestroy(local_is,ierr)  ! No longer necessary
+! Destroy objects which are no longer necessary.
+call ISDestroy(global_is,ierr)
+call ISDestroy(local_is,ierr)
 
 end subroutine petsc_create_vector_complex
 !===============================================================================
