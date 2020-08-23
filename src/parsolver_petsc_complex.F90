@@ -441,9 +441,9 @@ nnzero_offdiag=int(nzeror_oarray(1:n))
 call VecRestoreArrayF90(nzeror_ovec,nzeror_oarray,ierr)
 call VecDestroy(nzeror_ovec,ierr)
 
-! correction
+! Correction
 ! I do not know why but there are some DOFs where the correction exceeds by 4 or
-! 8 therefore to be safe we need to subtract this from all
+! 8 therefore to be safe we need to subtract this from all.
 call VecGetArrayF90(ninterface_dvec,rninterface_darray,ierr)
 !where(rninterface_darray.gt.0.0 .and. rninterface_darray.lt.1.0)rninterface_darray=1.0
 allocate(ninterface_darray(n),stat=ierr)
