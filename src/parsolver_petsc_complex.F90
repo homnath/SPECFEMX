@@ -518,15 +518,15 @@ PetscInt :: istart,iend
 
 errsrc=trim(myfname)//' => petsc_create_matrix'
 
-! create the matrix and preallocate
+! Create the matrix and preallocate
 call MatCreate(PETSC_COMM_WORLD,Amat,ierr)
 call MatSetType(Amat,MATMPIAIJ,ierr)
 CHKERRA(ierr)
 call MatSetSizes(Amat,PETSC_DECIDE,PETSC_DECIDE,ngdof,ngdof,ierr)
 CHKERRA(ierr)
 
-!does not work before preallocation
-!call MatGetLocalSize(Amat,nrow_part,ncol_part,ierr)
+! Does not work before preallocation
+! call MatGetLocalSize(Amat,nrow_part,ncol_part,ierr)
 
 ! preallocation
 !call MatMPIAIJSetPreallocation(Amat,nzeros_max,PETSC_NULL_INTEGER,nzeros_max, &
