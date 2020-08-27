@@ -525,10 +525,10 @@ CHKERRA(ierr)
 call MatSetSizes(Amat,PETSC_DECIDE,PETSC_DECIDE,ngdof,ngdof,ierr)
 CHKERRA(ierr)
 
-! Does not work before preallocation
+! The following statement does not work before preallocation.
 ! call MatGetLocalSize(Amat,nrow_part,ncol_part,ierr)
 
-! preallocation
+! Preallocation.
 !call MatMPIAIJSetPreallocation(Amat,nzeros_max,PETSC_NULL_INTEGER,nzeros_max, &
 !PETSC_NULL_INTEGER,ierr)
 call MatMPIAIJSetPreallocation(Amat,0,nnzero_diag,         &

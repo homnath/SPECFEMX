@@ -17,7 +17,7 @@ if(SFTYPE==0)then
   source_frequency_function_complex = cmplx(ONE,ZERO)
 elseif(SFTYPE==1)then
   omegath=cmplx(ZERO,TWO*freq*hdur)
-  !source_frequency_function_complex = sin(omegath)/omegath 
+  ! Source_frequency_function_complex = sin(omegath)/omegath 
   source_frequency_function_complex = exp(omegath) 
 else
   write(*,*)'ERROR: invalid SFTYPE for source_frequency_function_complex!'
