@@ -57,7 +57,7 @@ implicit none
 real(kind=kreal),intent(in) :: t,hdur
 
 
-! quasi Heaviside
+! Quasi Heaviside
 source_time_function = 0.5d0*(1.0d0 + erf(t/hdur))
 ! comp_source_time_function = dexp(-(t/hdur)**2)/(dsqrt(PI)*hdur)
 
@@ -69,7 +69,7 @@ real(kind=kreal) function source_time_function_rickr(t,f0)
 implicit none
 real(kind=kreal),intent(in) :: t,f0
 
-! ricker
+! Ricker
 source_time_function_rickr = (ONE-TWO*PI*PI*f0*f0*t*t)*exp(-PI*PI*f0*f0*t*t)
 
 !!! another source time function they have called 'ricker' in some old papers,
