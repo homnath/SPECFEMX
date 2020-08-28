@@ -535,7 +535,6 @@ call MatMPIAIJSetPreallocation(Amat,0,nnzero_diag,         &
 0,nnzero_offdiag,ierr)
 CHKERRA(ierr)
 deallocate(nnzero_diag,nnzero_offdiag)
-!if(myrank==0)print*,'ngdof:',ngdof
 call MatSetFromOptions(Amat,ierr)
 CHKERRA(ierr)
 
@@ -551,9 +550,9 @@ implicit none
 
 errsrc=trim(myfname)//' => petsc_create_solver'
 
-! Create the linear solver and set various options
+! Create the linear solver and set various options.
 
-! Create linear solver context
+! Create linear solver context.
 call KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
 CHKERRA(ierr)
 call KSPSetInitialGuessNonzero(ksp,PETSC_TRUE,ierr)
