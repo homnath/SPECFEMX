@@ -609,8 +609,6 @@ elseif(petsc_solver_type.eq.SUPERLU)then
   endif
   flg_ilu = PETSC_FALSE;
   flg_lu  = PETSC_FALSE;
-  ! version < 3.8.0
-  ! call PetscOptionsGetBool(PETSC_NULL_CHARACTER,"-use_superlu_lu",flg_lu,flg,ierr);
   call PetscOptionsGetBool(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &
   "-use_superlu_lu",flg_lu,flg,ierr);
   CHKERRA(ierr)
@@ -628,12 +626,8 @@ elseif(petsc_solver_type.eq.SUPERLU)then
     endif
     call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
     CHKERRA(ierr)
-    ! version < 3.9
-    !call PCFactorSetMatSolverPackage(pc,MATSOLVERSUPERLU,ierr);
     call PCFactorSetMatSolverType(pc,MATSOLVERSUPERLU,ierr);
     CHKERRA(ierr)
-    ! version < 3.9
-    !call PCFactorSetUpMatSolverPackage(pc,ierr); ! call MatGetFactor() to create F
     call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
     CHKERRA(ierr)
  
@@ -649,8 +643,6 @@ elseif(petsc_solver_type.eq.MUMPS)then
   endif
   flg_lu    = PETSC_FALSE;
   flg_ch = PETSC_FALSE;
-  ! version < 3.8.0
-  !call PetscOptionsGetBool(PETSC_NULL_CHARACTER,"-use_mumps_ch",flg_ch,flg,ierr);
   call PetscOptionsGetBool(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &
   "-use_mumps_ch",flg_ch,flg,ierr);
   if(flg_lu .or. flg_ch)then
