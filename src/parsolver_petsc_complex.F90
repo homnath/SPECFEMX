@@ -656,9 +656,6 @@ elseif(petsc_solver_type.eq.MUMPS)then
     endif
     call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
     CHKERRA(ierr)
-    ! version < 3.9
-    !call PCFactorSetMatSolverPackage(pc,MATSOLVERMUMPS,ierr);
-    !call PCFactorSetUpMatSolverPackage(pc,ierr); ! call MatGetFactor() to create F
     call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr);
     call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
   
