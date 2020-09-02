@@ -685,18 +685,16 @@ implicit none
 logical,intent(in) :: reuse_pc
 errsrc=trim(myfname)//' => petsc_set_ksp_operator'
 if(reuse_pc)then
-  ! reuse preconditioner
+  ! Reuse preconditioner
   call KSPSetReusePreconditioner(ksp,PETSC_TRUE,ierr)
 else
-  ! do not reuse preconditioner
+  ! Do not reuse preconditioner
   call KSPSetReusePreconditioner(ksp,PETSC_FALSE,ierr)
 endif
 CHKERRA(ierr)
 
-! set ksp operators
-! version < 3.5
-!call KSPSetOperators(ksp,Amat,Amat,SAME_PRECONDITIONER,ierr)
-call KSPSetOperators(ksp,Amat,Amat,ierr) !version >= 3.5.0
+! Set ksp operators.
+call KSPSetOperators(ksp,Amat,Amat,ierr)
 CHKERRA(ierr)
 end subroutine petsc_set_ksp_operator_complex
 !===============================================================================
@@ -726,7 +724,7 @@ CHKERRA(ierr)
 call sync_process
 rval=1.0
 
-! entirely in solid                                                              
+! Entirely in solid.
 do i_elmt=1,nelmt                                                                
   ielmt=i_elmt                                                                   
   ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
@@ -764,7 +762,7 @@ else
   CHKERRA(ierr)  
 endif
 
-!! check symmetry                                                                
+!! Check symmetry                                                                
 !call MatDuplicate(Amat,MAT_DO_NOT_COPY_VALUES,AmatT,ierr)                        
 !CHKERRA(ierr)                                                                   
 !call MatTranspose(Amat,MAT_INITIAL_MATRIX,AmatT,ierr)                            
