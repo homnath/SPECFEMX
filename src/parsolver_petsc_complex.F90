@@ -821,7 +821,7 @@ real(kind=8) :: xval
 
 ! Set and assemble matrix.
 !  - Note that MatSetValues() uses 0-based row and column numbers
-!  in Fortran as well as in C (as set here in the array "col").
+!  in C as well as in Fortran (as set here in the array "col").
 
 call MatZeroEntries(Amat,ierr)
 CHKERRA(ierr)
@@ -882,7 +882,7 @@ else
   CHKERRA(ierr)  
 endif
 
-!! check symmetry                                                                
+!! Check symmetry                                                                
 !call MatDuplicate(Amat,MAT_DO_NOT_COPY_VALUES,AmatT,ierr)                        
 !CHKERRA(ierr)                                                                   
 !call MatTranspose(Amat,MAT_INITIAL_MATRIX,AmatT,ierr)                            
