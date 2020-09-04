@@ -806,8 +806,8 @@ real(kind=kreal),intent(in) :: storemmat(:,:)
 complex(kind=kreal),intent(in) :: storekmat(:,:,:)
 integer :: i,i_elmt,ielmt,j,n,ndzero                                             
 integer :: ggdof_elmt(NEDOF)                                   
-
-PetscReal         freq,scale_freq2 ! angular frequency                           
+! Angular frequency
+PetscReal         freq,scale_freq2                           
 PetscBool         isscale_freq2
                                                                                  
 PetscInt irow,jcol                                                               
