@@ -968,7 +968,7 @@ PetscScalar sdata(:)
 PetscInt    cg_iter
 PetscInt    ireason
 
-!! null space
+!! Null space.
 !call MatNullSpaceCreate(PETSC_COMM_WORLD,PETSC_TRUE,0,0,nullspace,ierr)
 !!call MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, PETSC_NULL_OBJECT, nullspace,ierr);
 !call MatSetNullSpace(Amat,nullspace,ierr)
@@ -979,17 +979,17 @@ PetscInt    ireason
 !TMP !call KSPSetNullSpace(ksp, nullspace,ierr);
 !TMP !call MatNullSpaceDestroy(nullspace,ierr);
 
-! Solve the linear system
+! Solve the linear system.
 call KSPSolve(ksp,bvec,xvec,ierr)
 
 ! View solver info; we could instead use the option -ksp_view
 !call KSPView(ksp,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
-! Check solution and clean up
+! Check solution and clean up.
 call KSPGetConvergedReason(ksp,ireason,ierr)
 call KSPGetIterationNumber(ksp,cg_iter,ierr)
 
-! copy solution to local array
+! copy solution to local array.
 call scatter_globalvec(xvec,sdata)
 
 end subroutine petsc_solve_complex
