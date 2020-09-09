@@ -951,7 +951,7 @@ zero=0.0
 call VecSet(bvec,zero,ierr)
 call VecSetValues(bvec,neq,l2gdof(1:),rload(1:),ADD_VALUES,ierr);
 
-! assemble vector
+! Assemble vector
 call VecAssemblyBegin(bvec,ierr)
 call VecAssemblyEnd(bvec,ierr)
 if(myrank==0)then
@@ -989,7 +989,7 @@ call KSPSolve(ksp,bvec,xvec,ierr)
 call KSPGetConvergedReason(ksp,ireason,ierr)
 call KSPGetIterationNumber(ksp,cg_iter,ierr)
 
-! copy solution to local array.
+! Copy solution to local array.
 call scatter_globalvec(xvec,sdata)
 
 end subroutine petsc_solve_complex
