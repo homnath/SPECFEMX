@@ -807,7 +807,7 @@ real(kind=kreal),intent(in) :: storemmat(:,:)
 complex(kind=kreal),intent(in) :: storekmat(:,:,:)
 integer :: i,i_elmt,ielmt,j,n,ndzero
 integer :: ggdof_elmt(NEDOF)
-! Angular frequency
+! Angular frequenc.y
 PetscReal         freq,scale_freq2
 PetscBool         isscale_freq2
 
@@ -952,7 +952,7 @@ zero=0.0
 call VecSet(bvec,zero,ierr)
 call VecSetValues(bvec,neq,l2gdof(1:),rload(1:),ADD_VALUES,ierr);
 
-! Assemble vector
+! Assemble vector.
 call VecAssemblyBegin(bvec,ierr)
 call VecAssemblyEnd(bvec,ierr)
 if(myrank==0)then
