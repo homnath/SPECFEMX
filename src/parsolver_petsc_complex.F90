@@ -807,7 +807,7 @@ real(kind=kreal),intent(in) :: storemmat(:,:)
 complex(kind=kreal),intent(in) :: storekmat(:,:,:)
 integer :: i,i_elmt,ielmt,j,n,ndzero
 integer :: ggdof_elmt(NEDOF)
-! Angular frequenc.y
+! Angular frequency.
 PetscReal         freq,scale_freq2
 PetscBool         isscale_freq2
 
@@ -848,7 +848,7 @@ do i_elmt=1,nelmt
   endif
 
   ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))
-  ! petsc index starts from 0
+  ! petsc index starts from 0.
   ggdof_elmt=ggdof_elmt-1
   do i=1,NEDOF
     do j=1,NEDOF
