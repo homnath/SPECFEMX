@@ -848,7 +848,7 @@ do i_elmt=1,nelmt
   endif
 
   ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))
-  ! petsc index starts from 0.
+  ! PETSc index starts from 0.
   ggdof_elmt=ggdof_elmt-1
   do i=1,NEDOF
     do j=1,NEDOF
