@@ -6,12 +6,11 @@
 !  - Ordinary shear strain components can be obtained by multiplying the
 !    engineering strain with 0.5 if necessary.
 program specfemx
-! import necessary modules
+! Import necessary modules.
 use dimensionless
 use global
 use package_version
 use string_library, only : parse_file
-!use math_constants
 use input
 use mesh_spec
 use element
