@@ -41,7 +41,6 @@ PetscInt :: ngdof_part
 PetscInt :: ig0,ig1
 PetscInt,allocatable :: nnzero_diag(:),nnzero_offdiag(:)
 PetscErrorCode   ierr
-!integer :: ierr
 character(len=250),private :: myfname=" => parsolver_petsc.f90"
 character(len=500),private :: errsrc
 contains
