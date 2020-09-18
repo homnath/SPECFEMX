@@ -115,7 +115,6 @@ PetscScalar,allocatable :: rg_interface(:),rnself_lgarray(:)
 PetscScalar,pointer :: rninterface_darray(:),rninterface_oarray(:)
 
 character(len=10) :: ptail
-!character(len=60) :: outf_name
 PetscInt :: count_diag,count_nsparse
 
 errsrc=trim(myfname)//' => petsc_matrix_preallocate_size'
@@ -123,9 +122,9 @@ errsrc=trim(myfname)//' => petsc_matrix_preallocate_size'
 write(ptail,'(i4)')myrank
 ptail=adjustl(ptail)
 
-! predetermine or read compressed size of the sparse matrix
+! Predetermine or read compressed size of the sparse matrix.
 
-! count number of nonzeros per row
+! Count number of nonzeros per row.
 allocate(nzeros(neq),stat=ierr)
 call check_allocate(ierr,errsrc)
 
