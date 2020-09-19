@@ -142,7 +142,7 @@ if(myrank==0)then
 endif
 deallocate(nzeros)
 
-! precompute ownership range OR partion layout
+! Precompute ownership range OR partition layout.
 ng1=ngdof/nproc
 ng0=ceiling(real(ngdof)/real(nproc))
 
@@ -150,12 +150,12 @@ np0=ngdof-nproc*ng1
 
 if(np0.eq.0)then
 ! ng0=ng1
-! all processors have equal gdofs
+! All processors have equal gdofs.
   ng=ng0
   ig0=myrank*ng0 ! 0-based index
   ig1=ig0+ng0-1
 elseif(np0.gt.0)then
-! first np0 processors have ng0 gdofs each and remainging processors have ng1
+! First np0 processors have ng0 gdofs each and remainging processors have ng1
 ! gdofs each
   maxrank0=np0-1 ! myrank is 0-based
   if(myrank.le.maxrank0)then
