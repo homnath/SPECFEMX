@@ -156,7 +156,7 @@ if(np0.eq.0)then
   ig1=ig0+ng0-1
 elseif(np0.gt.0)then
 ! First np0 processors have ng0 gdofs each and remainging processors have ng1
-! gdofs each
+! gdofs each.
   maxrank0=np0-1 ! myrank is 0-based
   if(myrank.le.maxrank0)then
     ng=ng0
@@ -168,7 +168,7 @@ elseif(np0.gt.0)then
     ig1=ig0+ng1-1
   endif
 else
-! Error
+! Error.
   write(logunit,*)'ERROR: illegal value of "np0"!'
   flush(logunit)
   stop
