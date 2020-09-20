@@ -190,7 +190,7 @@ CHKERRA(ierr)
 call VecDuplicate(xvec,ninterface_ovec,ierr)
 CHKERRA(ierr)
 
-! assign owner processor ID to each gdof (or row)
+! Assign owner processor ID to each gdof (or row).
 allocate(ig_array(ng),rproc_array(ng),stat=ierr)
 call check_allocate(ierr,errsrc)
 ig_array=(/ (i,i=ig0,ig1) /)
