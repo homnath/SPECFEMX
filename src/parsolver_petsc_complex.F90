@@ -204,14 +204,14 @@ call VecAssemblyEnd(iproc_gvec,ierr)
 CHKERRA(ierr)
 call VecMin(iproc_gvec,PETSC_NULL_INTEGER,pmin,ierr)
 call VecMax(iproc_gvec,PETSC_NULL_INTEGER,pmax,ierr)
-! copy solution to local array
+! Copy solution to local array.
 allocate(iproc_array(neq),rproc_array(neq),stat=ierr)
 call check_allocate(ierr,errsrc)
 call scatter_globalvec(iproc_gvec,rproc_array)
 iproc_array=int(rproc_array)
 deallocate(rproc_array)
 call VecDestroy(iproc_gvec,ierr)
-! assign interface ID to each gdofs
+! Assign interface ID to each gdofs.
 rval=1.0
 ! all DOFs
 do i=1,ngpart
