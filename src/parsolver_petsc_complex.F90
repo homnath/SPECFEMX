@@ -213,7 +213,7 @@ deallocate(rproc_array)
 call VecDestroy(iproc_gvec,ierr)
 ! Assign interface ID to each gdofs.
 rval=1.0
-! all DOFs
+! All DOFs
 do i=1,ngpart
    nibool=gpart(i)%nnode
     allocate(ibool_interface(nibool),stat=ierr)
@@ -233,7 +233,7 @@ CHKERRA(ierr)
 call VecAssemblyEnd(interface_gvec,ierr)
 CHKERRA(ierr)
 
-! copy solution to local array
+! Copy solution to local array
 allocate(isg_interface(neq),rg_interface(neq),stat=ierr)
 call check_allocate(ierr,errsrc)
 call scatter_globalvec(interface_gvec,rg_interface)
