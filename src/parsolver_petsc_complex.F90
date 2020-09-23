@@ -233,7 +233,7 @@ CHKERRA(ierr)
 call VecAssemblyEnd(interface_gvec,ierr)
 CHKERRA(ierr)
 
-! Copy solution to local array
+! Copy solution to local array.
 allocate(isg_interface(neq),rg_interface(neq),stat=ierr)
 call check_allocate(ierr,errsrc)
 call scatter_globalvec(interface_gvec,rg_interface)
@@ -241,9 +241,9 @@ isg_interface=int(rg_interface)
 deallocate(rg_interface)
 call VecDestroy(interface_gvec,ierr)
 
-! estimate correction for the number of nonzero entries in the diagonal and
-! nondiagonal portion
-! self interface
+! Estimate correction for the number of nonzero entries in the diagonal and
+! nondiagonal portion.
+! Self interface.
 rval=1.0
 do i=1,neq
   if(isg_interface(i).eq.1)then
