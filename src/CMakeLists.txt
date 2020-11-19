@@ -47,8 +47,8 @@ IF(ISPARALLEL)
      ghost_library_mpi.f90
      prepare_sparse.f90
      parsolver.f90
-     parsolver_petsc.F90
-     parsolver_petsc_complex.F90)
+     parsolver_petsc.F90)
+     #parsolver_petsc_complex.F90)
   ADD_LIBRARY(parsem ${srcparsem})
   ADD_DEPENDENCIES(parsem sem)
   TARGET_INCLUDE_DIRECTORIES(parsem PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
