@@ -611,7 +611,7 @@ elseif(eqsource_type==1)then
   ! read CMT sources
   call read_cmtsolution(source_coord,M_cmt,errcode,errtag)
   if(errcode.ne.0)return
-  ! NOTE: all quanitites are nondimensionalized within read_cmtsolution routine
+  ! NOTE: all quantities are nondimensionalized within read_cmtsolution routine
 
   ! plot VTK file: CMT sources
   pfile=trim(out_path)//trim(file_head)//'_cmt_sources'//trim(ptail)//'.vtk'
