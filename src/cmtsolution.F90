@@ -119,7 +119,7 @@ real(kind=kreal) :: shape_quad4(4)
 real(kind=kreal) :: elevation
 
 integer :: iorientation
-real(kind=kreal) :: r_source,x_source,y_source,z_source
+real(kind=kreal) :: r_source
 real(kind=kreal) :: st,ct,sp,cp
 real(kind=kreal) :: stazi,stdip,thetan,phin,n(3)
 double precision :: r0,dcost,p20
@@ -420,17 +420,19 @@ src:do i_src=1,ncmt_source
     phi = long*DEG2RAD
     call reduce(theta,phi)
 
-    ! convert from a spherical to a Cartesian representation of the moment tensor
+    ! convert from a spherical to a Cartesian representation of 
+    ! the moment tensor
     st = dsin(theta)
     ct = dcos(theta)
     sp = dsin(phi)
     cp = dcos(phi)
-    M_cmt(1,i_src)= Mpp !Mxx
-    M_cmt(2,i_src)= Mtt !Myy
-    M_cmt(3,i_src)= Mrr !Mzz
-    M_cmt(4,i_src)=-Mtp !Mxy
-    M_cmt(5,i_src)=-Mrt !Myz
-    M_cmt(6,i_src)= Mrp !Mzx
+    
+    !M_cmt(1,i_src)= Mpp !Mxx
+    !M_cmt(2,i_src)= Mtt !Myy
+    !M_cmt(3,i_src)= Mrr !Mzz
+    !M_cmt(4,i_src)=-Mtp !Mxy
+    !M_cmt(5,i_src)=-Mrt !Myz
+    !M_cmt(6,i_src)= Mrp !Mzx
 
     M_cmt(1,i_src) = st*st*cp*cp*Mrr+ct*ct*cp*cp*Mtt+sp*sp*Mpp &
         +2.0d0*st*ct*cp*cp*Mrt-2.0d0*st*sp*cp*Mrp-2.0d0*ct*sp*cp*Mtp
@@ -464,20 +466,20 @@ src:do i_src=1,ncmt_source
         return
       endif
 
-      !   get the orientation of the seismometer
+      ! get the orientation of the seismometer
       thetan = (90.0d0+stdip)*DEG2RAD
       phin = stazi*DEG2RAD
 
       ! we use the same convention as in Harvard normal modes for the orientation
 
-      !   vertical component
+      ! vertical component
       n(1) = dcos(thetan)
       !   N-S component
       n(2) = - dsin(thetan)*dcos(phin)
       !   E-W component
       n(3) = dsin(thetan)*dsin(phin)
 
-      !   get the Cartesian components of n in the model: nu
+      ! get the Cartesian components of n in the model: nu
       nu_source(iorientation,1,i_src) = n(1)*st*cp + n(2)*ct*cp - n(3)*sp
       nu_source(iorientation,2,i_src) = n(1)*st*sp + n(2)*ct*sp + n(3)*cp
       nu_source(iorientation,3,i_src) = n(1)*ct - n(2)*st
@@ -508,107 +510,113 @@ src:do i_src=1,ncmt_source
     r_source = r0 - depth*1000.0d0/R_EARTH
 
     ! compute the Cartesian position of the source
-    x_source = r_source*dsin(theta)*dcos(phi)
-    y_source = r_source*dsin(theta)*dsin(phi)
-    z_source = r_source*dcos(theta)
+    source_coord(1,i_src) = r_source*dsin(theta)*dcos(phi)
+    source_coord(2,i_src) = r_source*dsin(theta)*dsin(phi)
+    source_coord(3,i_src) = r_source*dcos(theta)
 
+    ! Nondimensionalize
+    M_cmt(:,i_src)=NONDIM_MTENS*CGS2SI_MOMENT*M_cmt(:,i_src)
+    source_coord(:,i_src)=NONDIM_L*source_coord(:,i_src)
   elseif(trim(cmt_mapto).eq.'UTM')then
+    ! Nondimentionalize M
+    ! NOTE: unit of M is in CGS units. We should convert them to SI unit.
+    Mpp=NONDIM_MTENS*CGS2SI_MOMENT*Mpp
+    Mtt=NONDIM_MTENS*CGS2SI_MOMENT*Mtt
+    Mrr=NONDIM_MTENS*CGS2SI_MOMENT*Mrr
+    Mtp=NONDIM_MTENS*CGS2SI_MOMENT*Mtp
+    Mrt=NONDIM_MTENS*CGS2SI_MOMENT*Mrt
+    Mrp=NONDIM_MTENS*CGS2SI_MOMENT*Mrp
+    
+    !  Mrr =  Mzz
+    !  Mtt =  Myy
+    !  Mpp =  Mxx
+    !  Mrt = -Myz
+    !  Mrp =  Mxz
+    !  Mtp = -Mxy
+
+    ! Store 6 unique moment-tensor components in the order
+    ! 1: Mxx
+    ! 2: Myy
+    ! 3: Mzz
+    ! 4: Mxy
+    ! 5: Myz
+    ! 6: Mzx
+    M_cmt(1,i_src)= Mpp !Mxx
+    M_cmt(2,i_src)= Mtt !Myy
+    M_cmt(3,i_src)= Mrr !Mzz
+    M_cmt(4,i_src)=-Mtp !Mxy
+    M_cmt(5,i_src)=-Mrt !Myz
+    M_cmt(6,i_src)= Mrp !Mzx
+ 
+    ! Compute UTM coordinates
+    call geodetic2utm(long,lat,utmx(1),utmx(2))
+    print*,utmx 
+    ! Nondimentionalize coordinates
+    utmx=NONDIM_L*utmx
+    depth=NONDIM_L*KM2M*depth
+
+    source_coord(1,i_src)=utmx(1)
+    source_coord(2,i_src)=utmx(2)
+    !source_coord(3,i_src)=-depth
+
+    ! Find Z coordinate
+    ! step 1: find elevation
+    ! NOTE: All the processors will try to find elevation, but only a single
+    ! processor or processors shared by the point will find the correct elevation.
+    ! Otherwise the elevation is set to ZERO.
+    call free_surface_elevation(utmx,elevation,isrc_located(i_src))
+
+    source_coord(3,i_src)=elevation-depth
+    !print*,depth,source_coord(3,i_src)  
+    !iface=0
+    !do i_face=1,nelmt_fs
+    !  vx=g_coord(1,gnum4_fs(:,i_face))
+    !  vy=g_coord(2,gnum4_fs(:,i_face))
+    !  coord(1,:)=vx
+    !  coord(2,:)=vy
+    !  vz=g_coord(3,gnum4_fs(:,i_face))
+    !  isinside=IsPointInPolygon(vx,vy,utmx(1),utmx(2))
+    !  if(isinside)then
+    !    iface=iface+1
+    !    call  map_point2naturalquad4(coord,utmx,xip,located_x,niter,errx)
+    !    call shape_function_quad4p(4,xip(1),xip(2),shape_quad4)
+    !    elevation=sum(vz*shape_quad4)
+    !    
+    !    source_coord(3,i_src)=elevation-depth
+    !    isrc_located(i_src)=1
+    !  endif
+    !enddo
+    call sync_process
+    this_src_located=sumscal(isrc_located(i_src))
+    iface_all=sumscal(iface) 
+    if(this_src_located.lt.1)then
+      write(logunit,'(a,2(g0.6,1x),i0,1x,i0,1x,i0,1x,i0)')'WARNING: cmt source &
+      &cannot be projected on the free surface:',utmx,i_src,myrank,iface_all,    &
+      this_src_located
+      flush(logunit)
+    endif
 
   elseif(trim(cmt_mapto).eq.'NONE')then
 
   else
 
   endif
-  ! Nondimentionalize M
-  ! NOTE: unit of M is in CGS units. We should convert them to SI unit.
-  Mpp=NONDIM_MTENS*CGS2SI_MOMENT*Mpp
-  Mtt=NONDIM_MTENS*CGS2SI_MOMENT*Mtt
-  Mrr=NONDIM_MTENS*CGS2SI_MOMENT*Mrr
-  Mtp=NONDIM_MTENS*CGS2SI_MOMENT*Mtp
-  Mrt=NONDIM_MTENS*CGS2SI_MOMENT*Mrt
-  Mrp=NONDIM_MTENS*CGS2SI_MOMENT*Mrp
-  
-  !  Mrr =  Mzz
-  !  Mtt =  Myy
-  !  Mpp =  Mxx
-  !  Mrt = -Myz
-  !  Mrp =  Mxz
-  !  Mtp = -Mxy
-
-  ! Store 6 unique moment-tensor components in the order
-  ! 1: Mxx
-  ! 2: Myy
-  ! 3: Mzz
-  ! 4: Mxy
-  ! 5: Myz
-  ! 6: Mzx
-  M_cmt(1,i_src)= Mpp !Mxx
-  M_cmt(2,i_src)= Mtt !Myy
-  M_cmt(3,i_src)= Mrr !Mzz
-  M_cmt(4,i_src)=-Mtp !Mxy
-  M_cmt(5,i_src)=-Mrt !Myz
-  M_cmt(6,i_src)= Mrp !Mzx
- 
-  ! Compute UTM coordinates
-  call geodetic2utm(long,lat,utmx(1),utmx(2))
-  print*,utmx 
-  ! Nondimentionalize coordinates
-  utmx=NONDIM_L*utmx
-  depth=NONDIM_L*KM2M*depth
-
-  source_coord(1,i_src)=utmx(1)
-  source_coord(2,i_src)=utmx(2)
-  !source_coord(3,i_src)=-depth
-
-  ! Find Z coordinate
-  ! step 1: find elevation
-  ! NOTE: All the processors will try to find elevation, but only a single
-  ! processor or processors shared by the point will find the correct elevation.
-  ! Otherwise the elevation is set to ZERO.
-  call free_surface_elevation(utmx,elevation,isrc_located(i_src))
-
-  source_coord(3,i_src)=elevation-depth
-  !print*,depth,source_coord(3,i_src)  
-  !iface=0
-  !do i_face=1,nelmt_fs
-  !  vx=g_coord(1,gnum4_fs(:,i_face))
-  !  vy=g_coord(2,gnum4_fs(:,i_face))
-  !  coord(1,:)=vx
-  !  coord(2,:)=vy
-  !  vz=g_coord(3,gnum4_fs(:,i_face))
-  !  isinside=IsPointInPolygon(vx,vy,utmx(1),utmx(2))
-  !  if(isinside)then
-  !    iface=iface+1
-  !    call  map_point2naturalquad4(coord,utmx,xip,located_x,niter,errx)
-  !    call shape_function_quad4p(4,xip(1),xip(2),shape_quad4)
-  !    elevation=sum(vz*shape_quad4)
-  !    
-  !    source_coord(3,i_src)=elevation-depth
-  !    isrc_located(i_src)=1
-  !  endif
-  !enddo
-  call sync_process
-  this_src_located=sumscal(isrc_located(i_src))
-  iface_all=sumscal(iface) 
-  if(this_src_located.lt.1)then
-    write(logunit,'(a,2(g0.6,1x),i0,1x,i0,1x,i0,1x,i0)')'WARNING: cmt source &
-    &cannot be projected on the free surface:',utmx,i_src,myrank,iface_all,    &
-    this_src_located
-    flush(logunit)
-  endif
 
 enddo src
 close(11)
 call sync_process
 
-isrc_located=maxvec(isrc_located,ncmt_source)
-where(isrc_located.gt.1)isrc_located=1
-total_src_located=sum(isrc_located)
-if(myrank==0)then
-  write(logunit,'(a,i0,1x,a,i0)')'Total defined CMT sources: ',ncmt_source, &
-                           'Total projected CMT sources: ',total_src_located
-  flush(logunit)
+if(.not.trim(cmt_mapto).eq.'GLOBE')then
+  isrc_located=maxvec(isrc_located,ncmt_source)
+  where(isrc_located.gt.1)isrc_located=1
+  total_src_located=sum(isrc_located)
+  if(myrank==0)then
+    write(logunit,'(a,i0,1x,a,i0)')'Total defined CMT sources: ',ncmt_source, &
+                             'Total projected CMT sources: ',total_src_located
+    flush(logunit)
+  endif
 endif
+
 if(nsrc.ne.ncmt_source)then
   write(errtag,*)'ERROR: number of CMT sources mismatch!'
   return
