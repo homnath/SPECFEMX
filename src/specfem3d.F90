@@ -683,7 +683,7 @@ endif
 ! Angular frequency
 if(steptype.eq.FREQSTEP)then
   if(myrank.eq.0)then
-    print*,'timestepping: FREQUENCY'
+    print*,'Step type: FREQUENCY'
     print*,'f0, f1, df (Hz):',step0,step1,dstep
   endif
 endif

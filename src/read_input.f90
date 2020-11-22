@@ -712,6 +712,7 @@ do
       slipfile=get_string('slipfile',args,narg)
     elseif(eqsource_type==1)then
       cmtfile=get_string('cmtfile',args,narg)
+      cmt_mapto=get_string('mapto',args,narg)
     elseif(eqsource_type==2)then
       faultfile=get_string('faultfile',args,narg)
       faultmetafile=get_string('faultmetafile',args,narg)

@@ -19,6 +19,7 @@ SET(srcsem
   integration.f90
   infinite_element.f90
   utmgeo.f90
+  coordinate.f90
   write_ensight.f90
   fault.f90
   weakform.f90

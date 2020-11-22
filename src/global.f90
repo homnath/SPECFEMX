@@ -25,7 +25,7 @@ TWOPI=TWO*PI
 
 ! tolerance value for zero
 real(kind=kreal),parameter :: INFTOL=1.0e32_kreal,ZEROTOL = 1.0e-12_kreal
-
+real(kind=kreal),parameter :: SMALL_VAL_ANGLE = 1.d-10
 ! Gravitational constant: G ( m^3 kg^{-1} s^{-2} )
 ! source: 2014 CODATA recommended values
 ! http://www.physics.nist.gov/cgi-bin/cuu/Value?bg
@@ -120,6 +120,10 @@ use math_constants,only: ONE,PI
 ! R_EARTH is the radius of the bottom of the oceans (radius of Earth in m)
 double precision, parameter :: R_EARTH = 6371000.d0
 real(kind=kreal),parameter :: R_UNIT_SPHERE = ONE
+logical,parameter :: ASSUME_PERFECT_SPHERE=.true.
+logical, parameter :: USE_OLD_VERSION_5_1_5_FORMAT = .false.
+double precision, parameter :: FLATTENING_F = 1.d0 / 299.8d0
+double precision, parameter :: ONE_MINUS_F_SQUARED = (1.d0 - FLATTENING_F)**2
 end module earth_constants
 !===============================================================================
 
@@ -406,6 +410,8 @@ real(kind=kreal) :: z_datum,s0_datum,epk0
 ! earthquake fault variables
 character(len=250) :: slipfile,cmtfile,faultfile,faultmetafile,                &
 faultslipfile_plus,faultslipfile_minus
+! cmt_mapto = 'NONE', 'UTM', 'GLOBE'
+character(len=10) :: cmt_mapto
 integer :: nsource,fault_npatch
 !0: Fault slip, 1: CMT solution, 2: Finite fault, 3: Node split
 integer :: eqsource_type
