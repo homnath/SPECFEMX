@@ -102,7 +102,7 @@ jac(:,:)
 !storekmat: stiffness matrix for all elements
 real(kind=kreal),allocatable :: kmat(:,:),storekmat(:,:,:)
 !storemmat: mass matrix for all elements
-real(kind=kreal),allocatable :: storemmat(:)
+real(kind=kreal),allocatable :: storemmat(:,:)
 
 !uerr: used to check convergence
 !umax: max of displacement magnitude
@@ -573,7 +573,7 @@ allocate(cohf(nmatblk),nuf(nmatblk),phif(nmatblk),psif(nmatblk),ymf(nmatblk))
 
 allocate(load(0:neq),bodyload(0:neq),viscoload(0:neq),             &
 resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),            &
-storekmat(nedof,nedof,nelmt),storemmat(nnode),stat=istat)
+storekmat(nedof,nedof,nelmt),storemmat(nedof,nelmt),stat=istat)
 if(istat/=0)then
   write(logunit,*)'ERROR: cannot allocate memory!'
   flush(logunit)
@@ -688,6 +688,9 @@ if(steptype.eq.FREQSTEP)then
   endif
 endif
 
+! Compute mass matrix
+call compute_mass_elastic(storemmat,errcode,errtag)
+
 ! Starting time/frequency loop.
 loop_step: do i_step=istep0,nstep
   !t=dt*real(i_step,kreal)
@@ -718,39 +721,60 @@ loop_step: do i_step=istep0,nstep
     write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' t: ',t
     flush(logunit)
   endif
-
-  if(i_step==1)then
+  
+  if(steptype.eq.FREQSTEP)then
     ! compute elastic stiffness matrix for time = 0
-    call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
-    !if(istraction.and.trcase.eq.TRACTION_INTERNAL)then
-    !  call compute_surface_stiffness(storekmat,errcode,errtag)
-    !  symmetric_solver=.false.
-    !  call control_error(errcode,errtag,stdout,myrank)
-    !endif
+    if(i_step==0)then
+      call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+      !if(istraction.and.trcase.eq.TRACTION_INTERNAL)then
+      !  call compute_surface_stiffness(storekmat,errcode,errtag)
+      !  symmetric_solver=.false.
+      !  call control_error(errcode,errtag,stdout,myrank)
+      !endif
+    endif
     if(solver_type.eq.petsc_solver)then
-      call petsc_set_stiffness_matrix(storekmat)
+      call petsc_set_stiffness_matrix_freq(storekmat,storemmat,ang_freq, &
+      scale_ang_freq2,.false.)
       if(myrank==0)then
         write(logunit,'(a)')' petsc_set_stiffness_matrix: SUCCESS!'
         flush(logunit)
       endif
       call petsc_set_ksp_operator(reuse_pc=.false.)
     endif
-  elseif(i_step==2)then
-    ! Since we use a uniform dt, following routine has to be called only once 
-    ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
-    ! it has to be called for every time steps or every changing time step.
-    ! This will simply overwrite the storekmat for viscoelastic elements.
-    call compute_stiffness_viscoelastic(nelmt_viscoelas,eid_viscoelas,         &
-         dt,relaxtime,storekmat,errcode,errtag)
-    if(solver_type.eq.petsc_solver)then
-      call petsc_set_stiffness_matrix(storekmat)
-      if(myrank==0)then
-        write(logunit,'(a)')' petsc_set_stiffness_matrix: SUCCESS!'
-        flush(logunit)
+  else ! if(steptype.eq.FREQSTEP)
+    if(i_step==1)then
+      ! compute elastic stiffness matrix for time = 0
+      call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+      !if(istraction.and.trcase.eq.TRACTION_INTERNAL)then
+      !  call compute_surface_stiffness(storekmat,errcode,errtag)
+      !  symmetric_solver=.false.
+      !  call control_error(errcode,errtag,stdout,myrank)
+      !endif
+      if(solver_type.eq.petsc_solver)then
+        call petsc_set_stiffness_matrix(storekmat)
+        if(myrank==0)then
+          write(logunit,'(a)')' petsc_set_stiffness_matrix: SUCCESS!'
+          flush(logunit)
+        endif
+        call petsc_set_ksp_operator(reuse_pc=.false.)
       endif
-      call petsc_set_ksp_operator(reuse_pc=.true.)
+    elseif(i_step==2)then
+      ! Since we use a uniform dt, following routine has to be called only once 
+      ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
+      ! it has to be called for every time steps or every changing time step.
+      ! This will simply overwrite the storekmat for viscoelastic elements.
+      call compute_stiffness_viscoelastic(nelmt_viscoelas,eid_viscoelas,         &
+           dt,relaxtime,storekmat,errcode,errtag)
+      if(solver_type.eq.petsc_solver)then
+        call petsc_set_stiffness_matrix(storekmat)
+        if(myrank==0)then
+          write(logunit,'(a)')' petsc_set_stiffness_matrix: SUCCESS!'
+          flush(logunit)
+        endif
+        call petsc_set_ksp_operator(reuse_pc=.true.)
+      endif
     endif
-  endif
+  endif ! if(steptype.eq.FREQSTEP)
 
   ! apply traction boundary conditions
   ! WARNING: i_step==1 is ONLY for rod example

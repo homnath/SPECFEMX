@@ -1177,7 +1177,77 @@ use integration,only:dshape_hex8,lagrange_gll,dlagrange_gll,gll_weights,       &
 prepare_integration
 !use ieee_arithmetic
 implicit none
-real(kind=kreal),intent(out) :: storemmat(:)
+real(kind=kreal),intent(out) :: storemmat(:,:)
+integer,intent(out) :: errcode
+character(len=250),intent(out) :: errtag
+integer :: i,i_gll
+integer :: i_elmt,ielmt,imat,ignode
+integer :: num(nenode)
+real(kind=kreal) :: detjac !determinant of Jacobian
+real(kind=kreal) :: coord(ngnode,NDIM),jac(NDIM,NDIM)
+
+real(kind=kreal) :: xval
+real(kind=kreal) :: mass
+real(kind=kreal) :: interpf(NGLL),deriv(NDIM,nenode)
+
+! jacw=jacobian*weight
+real(kind=kreal) :: jacw
+integer :: nip
+
+errtag="ERROR: unknown!"
+errcode=-1
+errsrc=trim(myfname)//' => compute_mass_elastic'
+
+storemmat=zero
+! Elastic elements
+! Following loops through nelmt
+do i_elmt=1,nelmt
+  ielmt=i_elmt
+  num=g_num(:,ielmt)
+  coord=transpose(g_coord(:,num(hex8_gnode)))
+  nip=ngll
+  
+  mass=ZERO
+  do i=1,nip
+      ignode=num(i)
+      ! standard element
+      interpf=lagrange_gll(i,:)
+    
+      jac=matmul(dshape_hex8(:,:,i),coord)
+      detjac=determinant(jac)
+      call invert(jac)
+      deriv=matmul(jac,dlagrange_gll(:,i,:))
+      
+      jacw=detjac*gll_weights(i)
+     
+      mass=mass+massdens_elmt(i,ielmt)*jacw
+  enddo
+  storemmat(:,i_elmt)=mass
+enddo ! i_elmt
+
+end subroutine compute_mass_elastic
+!===============================================================================
+
+! This subrotine computes the mass matrix.
+subroutine compute_mass_elastic_global(storemmat_global,errcode,errtag)
+use set_precision
+use global,only:myrank,NDIM,nst,nelmt,ngll,nenode,ngnode,&
+ngllx,nglly,ngllz,ngll,g_coord,gdof_elmt,g_num,massdens_elmt,&
+storejw,devel_nondim, &
+isdxval,isdyval,isdzval,devel_gaminf,infquad, &
+edofu,edofphi,grav0_nodal,dgrav0_elmt,ISGRAV0,&
+imat_to_imatmag,magnetization_blk,ismagnet_blk
+use element,only:hex8_gnode,map2exodus_hex8
+use math_constants,only:HALF,ONE,ZERO,FOUR,GRAV_CONS,PI
+use math_library,only:determinant,invert,issymmetric
+use weakform
+use shape_library
+use gll_library
+use integration,only:dshape_hex8,lagrange_gll,dlagrange_gll,gll_weights,       &
+prepare_integration
+!use ieee_arithmetic
+implicit none
+real(kind=kreal),intent(out) :: storemmat_global(:)
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 integer :: i,i_gll
@@ -1197,7 +1267,7 @@ errtag="ERROR: unknown!"
 errcode=-1
 errsrc=trim(myfname)//' => compute_mass_elastic'
 
-storemmat=zero
+storemmat_global=zero
 ! Elastic elements
 ! Following loops through nelmt
 do i_elmt=1,nelmt
@@ -1218,11 +1288,11 @@ do i_elmt=1,nelmt
       
       jacw=detjac*gll_weights(i)
      
-      storemmat(ignode)=storemmat(ignode)+massdens_elmt(i,ielmt)*jacw
+      storemmat_global(ignode)=storemmat_global(ignode)+massdens_elmt(i,ielmt)*jacw
   enddo
 enddo ! i_elmt
 
-end subroutine compute_mass_elastic
+end subroutine compute_mass_elastic_global
 !===============================================================================
 end module preprocess
 !===============================================================================
