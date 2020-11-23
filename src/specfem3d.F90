@@ -150,7 +150,7 @@ integer,allocatable :: egdof(:),egdofu(:)
 ! placeholder array. holds values of gdof_elmt for a given element.
 
 ! Frequency
-logical :: isscale_freq2=.true.
+logical :: isscale_ang_freq=.true.
 real(kind=kreal) :: freq,ang_freq,scale_ang_freq2
 
 logical :: isgravity,ispseudoeq ! gravity load and pseudostatic load
@@ -738,7 +738,7 @@ loop_step: do i_step=istep0,nstep
     endif
     if(solver_type.eq.petsc_solver)then
       call petsc_set_stiffness_matrix_freq(storekmat,storemmat,ang_freq, &
-      scale_ang_freq2,.false.)
+      scale_ang_freq2,isscale_ang_freq)
       if(myrank==0)then
         write(logunit,'(a)')' petsc_set_stiffness_matrix: SUCCESS!'
         flush(logunit)
@@ -993,6 +993,9 @@ loop_step: do i_step=istep0,nstep
       !petsc solver
       !call petsc_set_stiffness_matrix(storekmat)
       !if(myrank==0)print*,'petsc_set_stiffness_matrix: SUCCESS!'
+      if(steptype.eq.FREQSTEP.and.isscale_ang_freq)then
+        resload=scale_ang_freq2*resload
+      endif
       call petsc_set_vector(resload)
       if(myrank==0)then
         write(logunit,'(a)')' petsc_set_vector: SUCCESS!'
