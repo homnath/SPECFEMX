@@ -1267,7 +1267,6 @@ source: do i_src=1,nsource
   ! Loop through the list of elements
   ! STRICT TEST: Element must be a proper hexagon, i.e., must have six faces. 
   ipass_strict=0
-  print*,'hello:',nelmt_srctry
   element_try1: do i_elmt=1,nelmt_srctry
     ielmt=ielmt_srctry(i_elmt)
 

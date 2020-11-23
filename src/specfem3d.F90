@@ -699,9 +699,17 @@ loop_step: do i_step=istep0,nstep
     ! Time step.
     t=step
     dt=dstep
+    if(myrank==0)then
+      write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' t: ',t
+      flush(logunit)
+    endif
   elseif(steptype.eq.FREQSTEP)then
     ! Frequency step.
     freq=step
+    if(myrank==0)then
+      write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' f: ',freq
+      flush(logunit)
+    endif
     if(devel_nondim)then
       ang_freq=TWO*freq*DIM_T
     else
@@ -717,10 +725,6 @@ loop_step: do i_step=istep0,nstep
   ubcload=ZERO
   !extload=ZERO
   rhoload=ZERO
-  if(myrank==0)then
-    write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' t: ',t
-    flush(logunit)
-  endif
   
   if(steptype.eq.FREQSTEP)then
     ! compute elastic stiffness matrix for time = 0

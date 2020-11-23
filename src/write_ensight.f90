@@ -69,7 +69,7 @@ end subroutine write_ensight_casefile
 
 subroutine write_ensight_casefile_long(case_file,geo_file,add_tag,isgeo_change,&
 ts,ns,fs,fi,twidth,errcode,errtag,freesurf,isplane)
-use global,only:file_head,ptail,savedata,benchmark_okada,dstep
+use global,only:file_head,ptail,savedata,benchmark_okada,dstep,step0
 implicit none
 character(len=250),intent(in) :: case_file,geo_file
 character(len=60),intent(in) :: add_tag 
@@ -200,7 +200,7 @@ write(11,'(a)',advance='no')'time values: '
 !  enddo
 !else
   do i=0,ns-1
-    write(11,'(es12.5)',advance='yes')real(i)*dstep
+    write(11,'(es12.5)',advance='yes')step0+real(i)*dstep
   enddo
 !endif
 close(11)

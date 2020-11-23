@@ -789,7 +789,7 @@ do
       step1=get_real('end',args,narg)
       call seek_string('funit',strval,args,narg)
       if (.not. isblank(strval))funit=trim(strval)
-      nstep=1+(step1-step0)/dstep
+      nstep=1+nint((step1-step0)/dstep)
     elseif(steptype.eq.TIMESTEP)then
       nstep=get_integer('nstep',args,narg)
       call seek_string('tunit',strval,args,narg)
