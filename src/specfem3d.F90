@@ -761,6 +761,7 @@ loop_step: do i_step=istep0,nstep
           flush(logunit)
         endif
         call petsc_set_ksp_operator(reuse_pc=.false.)
+        call petsc_set_solver()
       endif
     elseif(i_step==2)then
       ! Since we use a uniform dt, following routine has to be called only once 
@@ -776,6 +777,7 @@ loop_step: do i_step=istep0,nstep
           flush(logunit)
         endif
         call petsc_set_ksp_operator(reuse_pc=.true.)
+        call petsc_set_solver()
       endif
     endif
   endif ! if(steptype.eq.FREQSTEP)

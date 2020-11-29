@@ -554,7 +554,7 @@ errsrc=trim(myfname)//' => petsc_create_solver'
 ! Create linear solver context
 call KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
 CHKERRA(ierr)
-call KSPSetInitialGuessNonzero(ksp,PETSC_TRUE,ierr)
+!call KSPSetInitialGuessNonzero(ksp,PETSC_TRUE,ierr)
 
 ! diagonally scale the matrix
 ! since the euqutions are nondimensionalized, the scaling is not necessary?
@@ -564,7 +564,8 @@ CHKERRA(ierr)
 ! define solver type
 ! this will be overwritten by the command line arguments if provided
 ! default solver type
-petsc_solver_type=1
+!petsc_solver_type=1
+petsc_solver_type=MUMPS
 
 if(petsc_solver_type==0)then
   if(myrank==0)then
@@ -646,35 +647,59 @@ elseif(petsc_solver_type.eq.MUMPS)then
     write(logunit,'(a)')'Solver type: MUMPS'
     flush(logunit)
   endif
-  flg_lu    = PETSC_FALSE;
-  flg_ch = PETSC_FALSE;
-  ! version < 3.8.0
-  !call PetscOptionsGetBool(PETSC_NULL_CHARACTER,"-use_mumps_ch",flg_ch,flg,ierr);
-  call PetscOptionsGetBool(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &
-  "-use_mumps_ch",flg_ch,flg,ierr);
-  if(flg_lu .or. flg_ch)then
-    call KSPSetType(ksp,KSPPREONLY,ierr);
-    call KSPGetPC(ksp,pc,ierr);
-    if(flg_lu)then
-      call PCSetType(pc,PCLU,ierr);
-    elseif(flg_ch)then
-      call MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr); ! set MUMPS id%SYM=1
-      call PCSetType(pc,PCCHOLESKY,ierr);
-    endif
-    call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
-    CHKERRA(ierr)
-    ! version < 3.9
-    !call PCFactorSetMatSolverPackage(pc,MATSOLVERMUMPS,ierr);
-    !call PCFactorSetUpMatSolverPackage(pc,ierr); ! call MatGetFactor() to create F
-    call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr);
-    call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
-  
-    call PCFactorGetMatrix(pc,Fmat,ierr);
-    icntl = 7; ival = 2;
-    call MatMumpsSetIcntl(Fmat,icntl,ival,ierr);
-    icntl = 1; val = 0.0;
-    call MatMumpsSetCntl(Fmat,icntl,val,ierr);
-  endif
+!  flg_lu    = PETSC_FALSE;
+!  flg_ch = PETSC_FALSE;
+!  ! version < 3.8.0
+!  !call PetscOptionsGetBool(PETSC_NULL_CHARACTER,"-use_mumps_ch",flg_ch,flg,ierr);
+!  call PetscOptionsGetBool(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &
+!  "-use_mumps_ch",flg_ch,flg,ierr);
+!  if(flg_lu .or. flg_ch)then
+!    call KSPSetType(ksp,KSPPREONLY,ierr);
+!    call KSPGetPC(ksp,pc,ierr);
+!    if(flg_lu)then
+!      call PCSetType(pc,PCLU,ierr);
+!    elseif(flg_ch)then
+!      call MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr); ! set MUMPS id%SYM=1
+!      call PCSetType(pc,PCCHOLESKY,ierr);
+!    endif
+!    call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
+!    CHKERRA(ierr)
+!    ! version < 3.9
+!    !call PCFactorSetMatSolverPackage(pc,MATSOLVERMUMPS,ierr);
+!    !call PCFactorSetUpMatSolverPackage(pc,ierr); ! call MatGetFactor() to create F
+!    call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr);
+!    call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
+!  
+!    call PCFactorGetMatrix(pc,Fmat,ierr);
+!    icntl = 7; ival = 2;
+!    call MatMumpsSetIcntl(Fmat,icntl,ival,ierr);
+!    icntl = 1; val = 0.0;
+!    call MatMumpsSetCntl(Fmat,icntl,val,ierr);
+!  endif
+  call KSPSetType(ksp,KSPPREONLY,ierr)
+  call KSPGetPC(ksp,pc,ierr)
+  call PCSetType(pc,PCLU,ierr)
+!  call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr)
+!  call PCFactorSetUpMatSolverType(pc,ierr)
+!  call PCFactorGetMatrix(pc,Fmat,ierr)
+!
+!  !sequential ordering
+!  icntl = 7
+!  ival  = 2
+!   call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+!
+!  !threshold for row pivot detection
+!  icntl = 24
+!  ival  = 1
+!  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+!  icntl = 3
+!  val = 1.e-6
+!  call MatMumpsSetCntl(Fmat,icntl,val,ierr)
+!
+!  !compute determinant of A
+!  icntl = 33
+!  ival  = 1
+!  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
 endif
 
 call KSPSetTolerances(ksp,KSP_RTOL,KSP_ATOL,KSP_DTOL,KSP_MAXITER,ierr)
@@ -688,6 +713,64 @@ CHKERRA(ierr)
 call KSPSetFromOptions(ksp,ierr)
 
 end subroutine petsc_create_solver
+!===============================================================================
+
+subroutine petsc_set_solver()
+implicit none
+
+errsrc=trim(myfname)//' => petsc_set_solver'
+
+! define solver type
+! this will be overwritten by the command line arguments if provided
+! default solver type
+!petsc_solver_type=1
+petsc_solver_type=MUMPS
+
+if(petsc_solver_type.eq.SUPERLU)then
+  if(myrank==0)then
+    write(logunit,'(a)')'Solver type: SUPERLU'
+    flush(logunit)
+  endif
+    call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
+    CHKERRA(ierr)
+    call PCFactorSetMatSolverType(pc,MATSOLVERSUPERLU,ierr);
+    CHKERRA(ierr)
+    call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
+    CHKERRA(ierr)
+ 
+    call PCFactorGetMatrix(pc,Fmat,ierr);
+    CHKERRA(ierr)
+    !call MatSuperluSetILUDropTol(Fmat,1.e-8,ierr);
+    !CHKERRA(ierr)
+elseif(petsc_solver_type.eq.MUMPS)then
+  if(myrank==0)then
+    write(logunit,'(a)')'Solver type: MUMPS'
+    flush(logunit)
+  endif
+  call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr)
+  call PCFactorSetUpMatSolverType(pc,ierr)
+  call PCFactorGetMatrix(pc,Fmat,ierr)
+
+  !sequential ordering
+  icntl = 7
+  ival  = 2
+   call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+
+  !threshold for row pivot detection
+  icntl = 24
+  ival  = 1
+  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+  icntl = 3
+  val = 1.e-6
+  call MatMumpsSetCntl(Fmat,icntl,val,ierr)
+
+  !compute determinant of A
+  icntl = 33
+  ival  = 1
+  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+endif
+
+end subroutine petsc_set_solver
 !===============================================================================
 
 subroutine petsc_set_ksp_operator(reuse_pc)
