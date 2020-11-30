@@ -346,9 +346,6 @@ if(xp(1).lt.minval(xcorner(1,:)) .or. xp(1).gt.maxval(xcorner(1,:)) .or.     &
   !print*,'outrange!'
   return
 endif
-!print*,'at least!'
-!print*,xp
-!print*,xcorner
 ! check through all the faces
 do i_face=1,6
   x0=xcorner(:,fnode3(1,i_face))
