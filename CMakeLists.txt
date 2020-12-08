@@ -144,6 +144,12 @@ IF(ENABLE_PETSC)
   ENDIF()
 ENDIF(ENABLE_PETSC)
 
+# Complex number solver
+SET(ENABLE_COMPLEX_NUMBER OFF CACHE BOOL "Enable complex number solver")
+IF(ENABLE_COMPLEX_NUMBER)
+  SET(ISCOMPLEX ON)
+ENDIF(ENABLE_COMPLEX_NUMBER)
+
 # process CMakeLists.txt in other subdirectories
 ADD_SUBDIRECTORY(doc)
 ADD_SUBDIRECTORY(src)
