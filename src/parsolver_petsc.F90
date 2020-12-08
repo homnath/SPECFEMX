@@ -556,13 +556,13 @@ call KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
 CHKERRA(ierr)
 !call KSPSetInitialGuessNonzero(ksp,PETSC_TRUE,ierr)
 
-! diagonally scale the matrix
-! since the euqutions are nondimensionalized, the scaling is not necessary?
+! Diagonally scale the matrix
+! Since the equations are nondimensionalized, the scaling is not necessary?
 call KSPSetDiagonalScale(ksp,PETSC_TRUE,ierr)
 CHKERRA(ierr)
 
-! define solver type
-! this will be overwritten by the command line arguments if provided
+! Define solver type
+! This will be overwritten by the command line arguments if provided
 ! default solver type
 !petsc_solver_type=1
 petsc_solver_type=MUMPS
