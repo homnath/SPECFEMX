@@ -405,7 +405,7 @@ $(BIN)/specfem3d.o: specfem3d.F90
 $(BIN)/pspecfem3d.o: specfem3d.F90
 	$(FC_COMPILE) ${INCPETSC} -DUSE_MPI -c -o $(BIN)/pspecfem3d.o specfem3d.F90
 
-# following objective files are compiled from the same file but with
+# The following objective files are compiled from the same file but with
 # different compiler preprocessing directives options.
 $(BIN)/specfem-x.o: specfem-x.F90
 	$(FC_COMPILE) -c -o $(BIN)/specfem-x.o specfem-x.F90
