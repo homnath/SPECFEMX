@@ -85,6 +85,12 @@ ELSE(ISPARALLEL)
   ADD_DEPENDENCIES(both sem serial)
 ENDIF(ISPARALLEL)
 
+IF(ISCOMPLEX)
+
+ELSE(ISCOMPLEX)
+
+ENDIF(ISCOMPLEX)
+
 # Build geotech library
 #SET(srcgeotech "")
 #message("${srcgeotech}")
