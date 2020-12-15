@@ -39,7 +39,7 @@ SET(srcsem
   postprocess.f90)
 ADD_LIBRARY(sem ${srcsem})
 
-# build parsem library
+# Build parsem library
 IF(ISPARALLEL)
   SET(srcparsem
      set_precision_mpi.f90
@@ -54,7 +54,7 @@ IF(ISPARALLEL)
   ADD_DEPENDENCIES(parsem sem)
   TARGET_INCLUDE_DIRECTORIES(parsem PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
   TARGET_LINK_LIBRARIES(parsem ${PETSC_ARCH}/lib/libpetsc.so)
-# build serial library
+# Build serial library
 ELSE(ISPARALLEL)
   SET(srcserial
      serial_library.f90
@@ -72,7 +72,7 @@ SET(srcboth
    earthquake_load.F90
    station.F90
    benchmark.F90)
-#compiler preprocessor directives
+# Compiler preprocessor directives
 #ADD_DEFINITIONS(CMAKE_Fortran_FLAGS "-DUSE_MPI")
 IF(ISPARALLEL)
   SET_PROPERTY(SOURCE ${srcboth} PROPERTY COMPILE_DEFINITIONS USE_MPI)
@@ -85,7 +85,7 @@ ELSE(ISPARALLEL)
   ADD_DEPENDENCIES(both sem serial)
 ENDIF(ISPARALLEL)
 
-# build geotech library
+# Build geotech library
 #SET(srcgeotech "")
 #message("${srcgeotech}")
 #IF(BUILD_EXCAVATION)
@@ -96,14 +96,14 @@ ENDIF(ISPARALLEL)
 #ENDIF(BUILD_SLOPE)
 SET(srcgeotech
    specfem3d.F90)
-#compiler preprocessor directives
+# Compiler preprocessor directives
 #ADD_DEFINITIONS(CMAKE_Fortran_FLAGS "-DUSE_MPI")
 IF(ISPARALLEL)
   SET_PROPERTY(SOURCE ${srcgeotech} PROPERTY COMPILE_DEFINITIONS USE_MPI)
   #SET_PROPERTY(SOURCE ${srcgeotech} PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
 ENDIF(ISPARALLEL)
 ADD_LIBRARY(geotech ${srcgeotech})
-# following PETSC link is necessary due to the PETSC module called in the
+# Following PETSC link is necessary due to the PETSC module called in the
 # specfem3d.F90
 TARGET_INCLUDE_DIRECTORIES(geotech PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
 TARGET_LINK_LIBRARIES(geotech ${PETSC_ARCH}/lib/libpetsc.so)
@@ -113,7 +113,7 @@ ELSE(ISPARALLEL)
   ADD_DEPENDENCIES(geotech sem serial both)
 ENDIF(ISPARALLEL)
 
-# build specfem-x
+# Build specfem-x
 #TARGET_LINK_LIBRARIES(geotech ${semall})
 #SET_TARGET_PROPERTIES(geotech PROPERTIES LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
 IF(ISPARALLEL)
