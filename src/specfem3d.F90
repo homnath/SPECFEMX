@@ -607,7 +607,7 @@ u=ZERO
 !call control_error(errcode,errtag,stdout,myrank)
 
 if(solver_type.eq.petsc_solver)then
- ! prepare sparsity of the stiffness matrix
+ ! Prepare sparsity of the stiffness matrix
   call prepare_sparse()
 
  ! petsc solver
@@ -616,7 +616,7 @@ if(solver_type.eq.petsc_solver)then
     write(logunit,'(a)')'petsc_initialize: SUCCESS!'
     flush(logunit)
   endif
- ! create sparse vector, matrix, and preallocate                                                         
+ ! Create sparse vector, matrix, and preallocate                                                         
  ! TODO: following call is not necessary for RECYCLE                            
   call petsc_create_vector()                                                     
   call petsc_matrix_preallocate_size()                                           
