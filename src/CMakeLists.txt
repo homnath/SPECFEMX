@@ -50,8 +50,13 @@ IF(ISPARALLEL)
      parsolver.f90)
      #parsolver_petsc.F90)
      IF(USE_PETSC)
-     LIST(APPEND srcparsem
-        parsolver_petsc.F90)
+       IF(ISCOMPLEX)
+         LIST(APPEND srcparsem
+            parsolver_petsc_complex.F90)
+       ELSE(ISCOMPLEX)
+         LIST(APPEND srcparsem
+            parsolver_petsc.F90)
+       ENDIF(ISCOMPLEX)
      ENDIF(USE_PETSC)
      #parsolver_petsc_complex.F90)
   ADD_LIBRARY(parsem ${srcparsem})
