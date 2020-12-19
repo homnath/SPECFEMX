@@ -121,8 +121,10 @@ ENDIF(USE_PETSC)
 ADD_LIBRARY(geotech ${srcgeotech})
 # Following PETSC link is necessary due to the PETSC module called in the
 # specfem3d.F90
-TARGET_INCLUDE_DIRECTORIES(geotech PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
-TARGET_LINK_LIBRARIES(geotech ${PETSC_ARCH}/lib/libpetsc.so)
+IF(USE_PETSC)
+  TARGET_INCLUDE_DIRECTORIES(geotech PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
+  TARGET_LINK_LIBRARIES(geotech ${PETSC_ARCH}/lib/libpetsc.so)
+ENDIF(USE_PETSC)
 IF(ISPARALLEL)
   ADD_DEPENDENCIES(geotech sem parsem both)
 ELSE(ISPARALLEL)
