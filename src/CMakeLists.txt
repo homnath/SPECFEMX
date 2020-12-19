@@ -47,13 +47,19 @@ IF(ISPARALLEL)
      math_library_mpi.f90
      ghost_library_mpi.f90
      prepare_sparse.f90
-     parsolver.f90
-     parsolver_petsc.F90)
+     parsolver.f90)
+     #parsolver_petsc.F90)
+     IF(USE_PETSC)
+     LIST(APPEND srcparsem
+        parsolver_petsc.F90)
+     ENDIF(USE_PETSC)
      #parsolver_petsc_complex.F90)
   ADD_LIBRARY(parsem ${srcparsem})
   ADD_DEPENDENCIES(parsem sem)
+  IF(USE_PETSC)
   TARGET_INCLUDE_DIRECTORIES(parsem PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
   TARGET_LINK_LIBRARIES(parsem ${PETSC_ARCH}/lib/libpetsc.so)
+  ENDIF(USE_PETSC)
 # Build serial library
 ELSE(ISPARALLEL)
   SET(srcserial
@@ -105,9 +111,13 @@ SET(srcgeotech
 # Compiler preprocessor directives
 #ADD_DEFINITIONS(CMAKE_Fortran_FLAGS "-DUSE_MPI")
 IF(ISPARALLEL)
-  SET_PROPERTY(SOURCE ${srcgeotech} PROPERTY COMPILE_DEFINITIONS USE_MPI)
+  #SET_PROPERTY(SOURCE ${srcgeotech} PROPERTY COMPILE_DEFINITIONS USE_MPI)
+  SET_PROPERTY(SOURCE ${srcgeotech} APPEND PROPERTY COMPILE_DEFINITIONS USE_MPI)
   #SET_PROPERTY(SOURCE ${srcgeotech} PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
 ENDIF(ISPARALLEL)
+IF(USE_PETSC)
+  SET_PROPERTY(SOURCE ${srcgeotech} APPEND PROPERTY COMPILE_DEFINITIONS USE_PETSC)
+ENDIF(USE_PETSC)
 ADD_LIBRARY(geotech ${srcgeotech})
 # Following PETSC link is necessary due to the PETSC module called in the
 # specfem3d.F90
