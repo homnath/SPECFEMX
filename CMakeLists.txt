@@ -3,7 +3,7 @@
 # REVISION:
 #   HNG, Mar 24,2017; HNG, Sep 06,2011;
 
-# required cmake version
+# Required cmake version
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.4 FATAL_ERROR)
 
 SET(ENABLE_CUDA OFF CACHE BOOL "Build specfem-x with CUDA support")
@@ -12,7 +12,7 @@ IF(ENABLE_CUDA)
 ELSE(ENABLE_CUDA)
   PROJECT(specfem-x Fortran C)
 ENDIF(ENABLE_CUDA)
-# define project
+# Define project
 
 #SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake-modules")
 
@@ -35,7 +35,7 @@ IF(NOT TEST_F90)
   MESSAGE(FATAL_ERROR "Fortran compiler: ${CMAKE_Fortran_COMPILER} doesn't work! Please set working CMAKE_Fortran_COMPILER!")
 ENDIF(NOT TEST_F90)
 
-# build directories
+# Build directories
 SET(BDIR ${CMAKE_BINARY_DIR}/bin)
 SET(DDIR ${CMAKE_BINARY_DIR}/doc)
 SET(IDIR ${CMAKE_BINARY_DIR}/input)
@@ -50,17 +50,17 @@ FILE(MAKE_DIRECTORY ${IDIR})
 FILE(MAKE_DIRECTORY ${ODIR})
 FILE(MAKE_DIRECTORY ${PDIR})
 
-# set paths to executable and libraries
+# Set paths to executable and libraries
 SET(EXECUTABLE_OUTPUT_PATH ${BDIR})
 SET(LIBRARY_OUTPUT_PATH ${LDIR})
 
-# set internal default logical variables
+# Set internal default logical variables
 SET(ISDOCUMENTATION OFF)
 SET(ISPARTMESH OFF)
 SET(ISPARALLEL OFF)
 SET(ISCOMPLEX OFF)
 
-# build documentation option
+# Build documentation option
 SET(BUILD_DOCUMENTATION OFF CACHE BOOL "Build documentation for
 SPECFEM-X")
 IF(BUILD_DOCUMENTATION)
@@ -75,7 +75,7 @@ ENDIF(BUILD_DOCUMENTATION)
 #SET(BUILD_SLOPE ON CACHE BOOL "Build slope stability program")
 #SET(BUILD_EXCAVATION ON CACHE BOOL "Build excavation program")
 
-# build partmesh option
+# Build partmesh option
 SET(BUILD_PARTMESH OFF CACHE BOOL "Build mesh partitioning program")
 IF(BUILD_PARTMESH)
   SET(ISPARTMESH ON)
@@ -120,7 +120,7 @@ IF(ENABLE_MPI)
   ENDIF(NOT TEST_MPI)
 ENDIF(ENABLE_MPI)
 
-# to be used with cmake-modules
+# To be used with cmake-modules
 #FIND_PACKAGE(PETSc COMPONENTS Fortran REQUIRED)
 #IF(NOT MPI_FOUND)
 #  MESSAGE(WARNING "MPI Fortran compiler not found! Parallel specfem-x cannot be built!")
@@ -150,10 +150,10 @@ IF(ENABLE_COMPLEX_SOLVER)
   SET(ISCOMPLEX ON)
 ENDIF(ENABLE_COMPLEX_SOLVER)
 
-# process CMakeLists.txt in other subdirectories
+# Process CMakeLists.txt in other subdirectories
 ADD_SUBDIRECTORY(doc)
 ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(util)
 
-# notes
+# Notes
 #SET_SOURCE_FILES_PROPERTIES(${SRC} PROPERTIES LANGUAGE "C")
