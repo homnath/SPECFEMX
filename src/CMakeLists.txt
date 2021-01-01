@@ -48,7 +48,8 @@ IF(ISPARALLEL)
      ghost_library_mpi.f90
      prepare_sparse.f90
      parsolver.f90)
-     #parsolver_petsc.F90)
+     #parsolver_petsc.F90
+     #parsolver_petsc_complex.F90)
      IF(USE_PETSC)
        IF(ISCOMPLEX)
          LIST(APPEND srcparsem
