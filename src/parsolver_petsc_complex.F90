@@ -1,4 +1,3 @@
-!This module contains the PETSc routines for complex linear solver.
 !AUTHORS:
 ! Hom Nath Gharti
 ! Stefano Zhampini
@@ -7,19 +6,19 @@
 !-------------------------------------------------------------------------------
 module parsolver_petsc_complex
 !-------------------------------------------------------------------------------
-! Include PETSc header files and import modules.
+!                    Include files
 !-------------------------------------------------------------------------------
 #include "petsc/finclude/petscksp.h"
-use ksp_constants
-use global
-use math_library_mpi,only:maxscal,minscal
-use mpi_library,only:check_allocate,sync_process
-use ghost_library_mpi,only:ngpart,gpart
-
-use petscksp
+use ksp_constants                                                                
+use global                                                                       
+use math_library_mpi,only:maxscal,minscal                                          
+use mpi_library,only:check_allocate,sync_process                                 
+use ghost_library_mpi,only:ngpart,gpart                                          
+                                                                                 
+use petscksp  
 implicit none
 
-PetscBool      flg_ch,flg_lu,flg_ilu,flg,mat_symmetry
+PetscBool      flg,flg_ch,flg_lu,flg_ilu,mat_symmetry
 PetscInt       petsc_solver_type
 integer,parameter :: SUPERLU=2,MUMPS=3
 PetscInt       ival,icntl
@@ -31,16 +30,18 @@ KSP              ksp
 PC               pc
 PetscReal        mnorm,atol,dtol,rtol
 PetscInt         iter,maxiter
-! For communications from local to global.
-VecScatter             vscat!,pscat,vscat_all
-! Stores l2g map info.
-ISLocalToGlobalMapping l2gmap
+! For communications from local to global   
+VecScatter             vscat!,pscat,,vscat_all
+! Stores l2g map info 
+ISLocalToGlobalMapping l2gmap                    
+!PetscBool        flg
 
 PetscInt :: nzeros_max,nzeros_min,nzerosoff_max
 PetscInt :: ngdof_part
 PetscInt :: ig0,ig1
 PetscInt,allocatable :: nnzero_diag(:),nnzero_offdiag(:)
 PetscErrorCode   ierr
+!integer :: ierr
 character(len=250),private :: myfname=" => parsolver_petsc.f90"
 character(len=500),private :: errsrc
 contains
@@ -50,43 +51,42 @@ subroutine petsc_initialize()
 implicit none
 errsrc=trim(myfname)//' => petsc_initialize'
 
-! Initialize petsc.
+! initialize petsc
 call PetscInitialize(PETSC_NULL_CHARACTER,ierr)
 
 end subroutine petsc_initialize
 !===============================================================================
 
-subroutine petsc_create_vector_complex()
+subroutine petsc_create_vector()
 implicit none
 IS global_is,local_is
 
 errsrc=trim(myfname)//' => petsc_create_vector'
 
-! Create vector objects.
+! create vector objects
 call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,ngdof,xvec,ierr)
 CHKERRA(ierr)
 call VecDuplicate(xvec,bvec,ierr)
 CHKERRA(ierr)
 
-! Local vector.
+! local vector
 call VecCreateSeq(PETSC_COMM_SELF,neq,local_vec,ierr)
 CHKERRA(ierr)
 
-! Objects needed for global vector scattering to local vector.
-! Create local and global IS (index set) objects from the array of local and
-! global indices.
+! objects needed for global vector scattering to local vector
+! create local and global IS (index set) objects from the array of local and
+! global indices
 call ISCreateGeneral(PETSC_COMM_WORLD,neq,l2gdof(1:),PETSC_COPY_VALUES,global_is,ierr)
 CHKERRA(ierr)
 call ISCreateStride(PETSC_COMM_SELF,neq,0,1,local_is,ierr);
 CHKERRA(ierr)
-! Create VecScatter object which is needed to scatter PETSc parallel vectors.
+! create VecScatter object which is needed to scatter PETSc parallel vectors
 call VecScatterCreate(bvec,global_is,local_vec,local_is,vscat,ierr)
 CHKERRA(ierr)
-! Destroy objects which are no longer necessary.
-call ISDestroy(global_is,ierr)
-call ISDestroy(local_is,ierr)
+call ISDestroy(global_is,ierr) ! no longer necessary
+call ISDestroy(local_is,ierr)  ! no longer necessary
 
-end subroutine petsc_create_vector_complex
+end subroutine petsc_create_vector
 !===============================================================================
 
 subroutine petsc_matrix_preallocate_size()
@@ -94,7 +94,7 @@ implicit none
 Vec         nzeror_gvec,nzeror_dvec,nzeror_ovec,iproc_gvec,               &
             interface_gvec,ninterface_dvec,ninterface_ovec,nself_gvec
 PetscInt :: i !,ncol_part,nrow_part
-PetscInt,allocatable :: nzeros(:),ig_array(:)
+PetscInt,allocatable :: nzeros(:),ig_array(:) 
 PetscScalar rval
 
 PetscInt :: igdof,maxrank0,n,ng,ng0,ng1,np0
@@ -115,16 +115,17 @@ PetscScalar,allocatable :: rg_interface(:),rnself_lgarray(:)
 PetscScalar,pointer :: rninterface_darray(:),rninterface_oarray(:)
 
 character(len=10) :: ptail
+!character(len=60) :: outf_name
 PetscInt :: count_diag,count_nsparse
 
 errsrc=trim(myfname)//' => petsc_matrix_preallocate_size'
 
-write(ptail,'(i4)')myrank
+write(ptail,'(i4)')myrank                                                        
 ptail=adjustl(ptail)
 
-! Predetermine or read compressed size of the sparse matrix.
+! predetermine or read compressed size of the sparse matrix
 
-! Count number of nonzeros per row.
+! count number of nonzeros per row
 allocate(nzeros(neq),stat=ierr)
 call check_allocate(ierr,errsrc)
 
@@ -142,7 +143,7 @@ if(myrank==0)then
 endif
 deallocate(nzeros)
 
-! Precompute ownership range OR partition layout.
+! precompute ownership range OR partion layout
 ng1=ngdof/nproc
 ng0=ceiling(real(ngdof)/real(nproc))
 
@@ -150,13 +151,13 @@ np0=ngdof-nproc*ng1
 
 if(np0.eq.0)then
 ! ng0=ng1
-! All processors have equal gdofs.
+! all processors have equal gdofs
   ng=ng0
   ig0=myrank*ng0 ! 0-based index
   ig1=ig0+ng0-1
 elseif(np0.gt.0)then
-! First np0 processors have ng0 gdofs each and remainging processors have ng1
-! gdofs each.
+! first np0 processors have ng0 gdofs each and remainging processors have ng1
+! gdofs each
   maxrank0=np0-1 ! myrank is 0-based
   if(myrank.le.maxrank0)then
     ng=ng0
@@ -168,7 +169,7 @@ elseif(np0.gt.0)then
     ig1=ig0+ng1-1
   endif
 else
-! Error.
+! Error
   write(logunit,*)'ERROR: illegal value of "np0"!'
   flush(logunit)
   stop
@@ -190,7 +191,7 @@ CHKERRA(ierr)
 call VecDuplicate(xvec,ninterface_ovec,ierr)
 CHKERRA(ierr)
 
-! Assign owner processor ID to each gdof (or row).
+! assign owner processor ID to each gdof (or row)
 allocate(ig_array(ng),rproc_array(ng),stat=ierr)
 call check_allocate(ierr,errsrc)
 ig_array=(/ (i,i=ig0,ig1) /)
@@ -204,49 +205,49 @@ call VecAssemblyEnd(iproc_gvec,ierr)
 CHKERRA(ierr)
 call VecMin(iproc_gvec,PETSC_NULL_INTEGER,pmin,ierr)
 call VecMax(iproc_gvec,PETSC_NULL_INTEGER,pmax,ierr)
-! Copy solution to local array.
+! copy solution to local array
 allocate(iproc_array(neq),rproc_array(neq),stat=ierr)
 call check_allocate(ierr,errsrc)
 call scatter_globalvec(iproc_gvec,rproc_array)
 iproc_array=int(rproc_array)
 deallocate(rproc_array)
 call VecDestroy(iproc_gvec,ierr)
-! Assign interface ID to each gdofs.
+! assign interface ID to each gdofs
 rval=1.0
-! All DOFs
-do i=1,ngpart
-   nibool=gpart(i)%nnode
-    allocate(ibool_interface(nibool),stat=ierr)
-    call check_allocate(ierr,errsrc)
-    ibool_interface=gpart(i)%node
-    do i_bool=1,nibool
-      do i_ndof=1,NNDOF
-        igdof=ggdof(i_ndof,ibool_interface(i_bool))-1
-        if(igdof.ge.0)call VecSetValues(interface_gvec,1,igdof,rval,           &
-        INSERT_VALUES,ierr);
-      enddo
-    enddo
-    deallocate(ibool_interface)
-enddo
+! all DOFs
+do i=1,ngpart                                                                    
+   nibool=gpart(i)%nnode                                                         
+    allocate(ibool_interface(nibool),stat=ierr)                                  
+    call check_allocate(ierr,errsrc)                                             
+    ibool_interface=gpart(i)%node                                                
+    do i_bool=1,nibool                                                           
+      do i_ndof=1,NNDOF                                                          
+        igdof=ggdof(i_ndof,ibool_interface(i_bool))-1                            
+        if(igdof.ge.0)call VecSetValues(interface_gvec,1,igdof,rval,           & 
+        INSERT_VALUES,ierr);                                                     
+      enddo                                                                      
+    enddo                                                                        
+    deallocate(ibool_interface)                                                  
+enddo     
 call VecAssemblyBegin(interface_gvec,ierr)
 CHKERRA(ierr)
 call VecAssemblyEnd(interface_gvec,ierr)
 CHKERRA(ierr)
 
-! Copy solution to local array.
+! copy solution to local array
 allocate(isg_interface(neq),rg_interface(neq),stat=ierr)
 call check_allocate(ierr,errsrc)
 call scatter_globalvec(interface_gvec,rg_interface)
 isg_interface=int(rg_interface)
-deallocate(rg_interface)
+deallocate(rg_interface) 
 call VecDestroy(interface_gvec,ierr)
 
-! Estimate correction for the number of nonzero entries in the diagonal and
-! nondiagonal portion.
-! Self interface.
+! estimate correction for the number of nonzero entries in the diagonal and
+! nondiagonal portion
+! self interface
 rval=1.0
 do i=1,neq
-  if(isg_interface(i).eq.1)then
+  if(isg_interface(i).eq.1)then    
     call VecSetValues(nself_gvec,1,l2gdof(i),rval,ADD_VALUES,ierr);
   endif
 enddo
@@ -309,8 +310,7 @@ do i=2,nsparse
   ir=krow_sparse(i)
   ic=kcol_sparse(i)
   if(l2gdof(ir).ne.igr.or.l2gdof(ic).ne.igc)then
-    write(logunit,'(a,i0,1x,i0,1x,i0,1x,i0)')'strange error in l2gdof: ',      &
-    l2gdof(ir),igr,l2gdof(ic),igc
+    write(logunit,'(a,i0,1x,i0,1x,i0,1x,i0)')'strange error in l2gdof: ',l2gdof(ir),igr,l2gdof(ic),igc
     flush(logunit)
     stop
   endif
@@ -324,7 +324,7 @@ do i=2,nsparse
     CHKERRA(ierr)
     call VecSetValues(nzeror_ovec,1,igr0,rnoffd,ADD_VALUES,ierr)
     CHKERRA(ierr)
-
+    
     call VecSetValues(ninterface_dvec,1,igr0,rnid,ADD_VALUES,ierr)
     CHKERRA(ierr)
     call VecSetValues(ninterface_ovec,1,igr0,rnioffd,ADD_VALUES,ierr)
@@ -440,10 +440,9 @@ nnzero_offdiag=int(nzeror_oarray(1:n))
 call VecRestoreArrayF90(nzeror_ovec,nzeror_oarray,ierr)
 call VecDestroy(nzeror_ovec,ierr)
 
-! CORRECTION.
-! NOTE:
+! correction
 ! I do not know why but there are some DOFs where the correction exceeds by 4 or
-! 8 therefore to be safe we need to subtract this from all.
+! 8 therefore to be safe we need to subtract this from all
 call VecGetArrayF90(ninterface_dvec,rninterface_darray,ierr)
 !where(rninterface_darray.gt.0.0 .and. rninterface_darray.lt.1.0)rninterface_darray=1.0
 allocate(ninterface_darray(n),stat=ierr)
@@ -511,29 +510,30 @@ endif
 end subroutine petsc_matrix_preallocate_size
 !===============================================================================
 
-subroutine petsc_create_matrix_complex()
+subroutine petsc_create_matrix()
 implicit none
 PetscInt :: istart,iend
 
 errsrc=trim(myfname)//' => petsc_create_matrix'
 
-! Create the matrix and preallocate
+! create the matrix and preallocate
 call MatCreate(PETSC_COMM_WORLD,Amat,ierr)
 call MatSetType(Amat,MATMPIAIJ,ierr)
 CHKERRA(ierr)
 call MatSetSizes(Amat,PETSC_DECIDE,PETSC_DECIDE,ngdof,ngdof,ierr)
 CHKERRA(ierr)
 
-! The following statement does not work before preallocation.
-! call MatGetLocalSize(Amat,nrow_part,ncol_part,ierr)
+!does not work before preallocation
+!call MatGetLocalSize(Amat,nrow_part,ncol_part,ierr)
 
-! Preallocation.
+! preallocation
 !call MatMPIAIJSetPreallocation(Amat,nzeros_max,PETSC_NULL_INTEGER,nzeros_max, &
 !PETSC_NULL_INTEGER,ierr)
 call MatMPIAIJSetPreallocation(Amat,0,nnzero_diag,         &
 0,nnzero_offdiag,ierr)
 CHKERRA(ierr)
 deallocate(nnzero_diag,nnzero_offdiag)
+!if(myrank==0)print*,'ngdof:',ngdof
 call MatSetFromOptions(Amat,ierr)
 CHKERRA(ierr)
 
@@ -541,30 +541,31 @@ call MatGetOwnershipRange(Amat,istart,iend,ierr)
 CHKERRA(ierr)
 call sync_process
 
-end subroutine petsc_create_matrix_complex
+end subroutine petsc_create_matrix
 !===============================================================================
 
-subroutine petsc_create_solver_complex()
+subroutine petsc_create_solver()
 implicit none
 
 errsrc=trim(myfname)//' => petsc_create_solver'
 
-! Create the linear solver and set various options.
+! Create the linear solver and set various options
 
-! Create linear solver context.
+! Create linear solver context
 call KSPCreate(PETSC_COMM_WORLD,ksp,ierr)
 CHKERRA(ierr)
-call KSPSetInitialGuessNonzero(ksp,PETSC_TRUE,ierr)
+!call KSPSetInitialGuessNonzero(ksp,PETSC_TRUE,ierr)
 
-! Diagonally scale the matrix.
-! Since the euqutions are nondimensionalized, the scaling is not necessary?
+! Diagonally scale the matrix
+! Since the equations are nondimensionalized, the scaling is not necessary?
 call KSPSetDiagonalScale(ksp,PETSC_TRUE,ierr)
 CHKERRA(ierr)
 
-! Define solver type.
-! This will be overwritten by the command line arguments if provided.
-! Default solver type.
-petsc_solver_type=1
+! Define solver type
+! This will be overwritten by the command line arguments if provided
+! default solver type
+!petsc_solver_type=1
+petsc_solver_type=MUMPS
 
 if(petsc_solver_type==0)then
   if(myrank==0)then
@@ -607,7 +608,9 @@ elseif(petsc_solver_type.eq.SUPERLU)then
     flush(logunit)
   endif
   flg_ilu = PETSC_FALSE;
-  flg_lu  = PETSC_FALSE;
+  flg_lu     = PETSC_FALSE;
+  ! version < 3.8.0
+  ! call PetscOptionsGetBool(PETSC_NULL_CHARACTER,"-use_superlu_lu",flg_lu,flg,ierr);
   call PetscOptionsGetBool(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &
   "-use_superlu_lu",flg_lu,flg,ierr);
   CHKERRA(ierr)
@@ -625,11 +628,15 @@ elseif(petsc_solver_type.eq.SUPERLU)then
     endif
     call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
     CHKERRA(ierr)
+    ! version < 3.9
+    !call PCFactorSetMatSolverPackage(pc,MATSOLVERSUPERLU,ierr);
     call PCFactorSetMatSolverType(pc,MATSOLVERSUPERLU,ierr);
     CHKERRA(ierr)
+    ! version < 3.9
+    !call PCFactorSetUpMatSolverPackage(pc,ierr); ! call MatGetFactor() to create F
     call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
     CHKERRA(ierr)
-
+ 
     call PCFactorGetMatrix(pc,Fmat,ierr);
     CHKERRA(ierr)
     !call MatSuperluSetILUDropTol(Fmat,1.e-8,ierr);
@@ -640,30 +647,59 @@ elseif(petsc_solver_type.eq.MUMPS)then
     write(logunit,'(a)')'Solver type: MUMPS'
     flush(logunit)
   endif
-  flg_lu    = PETSC_FALSE;
-  flg_ch = PETSC_FALSE;
-  call PetscOptionsGetBool(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &
-  "-use_mumps_ch",flg_ch,flg,ierr);
-  if(flg_lu .or. flg_ch)then
-    call KSPSetType(ksp,KSPPREONLY,ierr);
-    call KSPGetPC(ksp,pc,ierr);
-    if(flg_lu)then
-      call PCSetType(pc,PCLU,ierr);
-    elseif(flg_ch)then
-      call MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr); ! set MUMPS id%SYM=1
-      call PCSetType(pc,PCCHOLESKY,ierr);
-    endif
-    call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
-    CHKERRA(ierr)
-    call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr);
-    call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
-
-    call PCFactorGetMatrix(pc,Fmat,ierr);
-    icntl = 7; ival = 2;
-    call MatMumpsSetIcntl(Fmat,icntl,ival,ierr);
-    icntl = 1; val = 0.0;
-    call MatMumpsSetCntl(Fmat,icntl,val,ierr);
-  endif
+!  flg_lu    = PETSC_FALSE;
+!  flg_ch = PETSC_FALSE;
+!  ! version < 3.8.0
+!  !call PetscOptionsGetBool(PETSC_NULL_CHARACTER,"-use_mumps_ch",flg_ch,flg,ierr);
+!  call PetscOptionsGetBool(PETSC_NULL_OPTIONS,PETSC_NULL_CHARACTER, &
+!  "-use_mumps_ch",flg_ch,flg,ierr);
+!  if(flg_lu .or. flg_ch)then
+!    call KSPSetType(ksp,KSPPREONLY,ierr);
+!    call KSPGetPC(ksp,pc,ierr);
+!    if(flg_lu)then
+!      call PCSetType(pc,PCLU,ierr);
+!    elseif(flg_ch)then
+!      call MatSetOption(Amat,MAT_SPD,PETSC_TRUE,ierr); ! set MUMPS id%SYM=1
+!      call PCSetType(pc,PCCHOLESKY,ierr);
+!    endif
+!    call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
+!    CHKERRA(ierr)
+!    ! version < 3.9
+!    !call PCFactorSetMatSolverPackage(pc,MATSOLVERMUMPS,ierr);
+!    !call PCFactorSetUpMatSolverPackage(pc,ierr); ! call MatGetFactor() to create F
+!    call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr);
+!    call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
+!  
+!    call PCFactorGetMatrix(pc,Fmat,ierr);
+!    icntl = 7; ival = 2;
+!    call MatMumpsSetIcntl(Fmat,icntl,ival,ierr);
+!    icntl = 1; val = 0.0;
+!    call MatMumpsSetCntl(Fmat,icntl,val,ierr);
+!  endif
+  call KSPSetType(ksp,KSPPREONLY,ierr)
+  call KSPGetPC(ksp,pc,ierr)
+  call PCSetType(pc,PCLU,ierr)
+!  call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr)
+!  call PCFactorSetUpMatSolverType(pc,ierr)
+!  call PCFactorGetMatrix(pc,Fmat,ierr)
+!
+!  !sequential ordering
+!  icntl = 7
+!  ival  = 2
+!   call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+!
+!  !threshold for row pivot detection
+!  icntl = 24
+!  ival  = 1
+!  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+!  icntl = 3
+!  val = 1.e-6
+!  call MatMumpsSetCntl(Fmat,icntl,val,ierr)
+!
+!  !compute determinant of A
+!  icntl = 33
+!  ival  = 1
+!  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
 endif
 
 call KSPSetTolerances(ksp,KSP_RTOL,KSP_ATOL,KSP_DTOL,KSP_MAXITER,ierr)
@@ -676,42 +712,102 @@ CHKERRA(ierr)
 !  routines.
 call KSPSetFromOptions(ksp,ierr)
 
-end subroutine petsc_create_solver_complex
+end subroutine petsc_create_solver
 !===============================================================================
 
-subroutine petsc_set_ksp_operator_complex(reuse_pc)
+subroutine petsc_set_solver()
+implicit none
+
+errsrc=trim(myfname)//' => petsc_set_solver'
+
+! define solver type
+! this will be overwritten by the command line arguments if provided
+! default solver type
+!petsc_solver_type=1
+petsc_solver_type=MUMPS
+
+if(petsc_solver_type.eq.SUPERLU)then
+  if(myrank==0)then
+    write(logunit,'(a)')'Solver type: SUPERLU'
+    flush(logunit)
+  endif
+    call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
+    CHKERRA(ierr)
+    call PCFactorSetMatSolverType(pc,MATSOLVERSUPERLU,ierr);
+    CHKERRA(ierr)
+    call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
+    CHKERRA(ierr)
+ 
+    call PCFactorGetMatrix(pc,Fmat,ierr);
+    CHKERRA(ierr)
+    !call MatSuperluSetILUDropTol(Fmat,1.e-8,ierr);
+    !CHKERRA(ierr)
+elseif(petsc_solver_type.eq.MUMPS)then
+  if(myrank==0)then
+    write(logunit,'(a)')'Solver type: MUMPS'
+    flush(logunit)
+  endif
+  call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr)
+  call PCFactorSetUpMatSolverType(pc,ierr)
+  call PCFactorGetMatrix(pc,Fmat,ierr)
+
+  !sequential ordering
+  icntl = 7
+  ival  = 2
+   call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+
+  !threshold for row pivot detection
+  icntl = 24
+  ival  = 1
+  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+  icntl = 3
+  val = 1.e-6
+  call MatMumpsSetCntl(Fmat,icntl,val,ierr)
+
+  !compute determinant of A
+  icntl = 33
+  ival  = 1
+  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+endif
+
+end subroutine petsc_set_solver
+!===============================================================================
+
+subroutine petsc_set_ksp_operator(reuse_pc)
 implicit none
 logical,intent(in) :: reuse_pc
 errsrc=trim(myfname)//' => petsc_set_ksp_operator'
 if(reuse_pc)then
-  ! Reuse preconditioner
+  ! reuse preconditioner
   call KSPSetReusePreconditioner(ksp,PETSC_TRUE,ierr)
 else
-  ! Do not reuse preconditioner
+  ! do not reuse preconditioner
   call KSPSetReusePreconditioner(ksp,PETSC_FALSE,ierr)
 endif
 CHKERRA(ierr)
 
-! Set ksp operators.
-call KSPSetOperators(ksp,Amat,Amat,ierr)
+! set ksp operators
+! version < 3.5
+!call KSPSetOperators(ksp,Amat,Amat,SAME_PRECONDITIONER,ierr)
+call KSPSetOperators(ksp,Amat,Amat,ierr) !version >= 3.5.0
 CHKERRA(ierr)
-end subroutine petsc_set_ksp_operator_complex
+end subroutine petsc_set_ksp_operator
 !===============================================================================
 
-subroutine petsc_set_stiffness_matrix_complex(storekmat)
+subroutine petsc_set_stiffness_matrix(storekmat)
 use math_library_mpi,only:sumscal
 use ieee_arithmetic
 implicit none
 
-real(kind=kreal),intent(in) :: storekmat(:,:,:)
-integer :: i,i_elmt,ielmt,j,n,ndzero
-integer :: ggdof_elmt(NEDOF)
-
-PetscInt irow,jcol
-Vec   vdiag
-PetscScalar rval
-PetscScalar,pointer :: diag_array(:)
-
+real(kind=kreal),intent(in) :: storekmat(:,:,:)                                  
+integer :: i,i_elmt,ielmt,j,n,ndzero                                             
+integer :: ggdof_elmt(NEDOF)                                                     
+                                                                                 
+PetscInt irow,jcol                                                               
+Vec   vdiag                                                                      
+PetscScalar rval                                                                 
+PetscScalar,pointer :: diag_array(:)                                             
+                                                                                 
 real(kind=8) :: xval
 
 ! Set and assemble matrix.
@@ -723,30 +819,30 @@ CHKERRA(ierr)
 call sync_process
 rval=1.0
 
-! Entirely in solid.
-do i_elmt=1,nelmt
-  ielmt=i_elmt
-  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))
-  ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0
-  do i=1,NEDOF
-    do j=1,NEDOF
-    irow=i; jcol=j
-    if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then
-    !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then
-      xval=storekmat(i,j,ielmt)
-      if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then
+! entirely in solid                                                              
+do i_elmt=1,nelmt                                                                
+  ielmt=i_elmt                                                                   
+  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
+  ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0                            
+  do i=1,NEDOF                                                                   
+    do j=1,NEDOF                                                                 
+    irow=i; jcol=j                                                               
+    if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
+    !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
+      xval=storekmat(i,j,ielmt)                                                  
+      if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
         write(logunit,*)'ERROR: stiffness matrix has nonfinite value/s!',myrank,ielmt,&
-        mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))
+        mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
         flush(logunit)
-        stop
-      endif
-      call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &
-      storekmat(i,j,ielmt),ADD_VALUES,ierr)
-      CHKERRA(ierr)
-    endif
-    enddo
-  enddo
-enddo
+        stop                                                                     
+      endif                                                                     
+      call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &  
+      storekmat(i,j,ielmt),ADD_VALUES,ierr)                                      
+      CHKERRA(ierr)                                                              
+    endif                                                                        
+    enddo                                                                        
+  enddo                                                                          
+enddo    
 
 call MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
 CHKERRA(ierr)
@@ -754,45 +850,163 @@ call MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
 CHKERRA(ierr)
 
 if(symmetric_solver)then
-  call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_TRUE,ierr)
-  CHKERRA(ierr)
+  call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_TRUE,ierr)                            
+  CHKERRA(ierr)  
 else
-  call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_FALSE,ierr)
-  CHKERRA(ierr)
+  call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_FALSE,ierr)                            
+  CHKERRA(ierr)  
 endif
 
-!! Check symmetry
-!call MatDuplicate(Amat,MAT_DO_NOT_COPY_VALUES,AmatT,ierr)
-!CHKERRA(ierr)
-!call MatTranspose(Amat,MAT_INITIAL_MATRIX,AmatT,ierr)
-!CHKERRA(ierr)
-!rval=-1.0
-!call MatAXPY(AmatT,rval,Amat,SAME_NONZERO_PATTERN,ierr)
-!call MatNorm(Amat,NORM_FROBENIUS,mnorm,ierr)
-!if(myrank==0)print*,'Matrix norm:',mnorm
-!call MatNorm(AmatT,NORM_FROBENIUS,mnorm,ierr)
-!if(myrank==0)print*,'Symmetry norm:',mnorm
-!call MatDestroy(AmatT,ierr)
-!if(myrank==0)print*,'matrix setting & assembly complete11!'
-!call sync_process
-
-call MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr)
-call MatGetDiagonal(Amat,vdiag,ierr)
-call VecGetLocalSize(vdiag,n,ierr)
-CHKERRA(ierr)
-call VecGetArrayF90(vdiag,diag_array,ierr)
-CHKERRA(ierr)
-ndzero=count(diag_array==0.)
-if(ndzero.gt.0)then
+!! check symmetry                                                                
+!call MatDuplicate(Amat,MAT_DO_NOT_COPY_VALUES,AmatT,ierr)                        
+!CHKERRA(ierr)                                                                   
+!call MatTranspose(Amat,MAT_INITIAL_MATRIX,AmatT,ierr)                            
+!CHKERRA(ierr)                                                                   
+!rval=-1.0                                                                       
+!call MatAXPY(AmatT,rval,Amat,SAME_NONZERO_PATTERN,ierr)                          
+!call MatNorm(Amat,NORM_FROBENIUS,mnorm,ierr)                                    
+!if(myrank==0)print*,'Matrix norm:',mnorm                                        
+!call MatNorm(AmatT,NORM_FROBENIUS,mnorm,ierr)                                    
+!if(myrank==0)print*,'Symmetry norm:',mnorm                                      
+!call MatDestroy(AmatT,ierr)                                                      
+!if(myrank==0)print*,'matrix setting & assembly complete11!'                     
+!call sync_process                                                               
+                                                                                 
+call MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr)                               
+call MatGetDiagonal(Amat,vdiag,ierr)                                             
+call VecGetLocalSize(vdiag,n,ierr)                                               
+CHKERRA(ierr)                                                                    
+call VecGetArrayF90(vdiag,diag_array,ierr)                                       
+CHKERRA(ierr)                                                                    
+ndzero=count(diag_array==0.)                                                     
+if(ndzero.gt.0)then                                                              
   write(logunit,*)'WARNING: NZEROs in diagonal:',myrank,n, &
-  count(diag_array==0.),minval(abs(diag_array)),maxval(abs(diag_array))
+  count(diag_array==0.),minval(abs(diag_array)),maxval(abs(diag_array))                                
   flush(logunit)
-endif
-call VecRestoreArrayF90(vdiag,diag_array,ierr)
-call sync_process
+endif                                                                            
+call VecRestoreArrayF90(vdiag,diag_array,ierr)                                   
+call sync_process                                                                
 call VecDestroy(vdiag,ierr)
+                                                      
+end subroutine petsc_set_stiffness_matrix
+!===============================================================================
 
-end subroutine petsc_set_stiffness_matrix_complex
+subroutine petsc_set_stiffness_matrix_freq(storekmat,storemmat,freq,           &
+scale_freq2,isscale_freq2)
+use math_library_mpi,only:sumscal
+use ieee_arithmetic
+implicit none
+
+real(kind=kreal),intent(in) :: storekmat(:,:,:),storemmat(:,:)
+integer :: i,i_elmt,ielmt,j,n,ndzero                                             
+integer :: ggdof_elmt(NEDOF)                                   
+
+PetscReal         freq,scale_freq2 ! angular frequency                           
+PetscBool         isscale_freq2
+                                                                                 
+PetscInt irow,jcol                                                               
+Vec   vdiag                                                                      
+PetscScalar rval  
+PetscReal  kmat(NEDOF,NEDOF),mdiag(NEDOFU)
+PetscScalar,pointer :: diag_array(:)                                             
+                                                                                 
+real(kind=8) :: xval
+
+! Set and assemble matrix.
+!  - Note that MatSetValues() uses 0-based row and column numbers
+!  in Fortran as well as in C (as set here in the array "col").
+
+call MatZeroEntries(Amat,ierr)
+CHKERRA(ierr)
+call sync_process
+rval=1.0
+
+! entirely in solid                                                              
+do i_elmt=1,nelmt                                                                
+  ielmt=i_elmt                           
+
+  kmat=storekmat(:,:,ielmt)                                                      
+  if(steptype.eq.FREQSTEP)then                                                   
+    mdiag=storemmat(:,i_elmt)                                                    
+    if(isscale_freq2)then                                                        
+      kmat=scale_freq2*kmat                                                      
+    else                                                                         
+      mdiag=freq*freq*mdiag                                                      
+    endif                                                                        
+    ! mass matrix has NEDOFU elements NOT NEDOF                                  
+    do i=1,NEDOFU                                                                
+      kmat(i,i)=kmat(i,i)-mdiag(i)                                               
+    enddo                                                                        
+  endif                                                                          
+
+  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
+  ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0                            
+  do i=1,NEDOF                                                                   
+    do j=1,NEDOF                                                                 
+    irow=i; jcol=j                                                               
+    if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
+    !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
+      !xval=storekmat(i,j,ielmt)                                                  
+      xval=kmat(i,j)                                                  
+      if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
+        write(logunit,*)'ERROR: stiffness matrix has nonfinite value/s!',myrank,ielmt,&
+        mat_id(ielmt),xval,minval(abs(kmat)),maxval(abs(kmat))         
+        flush(logunit)
+        stop                                                                     
+      endif                                                                     
+      call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &  
+      storekmat(i,j,ielmt),ADD_VALUES,ierr)                                      
+      CHKERRA(ierr)                                                              
+    endif                                                                        
+    enddo                                                                        
+  enddo                                                                          
+enddo    
+
+call MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
+CHKERRA(ierr)
+call MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
+CHKERRA(ierr)
+
+if(symmetric_solver)then
+  call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_TRUE,ierr)                            
+  CHKERRA(ierr)  
+else
+  call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_FALSE,ierr)                            
+  CHKERRA(ierr)  
+endif
+
+!! check symmetry                                                                
+!call MatDuplicate(Amat,MAT_DO_NOT_COPY_VALUES,AmatT,ierr)                        
+!CHKERRA(ierr)                                                                   
+!call MatTranspose(Amat,MAT_INITIAL_MATRIX,AmatT,ierr)                            
+!CHKERRA(ierr)                                                                   
+!rval=-1.0                                                                       
+!call MatAXPY(AmatT,rval,Amat,SAME_NONZERO_PATTERN,ierr)                          
+!call MatNorm(Amat,NORM_FROBENIUS,mnorm,ierr)                                    
+!if(myrank==0)print*,'Matrix norm:',mnorm                                        
+!call MatNorm(AmatT,NORM_FROBENIUS,mnorm,ierr)                                    
+!if(myrank==0)print*,'Symmetry norm:',mnorm                                      
+!call MatDestroy(AmatT,ierr)                                                      
+!if(myrank==0)print*,'matrix setting & assembly complete11!'                     
+!call sync_process                                                               
+                                                                                 
+call MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr)                               
+call MatGetDiagonal(Amat,vdiag,ierr)                                             
+call VecGetLocalSize(vdiag,n,ierr)                                               
+CHKERRA(ierr)                                                                    
+call VecGetArrayF90(vdiag,diag_array,ierr)                                       
+CHKERRA(ierr)                                                                    
+ndzero=count(diag_array==0.)                                                     
+if(ndzero.gt.0)then                                                              
+  write(logunit,*)'WARNING: NZEROs in diagonal:',myrank,n, &
+  count(diag_array==0.),minval(abs(diag_array)),maxval(abs(diag_array))                                
+  flush(logunit)
+endif                                                                            
+call VecRestoreArrayF90(vdiag,diag_array,ierr)                                   
+call sync_process                                                                
+call VecDestroy(vdiag,ierr)
+                                                      
+end subroutine petsc_set_stiffness_matrix_freq
 !===============================================================================
 
 subroutine petsc_set_stiffness_matrix_freq_complex(storekmat,storemmat,freq,           &
@@ -917,7 +1131,7 @@ call VecDestroy(vdiag,ierr)
 end subroutine petsc_set_stiffness_matrix_freq_complex
 !===============================================================================
 
-subroutine petsc_set_vector_complex(rload)
+subroutine petsc_set_vector(rload)
 use ieee_arithmetic
 implicit none
 PetscScalar,intent(in) :: rload(0:)
@@ -931,14 +1145,14 @@ zero=0.0
 call VecSet(bvec,zero,ierr)
 call VecSetValues(bvec,neq,l2gdof(1:),rload(1:),ADD_VALUES,ierr);
 
-! Assemble vector.
+! assemble vector
 call VecAssemblyBegin(bvec,ierr)
 call VecAssemblyEnd(bvec,ierr)
 
-end subroutine petsc_set_vector_complex
+end subroutine petsc_set_vector
 !===============================================================================
 
-subroutine petsc_set_initialguess_complex(rload)
+subroutine petsc_set_initialguess(rload)
 implicit none
 PetscScalar,intent(in) :: rload(0:)
 PetscScalar zero
@@ -951,7 +1165,7 @@ zero=0.0
 call VecSet(bvec,zero,ierr)
 call VecSetValues(bvec,neq,l2gdof(1:),rload(1:),ADD_VALUES,ierr);
 
-! Assemble vector.
+! assemble vector
 call VecAssemblyBegin(bvec,ierr)
 call VecAssemblyEnd(bvec,ierr)
 if(myrank==0)then
@@ -959,40 +1173,40 @@ if(myrank==0)then
   flush(logunit)
 endif
 
-end subroutine petsc_set_initialguess_complex
+end subroutine petsc_set_initialguess
 !===============================================================================
 
-subroutine petsc_solve_complex(sdata,cg_iter,ireason)
+subroutine petsc_solve(sdata,cg_iter,ireason)
 implicit none
 PetscScalar sdata(:)
 PetscInt    cg_iter
 PetscInt    ireason
 
-!! Null space.
+!! null space
 !call MatNullSpaceCreate(PETSC_COMM_WORLD,PETSC_TRUE,0,0,nullspace,ierr)
 !!call MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, PETSC_NULL_OBJECT, nullspace,ierr);
 !call MatSetNullSpace(Amat,nullspace,ierr)
 !call MatNullSpaceRemove(nullspace,bvec,PETSC_NULL_OBJECT,ierr)
 !call MatNullSpaceDestroy(nullspace,ierr)
-!TMP
+!TMP 
 !TMP !call MatNullSpaceCreate(PETSC_COMM_WORLD, PETSC_TRUE, 0, PETSC_NULL_OBJECT, nullspace,ierr);
 !TMP !call KSPSetNullSpace(ksp, nullspace,ierr);
 !TMP !call MatNullSpaceDestroy(nullspace,ierr);
 
-! Solve the linear system.
+! Solve the linear system
 call KSPSolve(ksp,bvec,xvec,ierr)
 
 ! View solver info; we could instead use the option -ksp_view
 !call KSPView(ksp,PETSC_VIEWER_STDOUT_WORLD,ierr)
 
-! Check solution and clean up.
+! Check solution and clean up
 call KSPGetConvergedReason(ksp,ireason,ierr)
 call KSPGetIterationNumber(ksp,cg_iter,ierr)
 
-! Copy solution to local array.
+! copy solution to local array
 call scatter_globalvec(xvec,sdata)
 
-end subroutine petsc_solve_complex
+end subroutine petsc_solve
 !===============================================================================
 
 subroutine scatter_globalvec(global_vec,larray)
