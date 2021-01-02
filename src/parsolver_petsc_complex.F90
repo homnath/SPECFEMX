@@ -802,7 +802,8 @@ use ieee_arithmetic
 implicit none
 
 real(kind=kreal),intent(in) :: storemmat(:,:)
-complex(kind=kreal),intent(in) :: storekmat(:,:,:)
+!complex(kind=kreal),intent(in) :: storekmat(:,:,:)
+PetscScalar  storekmat(:,:,:)
 integer :: i,i_elmt,ielmt,j,n,ndzero
 integer :: ggdof_elmt(NEDOF)
 ! Angular frequency.
