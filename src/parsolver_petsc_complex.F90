@@ -1031,7 +1031,7 @@ PetscComplex  kmat(NEDOF,NEDOF)
 PetscReal  mdiag(NEDOFU)
 PetscScalar,pointer :: diag_array(:)
 
-real(kind=8) :: xval
+PetscScalar xval
 
 ! Set and assemble matrix.
 !  - Note that MatSetValues() uses 0-based row and column numbers
