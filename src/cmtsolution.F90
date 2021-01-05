@@ -5,6 +5,7 @@ implicit none
 integer,parameter :: nline_cmtsolution=13
 ! Number of CMT sources in a CMTSOLUTION file
 integer :: ncmt_source
+real(kind=kreal),allocatable :: source_tshift(:),source_hdur(:)
 real(kind=kreal),allocatable :: nu_source (:,:,:)
 contains
 !-------------------------------------------------------------------------------
@@ -60,6 +61,7 @@ if(mod(nline,nline_cmtsolution).ne.0)then
 endif
 ncmt_source=nline/nline_cmtsolution
 
+allocate(source_tshift(ncmt_source),source_hdur(ncmt_source))
 allocate(nu_source(NDIM,NDIM,ncmt_source))
 errcode=0
 
@@ -76,7 +78,7 @@ end subroutine count_cmtsolution
 ! REVISION
 !  HNG, Oct 04, 2018
 ! TODO
-subroutine read_cmtsolution(source_tshift,source_hdur,source_coord,M_cmt,errcode,errtag)
+subroutine read_cmtsolution(source_coord,M_cmt,errcode,errtag)
 use dimensionless
 use global
 use math_constants
@@ -97,7 +99,6 @@ use serial_library
 use math_library_serial
 #endif
 implicit none
-real(kind=kreal),intent(out) :: source_tshift,source_hdur
 real(kind=kreal),intent(out) :: source_coord(:,:)
 real(kind=kreal),intent(out) :: M_cmt(:,:)
 integer,intent(out) :: errcode
@@ -450,6 +451,9 @@ src:do i_src=1,ncmt_source
     return
   endif
   nsrc=nsrc+1
+
+  source_tshift(i_src) = tshift
+  source_hdur(i_src) = hdur
 
   if(trim(cmt_mapto).eq.'GLOBE')then
     ! convert geographic latitude lat (degrees) to geocentric colatitude theta (radians)
