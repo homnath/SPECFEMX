@@ -22,7 +22,7 @@ bc: ubc=1, &
     uzfile='earthtest0_ssbcuz'
 
 #earthtest0quake slip or CMT file. 0 = slip,1 = CMT, 2 = Finite fault, 3 = Slip with split node
-eqsource: type=1, cmtfile='CMTSOLUTION_CORRECT'
+eqsource: type=1, cmtfile='CMTSOLUTION_CORRECT',mapto='GLOBE'
 
 #material list
 material: matfile='earthtest0_material_list',density=1
