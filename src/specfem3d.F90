@@ -6,7 +6,7 @@ subroutine specfem3d()
 ! Import necessary modules
 use dimensionless
 use global
-use string_library, only : parse_file
+use string_library,only : parse_file
 use math_constants
 use conversion_constants
 use gll_library
@@ -27,6 +27,8 @@ use global_dof
 use plastic_library
 use map_location
 use earthquake
+use source_function
+use cmtsolution,only:source_tshift,source_hdur
 #if (USE_MPI)
 use mpi_library
 use ghost_library_mpi
@@ -116,6 +118,8 @@ real(kind=kreal) :: uerr,maxu,maxdu
 !u: solution (summed over du)
 real(kind=kreal),allocatable :: du(:),u(:)
 
+! Source frequency function
+real(kind=kreal) :: sff
 real(kind=kreal),allocatable :: eld(:),eload(:),bload(:),   &
 vload(:),rhoload(:),resload(:)
 !eld: elastic displacement on all nodes of the element
@@ -858,6 +862,11 @@ loop_step: do i_step=istep0,nstep
     call earthquake_load(neq,extload,errcode,errtag)
     call sync_process
     call control_error(errcode,errtag,stdout,myrank)
+    if(steptype==FREQSTEP)then
+      !WARNING: make it general for nsrc
+      sff=source_frequency_function_complex(freq,source_hdur(1))
+      extload=extload*sff
+    endif
   endif
   
   ! Modify RHS vector for prescribed displacements
