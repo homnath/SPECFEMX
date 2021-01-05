@@ -76,7 +76,7 @@ end subroutine count_cmtsolution
 ! REVISION
 !  HNG, Oct 04, 2018
 ! TODO
-subroutine read_cmtsolution(source_coord,M_cmt,errcode,errtag)
+subroutine read_cmtsolution(source_tshift,source_hdur,source_coord,M_cmt,errcode,errtag)
 use dimensionless
 use global
 use math_constants
@@ -97,6 +97,7 @@ use serial_library
 use math_library_serial
 #endif
 implicit none
+real(kind=kreal),intent(out) :: source_tshift,source_hdur
 real(kind=kreal),intent(out) :: source_coord(:,:)
 real(kind=kreal),intent(out) :: M_cmt(:,:)
 integer,intent(out) :: errcode
@@ -108,6 +109,7 @@ integer :: i_elmt,i_face,i_line,i_src,iface,iface_all,ind,ios,istat
 integer :: niter,nline
 integer :: nsrc
 
+real(kind=kreal) :: tshift,hdur
 real(kind=kreal) :: lat,long,depth,Mrr,Mtt,Mpp,Mrt,Mrp,Mtp
 real(kind=kreal),dimension(3,3) :: Mcmt
 
@@ -177,6 +179,42 @@ src:do i_src=1,ncmt_source
     tag=trim(line)
     call first_token(tag,token)
 
+    ! time shift
+    if (trim(token)=='time')then
+      if(islat)then
+        write(errtag,*)'WARNING: copy of time shift found! Copies are discarded!'
+        cycle
+      endif
+      ind=index(line,':')
+      if(ind.le.0)then
+        write(errtag,*)'ERROR: invalid "time" token!',trim(line)
+        return
+      endif
+      read(line(ind+1:len_trim(line)),*,iostat=istat)tshift
+      if(istat.ne.0)then
+        write(*,*)'ERROR: cannot read time shift!',ind,trim(line)
+        stop
+      endif
+      islat=.true.
+    endif
+    ! half duration
+    if (trim(token)=='half')then
+      if(islat)then
+        write(errtag,*)'WARNING: copy of half duration! Copies are discarded!'
+        cycle
+      endif
+      ind=index(line,':')
+      if(ind.le.0)then
+        write(errtag,*)'ERROR: invalid "half" token!',trim(line)
+        return
+      endif
+      read(line(ind+1:len_trim(line)),*,iostat=istat)hdur
+      if(istat.ne.0)then
+        write(*,*)'ERROR: cannot read half duration!',ind,trim(line)
+        stop
+      endif
+      islat=.true.
+    endif
     ! latitude
     if (trim(token)=='latitude:')then
       if(islat)then
