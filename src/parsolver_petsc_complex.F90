@@ -523,10 +523,10 @@ CHKERRA(ierr)
 call MatSetSizes(Amat,PETSC_DECIDE,PETSC_DECIDE,ngdof,ngdof,ierr)
 CHKERRA(ierr)
 
-!does not work before preallocation
+! This does not work before preallocation
 !call MatGetLocalSize(Amat,nrow_part,ncol_part,ierr)
 
-! preallocation
+! Preallocation
 !call MatMPIAIJSetPreallocation(Amat,nzeros_max,PETSC_NULL_INTEGER,nzeros_max, &
 !PETSC_NULL_INTEGER,ierr)
 call MatMPIAIJSetPreallocation(Amat,0,nnzero_diag,         &
@@ -563,7 +563,7 @@ CHKERRA(ierr)
 
 ! Define solver type
 ! This will be overwritten by the command line arguments if provided
-! default solver type
+! Default solver type
 petsc_solver_type=1
 !petsc_solver_type=MUMPS
 
