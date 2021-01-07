@@ -516,7 +516,7 @@ PetscInt :: istart,iend
 
 errsrc=trim(myfname)//' => petsc_create_matrix'
 
-! create the matrix and preallocate
+! Create the matrix and preallocate
 call MatCreate(PETSC_COMM_WORLD,Amat,ierr)
 call MatSetType(Amat,MATMPIAIJ,ierr)
 CHKERRA(ierr)
