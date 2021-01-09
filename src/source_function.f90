@@ -16,6 +16,7 @@ if(SFTYPE==0)then
   ! Heaviside function
   source_frequency_function_complex = cmplx(ONE,ZERO)
 elseif(SFTYPE==1)then
+  ! Only imaginary component
   omegath=cmplx(ZERO,TWO*freq*hdur)
   ! Source_frequency_function_complex = sin(omegath)/omegath 
   source_frequency_function_complex = exp(omegath) 
