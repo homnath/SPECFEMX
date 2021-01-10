@@ -7,6 +7,7 @@ contains
 complex(kind=kreal) function source_frequency_function_complex(freq,hdur)
 
 implicit none
+! Type of source function
 integer,parameter :: SFTYPE=0
 
 real(kind=kreal),intent(in) :: freq,hdur
