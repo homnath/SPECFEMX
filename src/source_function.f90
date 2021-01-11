@@ -74,7 +74,7 @@ real(kind=kreal),intent(in) :: t,f0
 ! Ricker
 source_time_function_rickr = (ONE-TWO*PI*PI*f0*f0*t*t)*exp(-PI*PI*f0*f0*t*t)
 
-!!! Another source time function they have called 'ricker' in some old papers,
+!!! Another source time function they have called 'Ricker' in some old papers,
 !!! e.g., 'Finite-Frequency Kernels Based on Adjoint Methods' by Liu & Tromp, BSSA (2006)
 !!! in order to benchmark those simulations, the following formula is needed.
 ! comp_source_time_function_rickr = -2.d0*PI*PI*f0*f0*f0*t * exp(-PI*PI*f0*f0*t*t)
