@@ -2,9 +2,9 @@
 # REVISION
 #   HNG, Jan 17,2014
 
-default: createdir specfem-x
+default: createdir specfemx
 
-all: createdir default partmesh specfem-x pspecfem-x
+all: createdir default partmesh specfemx pspecfemx
 
 createdir:
 	(mkdir -p bin; mkdir -p input; mkdir -p output; mkdir -p partition; mkdir -p tmp)
@@ -18,10 +18,10 @@ debug:
 test:
 	(cd src; make $@)
 
-specfem-x: 
+specfemx: 
 	(cd src; make $@)
 
-pspecfem-x: 
+pspecfemx: 
 	(cd src; make $@)
 
 partmesh: 
