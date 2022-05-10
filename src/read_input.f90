@@ -202,7 +202,7 @@ nl_tol=zerotol; nl_maxiter=1
 
 ! Stepping
 steptype=0 ! time
-nstep=0
+nstep=1
 step0=ZERO
 step1=ZERO
 dstep=zero ! time/frequency step interval
