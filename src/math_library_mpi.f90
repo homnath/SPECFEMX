@@ -74,7 +74,7 @@ implicit none
 real(kind=kreal),intent(in)::scal
 real(kind=kreal),dimension(1,0:nproc-1) :: allscal
 real(kind=kreal) :: scal_mpi(1) ! input for MPI_ALLGATHER are arrays
-real(kind=kreal) :: ierr
+integer :: ierr
 
 scal_mpi(1)=scal
 call MPI_ALLGATHER(scal_mpi,1,MPI_KREAL,allscal,1,MPI_KREAL,MPI_COMM_WORLD,ierr)

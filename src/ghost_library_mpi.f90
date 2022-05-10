@@ -128,7 +128,7 @@ ofname='tmp/'//trim(file_head)//'_partitioninfo'//trim(adjustl(proc_str))
 open(unit=22,file=trim(ofname),access='stream',form='unformatted',             &
 status='replace',action='write',iostat=istat)
 if (istat /= 0)then
-  write(*,'(a)')'ERROR: output file "'//trim(fname)//'" cannot be opened!'
+  write(*,'(a)')'ERROR: output file "'//trim(ofname)//'" cannot be opened!'
   stop
 endif
 write(22)nnode
