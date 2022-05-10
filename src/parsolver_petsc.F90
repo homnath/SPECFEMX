@@ -723,8 +723,8 @@ errsrc=trim(myfname)//' => petsc_set_solver'
 ! define solver type
 ! this will be overwritten by the command line arguments if provided
 ! default solver type
-!petsc_solver_type=1
-petsc_solver_type=MUMPS
+petsc_solver_type=1
+!petsc_solver_type=MUMPS
 
 if(petsc_solver_type.eq.SUPERLU)then
   if(myrank==0)then
