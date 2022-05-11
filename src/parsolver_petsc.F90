@@ -503,7 +503,7 @@ where(nnzero_offdiag.lt.0)nnzero_offdiag=0
 where(nnzero_diag.gt.ng)nnzero_diag=ng
 call sync_process
 if(myrank==0)then
-  write(logunit,'(a,i0)')'success!',nzeros_max
+  write(logunit,'(a,i0)')'success! nzeros_max:',nzeros_max
   flush(logunit)
 endif
 
