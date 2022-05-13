@@ -410,8 +410,9 @@ This file will be generated automatically by a program \texttt{partmesh}.\\
 
 \subsection{Displacement boundary conditions files: \texttt{uxfile, uyfile, uzfile}}
 
-This file contains information on the displacement boundary conditions (currently only the zero-displacement is implemented), and has the following format:\\
-
+This file contains information on the displacement boundary conditions, and has the following format:\\
+\emph{BC\_type val}\\
+     $\Rightarrow$\emph{BC\_type} (integer, 0=nodal, 1=edge, 2=face)\\
 \emph{number of element faces}\\
 \emph{elementID faceID \\
 elementID faceID \\
@@ -421,6 +422,32 @@ elementID faceID \\
 
 Example:\\
 \\
+2 0.0\\
+\texttt{849\\
+2 2\\
+3 4\\
+5 1\\
+6 1\\
+7 1\\
+8 1\\
+9 1\\
+...\\
+...}\\
+
+\subsection{Fault slip files: \texttt{faultslipfile\_plus, faultslipfile\_minus}}
+
+This file contains information on the fault slip, and has the following format:\\
+\emph{slip vector}\\
+\emph{number of element faces}\\
+\emph{elementID faceID \\
+elementID faceID \\
+elementID faceID \\
+...\\
+...\\}
+
+Example:\\
+\\
+-5.0 0.0 0.0\\
 \texttt{849\\
 2 2\\
 3 4\\
