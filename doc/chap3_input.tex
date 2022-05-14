@@ -31,6 +31,7 @@ Only the following line types are permitted.
 \item[eqload:]    pseudo-static earthquake loading [optional]
 \item[water:]     water table information [optional]
 \item[control:]   control of the simulation
+\item[step:]      frequency/time step information
 \item[save:]      options to save data
 \item[devel:]     development parameters for experimental features [optional]
 \end{adescription}
@@ -152,6 +153,20 @@ Only the following arguments under the specified line types are permitted.\\
   \\
 \end{adescription}
 
+\texttt{\underline{step:}}
+\begin{adescription}{  start}
+  \item[type]: step type [integer, 0 = Time, 1 = Frequency, default $\Rightarrow$ 0].
+  \item[step]: step interval [real].
+  \item[if type = 1, i.e., frequency]
+  \item[  start]: start frequency [real].
+  \item[  end]: end frequency [real].
+  \item[  funit]: frequency unit [string, optional, `Hz'].
+  \item[if type = 0, i.e., time]
+  \item[  nstep]: number of time steps [integer > 0, default $\Rightarrow$ 1].
+  \item[  tunit]: time unit [string, optional, `sec', `hr',`day', `yr', default $\Rightarrow$ `sec'].
+  \\
+\end{adescription}
+
 \texttt{\underline{control:}}
 \begin{adescription}{nl\_maxiter}
   \item[ksp\_tol]: tolerance for conjugate gradient method [real].
@@ -169,6 +184,12 @@ Only the following arguments under the specified line types are permitted.\\
   \item[excavid]: IDs of blocks/regions in the mesh to be excavated in each stage [integer vector, default $\Rightarrow$ {1}].
   \\\\
   {\emph{Note: Do not mix arguments for slope stability and excavation.}} \\
+\end{adescription}
+
+\texttt{\underline{station:}}
+\begin{adescription}{sfile}
+  \item[sfile]: file name of stations.
+  \\
 \end{adescription}
 
 \texttt{\underline{save:}}
