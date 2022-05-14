@@ -19,7 +19,6 @@ All legitimate input lines should be written in lower case. Line type and argume
 
 Only the following line types are permitted.
 \begin{adescription}{benchmark:}
-\item[utm\_zone]  The UTM (Universal Transverse Mercator) zone [integer, optional, valid range (1, 60)]. This is required for regional simulations.
 \item[preinfo:]   preliminary information of the simulation
 \item[mesh:]      mesh information
 \item[bc:]        boundary conditions information
@@ -44,6 +43,7 @@ Only the following arguments under the specified line types are permitted.\\
 \texttt{\underline{preinfo:}}
 
 \begin{adescription}{nl\_maxiter}
+  \item[utm\_zone]  The UTM (Universal Transverse Mercator) zone [integer, optional, valid range (1, 60)]. This is required for regional simulations.
   \item[nproc] : number of processors to be used for the parallel processing [integer > 1]. Only required for parallel processing.
   \item[ngllx] : number of Gauss-Lobatto-Legendre (GLL) points along $x$-axis [integer > 1].
   \item[nglly] : number of GLL points along $y$-axis [integer > 1].
@@ -55,7 +55,7 @@ Only the following arguments under the specified line types are permitted.\\
   \item[disp\_dof]  : switch to activate displacement degree of freedom [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 1].
   \item[pot\_dof]  : switch to activate potential (gravity or magnetic) degree of freedom [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
   \item[pot\_type] : potential type [string, optional,\texttt{\sq{gravity}} = Gravity potential, \texttt{\sq{magnetic}} = Magnetic potential]. It must be provided if \texttt{pot\_dof = 1}.
-  \item[magnetic]  : switch gravity potential to magnetic potential degree of freedom [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
+  \item[grav0]  : switch to activate background gravity (Cowling approximation) [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
   \\
 \end{adescription}
 
@@ -66,31 +66,33 @@ Only the following arguments under the specified line types are permitted.\\
   \item[yfile] : file name of $y$-coordinates [string].
   \item[zfile] : file name of $z$-coordinates [string].
   \item[confile]: file name of mesh connectivity [string].
+  \item[fsfile]: file name of free surface [string]. Use an empty file if there is no free surface.
   \item[idfile]: file name of element IDs [string].
   \item[gfile]: file name of ghost interfaces, i.e., partition interfaces [string]. Only required for parallel processing.  \\
 \end{adescription}
 
 \texttt{\underline{bc:}}
-\begin{adescription}{add\_infmesh}
+\begin{adescription}{  add\_infmesh}
   \item[ubc]  : switch to apply primary/essential boundary condition [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 1].
   \item[uxfile]: file name of displacement boundary conditions along $x$-axis [string].
   \item[uyfile]: file name of displacement boundary conditions along $y$-axis [string].
   \item[uzfile]: file name of displacement boundary conditions along $z$-axis [string].
   \item[infbc]  : switch to apply infnite bounday condition condition [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
-  \item[add\_infmesh]  : switch to add infinite mesh layer [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
-  \item[infrfile]  : surface file on which the infinite elements are created [string].
-  \item[mat\_type]  : type of material block for infinite elements [string, \texttt{\sq{define}} = Define specific material block IDs for transition infinite and infinite regions, \texttt{\sq{inherit}} = Inherit material block IDs of the parent elements].
-  \item[imat\_trinf]  : material block ID for transition-infinite elements [integer, optional].
-  \item[imat\_inf]  : material block ID for infinite elements [integer, optional but must be defined if \texttt{mat\_type}=\texttt{\sq{define}}].
-  \item[pole0]  : initial pole for the infinite element layer [string, optional, \texttt{\sq{origin}} = Origin of the model, \texttt{\sq{center}} = Center of the model, \texttt{\sq{user}} = User-defined, default $\Rightarrow$ \texttt{\sq{origin}}].
-  \item[pole\_type]  : pole type for the infinite element layer [string, optional, \texttt{\sq{point}} = A point, \texttt{\sq{axis}} = Multipoles on the axis, \texttt{\sq{pointaxis}} = Single pole and multipoles on the axis, \texttt{\sq{plane}} = Multipoles on the plane, default $\Rightarrow$ \texttt{\sq{point}}].
-  \item[coord0]: user defined coordinates for the pole [real vector].
-  \item[coord1]: user defined coordinates for the end pole [real vector, optional]. It is necessary only if the \texttt{pole\_type}=\texttt{\sq{pointaxis}}.
-  \item[pole\_axis]  : pole axis [integer, 1 = X-axis, 2 = Y-axis, 3 = Z-axis]. This must be defined for \texttt{\sq{pole\_type}} = \texttt{\sq{axis}} or \texttt{\sq{pointaxis}}.
-  \item[axis\_range]: ragnge of the pole coordinates along the pole axis [real two-component vector, optional]. This must be defined for \texttt{\sq{pole\_type}} = \texttt{\sq{pointaxis}}.
-  \item[rinf]: reference radius for infinite elements [real]. rinf > largest corner distance from the pole.
-  \item[valinf]: value of the primary variable at the infinity [real, default $\Rightarrow$ 0.0].
-  \item[infquad]  : quadrature type in the infinite elements [string, optional, \texttt{\sq{radau}} = Radau quadrature, \texttt{\sq{gauss}} = Gauss quadrature, default $\Rightarrow$ \texttt{\sq{radau}}].
+  \item[if infbc = 1, i.e., infinite BC]
+  \item[  add\_infmesh]  : switch to add infinite mesh layer [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
+  \item[  infrfile]  : surface file on which the infinite elements are created [string].
+  \item[  mat\_type]  : type of material block for infinite elements [string, \texttt{\sq{define}} = Define specific material block IDs for transition infinite and infinite regions, \texttt{\sq{inherit}} = Inherit material block IDs of the parent elements].
+  \item[  imat\_trinf]  : material block ID for transition-infinite elements [integer, optional].
+  \item[  imat\_inf]  : material block ID for infinite elements [integer, optional but must be defined if \texttt{mat\_type}=\texttt{\sq{define}}].
+  \item[  pole0]  : initial pole for the infinite element layer [string, optional, \texttt{\sq{origin}} = Origin of the model, \texttt{\sq{center}} = Center of the model, \texttt{\sq{user}} = User-defined, default $\Rightarrow$ \texttt{\sq{origin}}].
+  \item[  pole\_type]  : pole type for the infinite element layer [string, optional, \texttt{\sq{point}} = A point, \texttt{\sq{axis}} = Multipoles on the axis, \texttt{\sq{pointaxis}} = Single pole and multipoles on the axis, \texttt{\sq{plane}} = Multipoles on the plane, default $\Rightarrow$ \texttt{\sq{point}}].
+  \item[  coord0]: user defined coordinates for the pole [real vector].
+  \item[  coord1]: user defined coordinates for the end pole [real vector, optional]. It is necessary only if the \texttt{pole\_type}=\texttt{\sq{pointaxis}}.
+  \item[  pole\_axis]  : pole axis [integer, 1 = X-axis, 2 = Y-axis, 3 = Z-axis]. This must be defined for \texttt{\sq{pole\_type}} = \texttt{\sq{axis}} or \texttt{\sq{pointaxis}}.
+  \item[  axis\_range]: ragnge of the pole coordinates along the pole axis [real two-component vector, optional]. This must be defined for \texttt{\sq{pole\_type}} = \texttt{\sq{pointaxis}}.
+  \item[  rinf]: reference radius for infinite elements [real]. rinf > largest corner distance from the pole.
+  \item[  valinf]: value of the primary variable at the infinity [real, default $\Rightarrow$ 0.0].
+  \item[  infquad]  : quadrature type in the infinite elements [string, optional, \texttt{\sq{radau}} = Radau quadrature, \texttt{\sq{gauss}} = Gauss quadrature, default $\Rightarrow$ \texttt{\sq{radau}}].
   \\
 \end{adescription}
 
