@@ -95,6 +95,7 @@ endif
 fsurf_stat=.true.
 count_fsurf=0
 isempty=.true.
+pfault_nface=0
 fsurface_plus: do
   read(11,*,iostat=ios)pfault_svec
   if(ios/=0)exit fsurface_plus
@@ -104,6 +105,7 @@ fsurface_plus: do
   fsurf_stat=.false.
 
   read(11,*)pfault_nface
+  ! WARNING: for multiple surfaces following statement may not work!
   allocate(pfault_ielmt(pfault_nface),pfault_iface(pfault_nface),              &
   pfault_iedge(4,pfault_nface))
   do i_face=1,pfault_nface
@@ -118,6 +120,11 @@ if(.not.fsurf_stat)then
   write(errtag,'(a)')'ERROR: some fault surfaces cannot be read for PLUS side!'
   return
 endif
+
+! Allocate with 0 element to avoid "not allocated" error!
+if(.not.allocated(pfault_ielmt))allocate(pfault_ielmt(pfault_nface))
+if(.not.allocated(pfault_iface))allocate(pfault_iface(pfault_nface))
+if(.not.allocated(pfault_iedge))allocate(pfault_iedge(4,pfault_nface))
 
 ! Plot VTK file.
 ! File names for plotting fault slip VTK format.
@@ -140,6 +147,7 @@ endif
 fsurf_stat=.true.
 count_fsurf=0
 isempty=.true.
+mfault_nface=0
 fsurface_minus: do
   read(11,*,iostat=ios)mfault_svec
   if(ios/=0)exit fsurface_minus
@@ -164,6 +172,10 @@ if(.not.fsurf_stat)then
   return
 endif
 
+! Allocate with 0 element to avoid "not allocated" error!
+if(.not.allocated(mfault_ielmt))allocate(mfault_ielmt(mfault_nface))
+if(.not.allocated(mfault_iface))allocate(mfault_iface(mfault_nface))
+if(.not.allocated(mfault_iedge))allocate(mfault_iedge(4,mfault_nface))
 ! Plot VTK file.
 ! File names for plotting fault slip VTK format.
 fminus_file=trim(out_path)//trim(file_head)//'_fault_minus'//trim(ptail)//'.vtk'

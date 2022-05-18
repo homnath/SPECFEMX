@@ -489,7 +489,7 @@ if(myrank==0)then
 endif
 
 ! compute initial stress assuming elastic domain
-if(savedata%stress)then
+if(savedata%stress.or.isplastic)then
   allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
   stress_elmt=ZERO
 endif
@@ -992,6 +992,7 @@ loop_step: do i_step=istep0,nstep
   !bodyload=ZERO; bodyload(0)=ZERO
   ! nonlinear iteration loop
   nonlinear: do i_nliter=1,NL_MAXITER
+    fmax=0 ! failure indicator for plastic simulation.
     nl_iter=nl_iter+1
    
     if(isplastic)then
@@ -1155,7 +1156,7 @@ loop_step: do i_step=istep0,nstep
           sigma=matmul(cmat,estrain)
 
           if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
-          if(savedata%stress)stress_elmt(:,i,ielmt)=sigma
+          if(savedata%stress .and. .not.isplastic)stress_elmt(:,i,ielmt)=sigma
 
           if(isplastic)then
             effsigma=sigma+stress_elmt(:,i,ielmt)
@@ -1202,7 +1203,15 @@ loop_step: do i_step=istep0,nstep
         enddo ! i=1,ngll
         if(nl_isconv .or. nl_iter==nl_maxiter)cycle
         bodyload(egdofu)=bodyload(egdofu)+bload
-      enddo
+      enddo ! i_elmt
+
+      fmax=maxscal(fmax)                                                           
+      if(myrank==0)then                                                            
+        write(logunit,'(a,i4,a,f12.6,a,f12.6,a,f12.6)') &                           
+        ' nl_iter:',nl_iter,' f_max:',fmax,' uerr:',uerr,' umax:',maxdu
+        flush(logunit) 
+      endif
+
       !---------------------------------------------------------------------------
       
       if(allelastic)exit nonlinear
