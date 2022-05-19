@@ -195,7 +195,7 @@ real(kind=kreal) :: e0(nst) !e0: initial strain
 real(kind=kreal) :: vesigma(nst)
 real(kind=kreal) :: trace_vsigma0,trace_strain
 real(kind=kreal) :: esigma0_dev(nst),esigma_dev(nst)
-real(kind=kreal) :: maxres
+real(kind=kreal) :: maxresload,maxbodyload
 
 integer :: geq,inum,nequ
 logical,allocatable :: iseq(:)
@@ -706,8 +706,8 @@ call compute_mass_elastic(storemmat,errcode,errtag)
 if(isplastic)then
   ! Compute minimum pseudo-time step for viscoplasticity
   dt_vp=dt_viscoplas(nmatblk,nu_blk,phi_blk,ym_blk)
-  ! find global dt
-  dt=minscal(dt)
+  ! find global dt_vp
+  dt_vp=minscal(dt_vp)
 endif
 ! Starting time/frequency loop.
 loop_step: do i_step=istep0,nstep
@@ -836,8 +836,8 @@ loop_step: do i_step=istep0,nstep
   if(iseqsource.and.eqsource_type.eq.3)then
     if(i_step==1)then
       if(myrank==0)then
-        write(logunit,'(a)')'Earthquake source type: slip with split node'
-        write(logunit,'(a,1x,i2)')'Slip taper option: ',itaper_slip
+        write(logunit,'(a)')'  Earthquake source type: slip with split node'
+        write(logunit,'(a,1x,i2)')'  Slip taper option: ',itaper_slip
         flush(logunit)
       endif
       if(divide_slip)then
@@ -866,7 +866,7 @@ loop_step: do i_step=istep0,nstep
   ! from the prescribe slip on the fault
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
     if(myrank==0)then
-      write(logunit,'(a)')'Earthquake source type: moment-density tensor'
+      write(logunit,'(a)')'  Earthquake source type: moment-density tensor'
       flush(logunit)
     endif
     call earthquake_load(neq,extload,errcode,errtag)
@@ -999,12 +999,13 @@ loop_step: do i_step=istep0,nstep
       resload=load+bodyload
     else
       resload=load-bodyload
-      resload(0)=ZERO
-      maxres=maxscal(maxval(abs(resload)))
     endif
+    resload(0)=ZERO
+    maxresload=maxscal(maxval(abs(resload)))
+    maxbodyload=maxscal(maxval(abs(bodyload)))
     if(myrank==0)then
-      write(logunit,'(a,i0,1x,g0.6,1x,g0.6)')' Residual NL: ',i_nliter, &
-      maxres,maxval(abs(bodyload))
+      write(logunit,'(a,i0,1x,e12.5,1x,e12.5)')' Residual NL: ',i_nliter, &
+      maxresload,maxbodyload
       flush(logunit)
     endif
 
@@ -1051,9 +1052,7 @@ loop_step: do i_step=istep0,nstep
     if(myrank==0)then
       write(format_str,*)ceiling(log10(real(telap)+1.))+5 ! 1 . and 4 decimals
       format_str='(a,1x,f'//trim(adjustl(format_str))//'.4)'
-      write(logunit,fmt=format_str)'Solver Elapsed Time:',telap
-      write(logunit,'(a)')'--------------------------------------------'
-      flush(logunit)
+      write(logunit,fmt=format_str)' Solver Elapsed Time:',telap
     endif
 
     ksp_tot=ksp_tot+ksp_iter
@@ -1171,7 +1170,7 @@ loop_step: do i_step=istep0,nstep
               flow=f*(m1*dq1+m2*dq2+m3*dq3)
 
               erate=matmul(flow,effsigma)
-              evp=erate*dt
+              evp=erate*dt_vp
               evpt(:,i,ielmt)=evpt(:,i,ielmt)+evp
               devp=matmul(cmat,evp)
               
@@ -1203,6 +1202,7 @@ loop_step: do i_step=istep0,nstep
         enddo ! i=1,ngll
         if(nl_isconv .or. nl_iter==nl_maxiter)cycle
         bodyload(egdofu)=bodyload(egdofu)+bload
+        !print*,maxval(abs(bload)),maxval(abs(bodyload))
       enddo ! i_elmt
 
       fmax=maxscal(fmax)                                                           
@@ -1211,6 +1211,8 @@ loop_step: do i_step=istep0,nstep
         ' nl_iter:',nl_iter,' f_max:',fmax,' uerr:',uerr,' umax:',maxdu
         flush(logunit) 
       endif
+      write(logunit,'(a)')'--------------------------------------------'
+      flush(logunit)
 
       !---------------------------------------------------------------------------
       
