@@ -29,7 +29,7 @@ faultslipfile_minus='vfault_fault_minus',shalf=1
 material: matfile='vfault_plastic_material_list',density=1,plastic=1
 
 #control parameters
-control: ksp_tol=1e-6, ksp_maxiter=1000, nl_tol=1e-4, nl_maxiter=1
+control: ksp_tol=1e-6, ksp_maxiter=1000, nl_tol=1e-4, nl_maxiter=20
 
 #save data
 save: disp=1, strain=1, fsplot=1
