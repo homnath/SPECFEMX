@@ -391,6 +391,7 @@ do
     preinfo_stat=1
     cycle
   endif
+
   ! read mesh information
   if (trim(token)=='mesh:')then
     if(mesh_stat==1)then

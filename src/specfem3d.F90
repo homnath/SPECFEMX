@@ -1209,10 +1209,9 @@ loop_step: do i_step=istep0,nstep
       if(myrank==0)then                                                            
         write(logunit,'(a,i4,a,f12.6,a,f12.6,a,f12.6)') &                           
         ' nl_iter:',nl_iter,' f_max:',fmax,' uerr:',uerr,' umax:',maxdu
+        write(logunit,'(a)')'--------------------------------------------'
         flush(logunit) 
       endif
-      write(logunit,'(a)')'--------------------------------------------'
-      flush(logunit)
 
       !---------------------------------------------------------------------------
       

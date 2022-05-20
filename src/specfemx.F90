@@ -444,7 +444,7 @@ call set_element_dof()
 !endif
 
 if(myrank==0)then
-  write(logunit,'(a,i0)')'-----------------------------------------------'
+  write(logunit,'(a)')'-----------------------------------------------'
   if(ISDISP_DOF)then
     write(logunit,'(a)')'Displacement DOF: '//'ON'
     write(logunit,'(a,i0)')' NNDOFU: ',nndofu
@@ -466,7 +466,7 @@ if(myrank==0)then
   write(logunit,'(a,i0)')'NEDOFU: ',nedofu
   write(logunit,'(a,i0)')'NEDOFPHI: ',nedofphi
   write(logunit,'(a,i0)')'Total DOFs per element: ',nedof
-  write(logunit,'(a,i0)')'-----------------------------------------------'
+  write(logunit,'(a)')'-----------------------------------------------'
   flush(logunit)
 endif
 
