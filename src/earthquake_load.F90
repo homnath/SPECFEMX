@@ -1491,7 +1491,7 @@ if(myrank==0)then
   write(logunit,'(a,i0)')'Total sources fail strict test: ',nfail_strict
   if(nfail_strict.gt.0)then
     write(logunit,'(a,i0)')'NOTE: failed strict test indicates that some of &
-    &                    the elements may NOT be proper hexahedra!'
+    &the elements may NOT be proper hexahedra!'
   endif
   flush(logunit)
 endif
