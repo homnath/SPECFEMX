@@ -234,6 +234,7 @@ real(kind=kreal) :: minbulkmod,maxbulkmod
 real(kind=kreal) :: minshearmod,maxshearmod
 integer :: nmatblk !number of material domains
 logical :: isdensity
+logical :: isplastic
 ! Flag to check if the domain is empty
 logical,allocatable :: isempty_blk(:)
 integer,allocatable :: mat_domain(:),type_blk(:)

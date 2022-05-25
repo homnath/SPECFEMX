@@ -139,27 +139,27 @@ ELSE(ISPARALLEL)
   ADD_DEPENDENCIES(geotech sem serial both)
 ENDIF(ISPARALLEL)
 
-# Build specfem-x
+# Build specfemx
 #TARGET_LINK_LIBRARIES(geotech ${semall})
 #SET_TARGET_PROPERTIES(geotech PROPERTIES LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
 IF(ISPARALLEL)
-  SET_PROPERTY(SOURCE specfem-x.F90 PROPERTY COMPILE_DEFINITIONS USE_MPI)
-  #SET_PROPERTY(SOURCE specfem-x.F90 PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
+  SET_PROPERTY(SOURCE specfemx.F90 PROPERTY COMPILE_DEFINITIONS USE_MPI)
+  #SET_PROPERTY(SOURCE specfemx.F90 PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
   SET(LIBS geotech both parsem sem ${MPI_Fortran_LIBRARIES})
-  SET(mainprog pspecfem-x)
+  SET(mainprog pspecfemx)
 ELSE(ISPARALLEL)
   SET(LIBS geotech both serial sem)
-  SET(mainprog specfem-x)
+  SET(mainprog specfemx)
 ENDIF(ISPARALLEL)
 ADD_EXECUTABLE(${mainprog}
-              specfem-x.F90)
+              specfemx.F90)
 TARGET_LINK_LIBRARIES(${mainprog} ${LIBS})
 #IF(ISPARALLEL)
 #  SET(semall geotech parsem sem)
 #ELSE(ISPARALLEL)
 #  SET(semall geotech serial sem)
 #ENDIF(ISPARALLEL)
-#TARGET_LINK_LIBRARIES(specfem-x ${semall} ${MPI_Fortran_LIBRARIES})
+#TARGET_LINK_LIBRARIES(specfemx ${semall} ${MPI_Fortran_LIBRARIES})
 
 # Build partmesh program
 # partmesh program partitions the mesh for the parallel processing
@@ -183,5 +183,6 @@ ${SCOTCH_INCLUDE_PATH})
   ADD_EXECUTABLE(partmesh
               partmesh.f90)
   TARGET_LINK_LIBRARIES(partmesh partscotch
-${SCOTCH_LIBRARY_PATH}/libscotch.a ${SCOTCH_LIBRARY_PATH}/libscotcherr.a)
+${SCOTCH_LIBRARY_PATH}/libscotch.a ${SCOTCH_LIBRARY_PATH}/libscotcherr.a
+-lpthread)
 ENDIF(ISPARTMESH)

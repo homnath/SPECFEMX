@@ -29,6 +29,19 @@ IF(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 ENDIF()
 
+#  ADD compiler specific flags
+if(CMAKE_Fortran_COMPILER_ID MATCHES Intel)
+    set(CMAKE_Fortran_FLAGS         "${CMAKE_Fortran_FLAGS} -xHOST -fpe0 -ftz -assume buffered_io -assume byterecl -align sequence -std08 -diag-disable 6477 -implicitnone -gen-interfaces -warn all -Wall")
+    set(CMAKE_Fortran_FLAGS_DEBUG   "-check all -debug -g -O0 -fp-stack-check -traceback -ftrapuv")
+    set(CMAKE_Fortran_FLAGS_RELEASE "-O3 -ip")
+endif()
+
+if(CMAKE_Fortran_COMPILER_ID MATCHES GNU)
+    set(CMAKE_Fortran_FLAGS         "${CMAKE_Fortran_FLAGS} -std=f2008 -fimplicit-none -fmax-errors=10 -pedantic -pedantic-errors -Waliasing -Wampersand -Wcharacter-truncation -Wline-truncation -Wsurprising -Wno-tabs -Wunderflow -ffpe-trap=invalid,zero,overflow")
+    set(CMAKE_Fortran_FLAGS_DEBUG   "-g -O0 -ggdb -fbacktrace -fbounds-check -frange-check")
+    set(CMAKE_Fortran_FLAGS_RELEASE "-O3 -finline-functions")
+endif()
+
 # Test Fortran compiler
 TRY_COMPILE(TEST_F90 ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src/testf90.f90)
 IF(NOT TEST_F90)

@@ -174,6 +174,7 @@ devel_rtfac=ONE
 ! by default 4th column of the material list is assumed to be unit weight
 ! if .true., density is assumed
 isdensity=.false.
+isplastic=.false.
 
 s0_type=0 ! by default compute initial stress using SEM
 
@@ -202,7 +203,7 @@ nl_tol=zerotol; nl_maxiter=1
 
 ! Stepping
 steptype=0 ! time
-nstep=0
+nstep=1
 step0=ZERO
 step1=ZERO
 dstep=zero ! time/frequency step interval
@@ -390,6 +391,7 @@ do
     preinfo_stat=1
     cycle
   endif
+
   ! read mesh information
   if (trim(token)=='mesh:')then
     if(mesh_stat==1)then
@@ -673,6 +675,8 @@ do
     if(istat==0 .and. iselastic==1)allelastic=.true.
     call seek_integer('density',ival,args,narg,istat)
     if(istat==0 .and. ival==1)isdensity=.true.
+    call seek_integer('plastic',ival,args,narg,istat)
+    if(istat==0 .and. ival==1)isplastic=.true.
     call seek_string('model',strval,args,narg)
     if (.not. isblank(strval))cmodel=trim(strval)
     if(trim(cmodel)=='chakravarthi')then

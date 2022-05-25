@@ -68,7 +68,7 @@ integer :: iu0,iphi0
 
 ! order ux,uy,uz,\phi
 edofu=-9999
-edofphi=-9999
+if(ISPOT_DOF)edofphi=-9999
 
 iu0=0
 iphi0=0

@@ -503,7 +503,7 @@ where(nnzero_offdiag.lt.0)nnzero_offdiag=0
 where(nnzero_diag.gt.ng)nnzero_diag=ng
 call sync_process
 if(myrank==0)then
-  write(logunit,'(a,i0)')'success!',nzeros_max
+  write(logunit,'(a,i0)')'success! nzeros_max:',nzeros_max
   flush(logunit)
 endif
 
@@ -564,8 +564,8 @@ CHKERRA(ierr)
 ! Define solver type
 ! This will be overwritten by the command line arguments if provided
 ! default solver type
-!petsc_solver_type=1
-petsc_solver_type=MUMPS
+petsc_solver_type=1
+!petsc_solver_type=MUMPS
 
 if(petsc_solver_type==0)then
   if(myrank==0)then
@@ -723,8 +723,8 @@ errsrc=trim(myfname)//' => petsc_set_solver'
 ! define solver type
 ! this will be overwritten by the command line arguments if provided
 ! default solver type
-!petsc_solver_type=1
-petsc_solver_type=MUMPS
+petsc_solver_type=1
+!petsc_solver_type=MUMPS
 
 if(petsc_solver_type.eq.SUPERLU)then
   if(myrank==0)then

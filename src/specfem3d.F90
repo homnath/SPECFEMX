@@ -69,7 +69,7 @@ integer :: ielmt,imat,idof,iedof!element ID for gdof, node, etc.
 real(kind=kreal),dimension(nst),parameter :: unit_voigt=(/one,one,one,ZERO,    &
 ZERO,ZERO /)!Voigt representation for vector
 real(kind=kreal) :: jacw !determinant of Jacobian*gll_weight
-real(kind=kreal) :: dt ! time step
+real(kind=kreal) :: dt,dt_vp ! time step
 
 real(kind=kreal) :: sfac ! slip factor
 
@@ -84,7 +84,12 @@ logical :: nl_isconv ! logical variable to check convergence of
 
 real(kind=kreal) :: G,K
 real(kind=kreal) :: cmat(nst,nst),estrain(nst),dev_strain(nst),  &
-esigma(nst),sigma(nst),vsigma(nst)
+esigma(nst),sigma(nst),effsigma(nst),vsigma(nst)
+real(kind=kreal) :: devp(nst),eps(nst),erate(nst),evp(nst),      &
+flow(nst,nst),m1(nst,nst),m2(nst,nst),m3(nst,nst)
+real(kind=kreal) :: dq1,dq2,dq3,dsbar,f,fmax,lode_theta,sigm
+
+
 ! cmat: elastic matric (Cijkl) in Voigt notation
 ! estrain: elastic strain
 ! esigma: elastic stress
@@ -95,9 +100,6 @@ esigma(nst),sigma(nst),vsigma(nst)
 ! num: g_num for particular element.
 ! node_valency: number of elements that share each node.
 integer,allocatable::num(:),node_valency(:)
-
-! Factored parameters. Only for elasto-plastic implementation.
-real(kind=kreal),allocatable :: cohf(:),nuf(:),phif(:),psif(:),ymf(:)
 
 integer :: nzero_dprecon
 real(kind=kreal),allocatable :: dprecon(:),ndscale(:)
@@ -116,7 +118,7 @@ real(kind=kreal),allocatable :: storemmat(:,:)
 real(kind=kreal) :: uerr,maxu,maxdu
 !du: incremental solution
 !u: solution (summed over du)
-real(kind=kreal),allocatable :: du(:),u(:)
+real(kind=kreal),allocatable :: du(:),u(:),olddu(:)
 
 ! Source frequency function
 real(kind=kreal) :: sff
@@ -134,7 +136,7 @@ viscoload(:),ubcload(:),load(:)
 !stress_elmt: stress for each element
 !stress_nodal: nodal stress for all elements in processor
 real(kind=kreal),allocatable :: strain_elmt(:,:,:),strain_nodal(:,:),      &
-stress_elmt(:,:,:),stress_nodal(:,:)
+stress_elmt(:,:,:),stress_nodal(:,:),evpt(:,:,:)
 !bcnodalv: prescribed BC nodal variables
 !nodalu: nodal displacement for all nodes (not just BC)
 real(kind=kreal),allocatable :: bcnodalv(:,:),nodalu(:,:)
@@ -193,7 +195,7 @@ real(kind=kreal) :: e0(nst) !e0: initial strain
 real(kind=kreal) :: vesigma(nst)
 real(kind=kreal) :: trace_vsigma0,trace_strain
 real(kind=kreal) :: esigma0_dev(nst),esigma_dev(nst)
-real(kind=kreal) :: maxres
+real(kind=kreal) :: maxresload,maxbodyload
 
 integer :: geq,inum,nequ
 logical,allocatable :: iseq(:)
@@ -487,7 +489,7 @@ if(myrank==0)then
 endif
 
 ! compute initial stress assuming elastic domain
-if(savedata%stress)then
+if(savedata%stress.or.isplastic)then
   allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
   stress_elmt=ZERO
 endif
@@ -577,8 +579,6 @@ if(myrank==0)then
   flush(logunit)
 endif
 
-allocate(cohf(nmatblk),nuf(nmatblk),phif(nmatblk),psif(nmatblk),ymf(nmatblk))
-
 allocate(load(0:neq),bodyload(0:neq),viscoload(0:neq),             &
 resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),            &
 storekmat(nedof,nedof,nelmt),storemmat(nedof,nelmt),stat=istat)
@@ -586,6 +586,10 @@ if(istat/=0)then
   write(logunit,*)'ERROR: cannot allocate memory!'
   flush(logunit)
   stop
+endif
+
+if(isplastic)then
+  allocate(olddu(0:neq),evpt(nst,ngll,nelmt))
 endif
 
 allocate(ngpart_node(nnode))
@@ -699,6 +703,12 @@ endif
 ! Compute mass matrix
 call compute_mass_elastic(storemmat,errcode,errtag)
 
+if(isplastic)then
+  ! Compute minimum pseudo-time step for viscoplasticity
+  dt_vp=dt_viscoplas(nmatblk,nu_blk,phi_blk,ym_blk)
+  ! find global dt_vp
+  dt_vp=minscal(dt_vp)
+endif
 ! Starting time/frequency loop.
 loop_step: do i_step=istep0,nstep
   !t=dt*real(i_step,kreal)
@@ -826,8 +836,8 @@ loop_step: do i_step=istep0,nstep
   if(iseqsource.and.eqsource_type.eq.3)then
     if(i_step==1)then
       if(myrank==0)then
-        write(logunit,'(a)')'Earthquake source type: slip with split node'
-        write(logunit,'(a,1x,i2)')'Slip taper option: ',itaper_slip
+        write(logunit,'(a)')'  Earthquake source type: slip with split node'
+        write(logunit,'(a,1x,i2)')'  Slip taper option: ',itaper_slip
         flush(logunit)
       endif
       if(divide_slip)then
@@ -856,7 +866,7 @@ loop_step: do i_step=istep0,nstep
   ! from the prescribe slip on the fault
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
     if(myrank==0)then
-      write(logunit,'(a)')'Earthquake source type: moment-density tensor'
+      write(logunit,'(a)')'  Earthquake source type: moment-density tensor'
       flush(logunit)
     endif
     call earthquake_load(neq,extload,errcode,errtag)
@@ -974,16 +984,28 @@ loop_step: do i_step=istep0,nstep
   
   load(0)=ZERO
 
+  if(isplastic)then
+    evpt=ZERO
+    olddu=ZERO
+    bodyload=ZERO
+  endif
   !bodyload=ZERO; bodyload(0)=ZERO
   ! nonlinear iteration loop
   nonlinear: do i_nliter=1,NL_MAXITER
+    fmax=0 ! failure indicator for plastic simulation.
     nl_iter=nl_iter+1
-    resload=load-bodyload
+   
+    if(isplastic)then
+      resload=load+bodyload
+    else
+      resload=load-bodyload
+    endif
     resload(0)=ZERO
-    maxres=maxscal(maxval(abs(resload)))
+    maxresload=maxscal(maxval(abs(resload)))
+    maxbodyload=maxscal(maxval(abs(bodyload)))
     if(myrank==0)then
-      write(logunit,'(a,i0,1x,g0.6,1x,g0.6)')' Residual NL: ',i_nliter, &
-      maxres,maxval(abs(bodyload))
+      write(logunit,'(a,i0,1x,e12.5,1x,e12.5)')' Residual NL: ',i_nliter, &
+      maxresload,maxbodyload
       flush(logunit)
     endif
 
@@ -1030,9 +1052,7 @@ loop_step: do i_step=istep0,nstep
     if(myrank==0)then
       write(format_str,*)ceiling(log10(real(telap)+1.))+5 ! 1 . and 4 decimals
       format_str='(a,1x,f'//trim(adjustl(format_str))//'.4)'
-      write(logunit,fmt=format_str)'Solver Elapsed Time:',telap
-      write(logunit,'(a)')'--------------------------------------------'
-      flush(logunit)
+      write(logunit,fmt=format_str)' Solver Elapsed Time:',telap
     endif
 
     ksp_tot=ksp_tot+ksp_iter
@@ -1046,15 +1066,25 @@ loop_step: do i_step=istep0,nstep
       endif
       flush(logunit)
     endif
-    u=u+du
+
+    if(isplastic)then
+      u=du
+    else
+      u=u+du
+    endif
 
     maxu=maxscal(maxval(abs(u)))
     ! check convergence
-    uerr=ZERO
-    if(maxu.eq.ZERO)then
-      uerr=one
+    if(isplastic)then
+      uerr=maxscal(maxval(abs(u-olddu)))/maxu    
+      olddu=u
     else
-      uerr=maxdu/maxu
+      uerr=ZERO
+      if(maxu.eq.ZERO)then
+        uerr=one
+      else
+        uerr=maxdu/maxu
+      endif
     endif
     nl_isconv=uerr.le.NL_TOL
     if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROtol)nl_isconv=.true.
@@ -1102,8 +1132,10 @@ loop_step: do i_step=istep0,nstep
       ! Elastic elements
       ! This part is repeated for the first step. We should change this for
       ! efficiency.
+      if(isplastic)bload=ZERO
       do i_elmt=1,nelmt_elas
         ielmt=eid_elas(i_elmt)
+        imat=mat_id(ielmt)
         num=g_num(:,ielmt)
         egdofu=gdof_elmt(edofu,ielmt)
         eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
@@ -1117,15 +1149,70 @@ loop_step: do i_step=istep0,nstep
         
           call compute_bmat_stress(deriv,bmat)
           estrain=matmul(bmat,eld)
+          if(isplastic)then
+            estrain=estrain-evpt(:,i,ielmt)
+          endif
           sigma=matmul(cmat,estrain)
-          if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
-          if(savedata%stress)stress_elmt(:,i,ielmt)=sigma
 
-          eload=matmul(sigma,bmat)
-          bload=bload+eload*jacw
-        enddo ! i
+          if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
+          if(savedata%stress .and. .not.isplastic)stress_elmt(:,i,ielmt)=sigma
+
+          if(isplastic)then
+            effsigma=sigma+stress_elmt(:,i,ielmt)
+            call stress_invariant(effsigma,sigm,dsbar,lode_theta)
+            ! check whether yield is violated
+            call mohcouf(phi_blk(imat),coh_blk(imat),sigm,dsbar,lode_theta,f)
+            if(f>fmax)fmax=f
+
+            if(f>=zero)then !.or.(nl_isconv.or.nl_iter==nl_maxiter))then
+              call mohcouq(psi_blk(imat),dsbar,lode_theta,dq1,dq2,dq3)
+              call formm(effsigma,m1,m2,m3)
+              flow=f*(m1*dq1+m2*dq2+m3*dq3)
+
+              erate=matmul(flow,effsigma)
+              evp=erate*dt_vp
+              evpt(:,i,ielmt)=evpt(:,i,ielmt)+evp
+              devp=matmul(cmat,evp)
+              
+              ! if not converged we need body load for next iteration
+              if(.not.nl_isconv .and. nl_iter/=nl_maxiter)then
+                !devp(1:3)=devp(1:3)-wpressure(num(i))
+                eload=matmul(devp,bmat)
+                bload=bload+eload*jacw
+              endif
+            endif!(f>=zero)
+            if(nl_isconv.or.nl_iter==nl_maxiter)then
+              devp=sigma
+              ! compute von Mises effective plastic strain
+              !vmeps(num(i))=vmeps(num(i))+sqrt(two_third*                         &
+              !dot_product(evpt(:,i,ielmt),evpt(:,i,ielmt)))
+              ! update stresses
+              stress_elmt(:,i,ielmt)=effsigma
+              !phif_blkr=atan(tnph/srf(i_srf))
+              !sf=(sigm*sin(phif_blkr)-cohf_blk*cos(phif_blkr))/&
+              !(-dsbar*(cos(lode_theta)/      &
+              !sqrt(r3)-sin(lode_theta)*sin(phif_blkr)/r3))
+              !if(sf<scf(num(i)))scf(num(i))=sf
+            endif
+
+          else
+            eload=matmul(sigma,bmat)
+            bload=bload+eload*jacw
+          endif
+        enddo ! i=1,ngll
+        if(nl_isconv .or. nl_iter==nl_maxiter)cycle
         bodyload(egdofu)=bodyload(egdofu)+bload
-      enddo
+        !print*,maxval(abs(bload)),maxval(abs(bodyload))
+      enddo ! i_elmt
+
+      fmax=maxscal(fmax)                                                           
+      if(myrank==0)then                                                            
+        write(logunit,'(a,i4,a,f12.6,a,f12.6,a,f12.6)') &                           
+        ' nl_iter:',nl_iter,' f_max:',fmax,' uerr:',uerr,' umax:',maxdu
+        write(logunit,'(a)')'--------------------------------------------'
+        flush(logunit) 
+      endif
+
       !---------------------------------------------------------------------------
       
       if(allelastic)exit nonlinear
@@ -1269,8 +1356,10 @@ loop_step: do i_step=istep0,nstep
             call write_vector_to_file_freesurf(nnode_fs,DIM_MOD*strain_nodal(:,gnode_fs),&
             ext='eps',istep=0,plane=.true.)
           endif
-          write(77,*)0.0,strain_nodal(1,2099)                               
-          flush(77)
+          if(trim(devel_example).eq.'axial_rod')then
+            write(77,*)0.0,strain_nodal(1,2099)                               
+            flush(77) 
+          endif
         endif
         ! Benchmark calculation for elastic result
         if(benchmark_okada .and. ISDISP_DOF)then
@@ -1565,6 +1654,9 @@ if(ISPOT_DOF)then
   deallocate(nodalphi)
 endif
 
+if(isplastic)then
+  deallocate(olddu,evpt)
+endif
 if(solver_type.eq.builtin_solver .and.solver_diagscale)then
   deallocate(dprecon,ndscale)
 endif

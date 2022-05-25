@@ -101,8 +101,10 @@ endif
 ! total degrees of freedoms
 ngdof=maxscal(maxval(ggdof))
 
-if(myrank==0)write(logunit,'(a,i0)')'Total global degrees of freedom: ',ngdof
-flush(logunit)
+if(myrank==0)then
+  write(logunit,'(a,i0)')'Total global degrees of freedom: ',ngdof
+  flush(logunit)
+endif
 
 ! precompute ownership range OR partion layout
 ng1=ngdof/nproc
