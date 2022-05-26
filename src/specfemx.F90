@@ -448,6 +448,11 @@ if(myrank==0)then
   if(ISDISP_DOF)then
     write(logunit,'(a)')'Displacement DOF: '//'ON'
     write(logunit,'(a,i0)')' NNDOFU: ',nndofu
+    if(isplastic)then
+      write(logunit,'(a)')' Plasticity: ON'
+    else
+      write(logunit,'(a)')' Plasticity: OFF'
+    endif
   else
     write(logunit,'(a)')'Displacement DOF: '//'OFF'
     write(logunit,'(a,i0)')' NNDOFU: ',nndofu
