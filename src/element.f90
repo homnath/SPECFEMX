@@ -620,7 +620,6 @@ function isort2(v2) result(s2)
 implicit none
 integer,dimension(2),intent(in) :: v2
 integer,dimension(2) :: s2
-integer :: i,id
 
 if(v2(1).gt.v2(2))then
   s2(1)=v2(2)
