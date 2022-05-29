@@ -1207,7 +1207,7 @@ loop_step: do i_step=istep0,nstep
 
       fmax=maxscal(fmax)                                                           
       if(myrank==0)then                                                            
-        write(logunit,'(a,i4,a,f12.6,a,f12.6,a,f12.6)') &                           
+        write(logunit,'(a,i4,a,f0.6,a,f12.6,a,f12.6)') &                           
         ' nl_iter:',nl_iter,' f_max:',fmax,' uerr:',uerr,' umax:',maxdu
         write(logunit,'(a)')'--------------------------------------------'
         flush(logunit) 
