@@ -5,7 +5,6 @@ character(len=500),private :: errsrc
 
 contains
 !-------------------------------------------------------------------------------
-
 ! This routine reads and applies the traction specified in the traction file.
 ! REVISION
 !   HNG, Jul 12,2011; HNG, Apr 09,2010; HNG, Dec 08,2010

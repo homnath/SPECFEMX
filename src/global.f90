@@ -484,6 +484,9 @@ character(len=250) :: log_file
 integer :: logunit=7
 integer :: stdout=6
 
+character(len=250) :: log_msg
+
+
 ! developement variables
 ! By default model is nondimensionalized unless the "devel_nondim" is .false. 
 logical :: devel_nondim

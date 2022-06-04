@@ -6,6 +6,7 @@ subroutine specfem3d()
 ! Import necessary modules
 use dimensionless
 use global
+use output_to_user
 use string_library,only : parse_file
 use math_constants
 use conversion_constants
@@ -35,6 +36,11 @@ use ghost_library_mpi
 use math_library_mpi
 use sparse
 use parsolver
+use count_elements  !WE
+use relaxation_time !WE
+use ghost           !WE
+!use prestress       !WE
+
 #if (USE_COMPLEX)
 use parsolver_petsc_complex
 #else
@@ -52,6 +58,8 @@ use free_surface
 use benchmark
 use write_ensight
 use postprocess
+
+!use relaxation_time
 implicit none
 
 character(len=250) :: myfname=' => specfem3d.f90'
@@ -207,125 +215,30 @@ character(len=250) :: errtag ! error message
 integer :: errcode
 errtag=""; errcode=-1
 
-! Relaxation time
-! Convert relaxation time unit to the time step time unit for consistency
-! TODO: check for nondimensionalizing the time step and relaxation time
-! Note: for viscosity it doesn't matter because the only relevant parameter is 
-! 'tratio' which is dimensionless in itself.
+! ______________________________________________________________________
+
+
+! Calculate relaxation time for viscoelastic/plastic models
 allocate(relaxtime(nmaxwell,nmatblk_viscoelas),muratio(nmaxwell),tratio(nmaxwell))
-relaxtime=inftol
-tunitfac=ONE
-if(index(tunit,'sec').gt.0 .or. index(tunit,'second').gt.0)then
-  ! Do not convert, because origin unit of relaxtime is second.
-  tunitfac=ONE
-elseif(index(tunit,'hr').gt.0 .or. index(tunit,'hour').gt.0)then
-  ! Convert second to hour
-  tunitfac=SEC2HOUR
-elseif(index(tunit,'day').gt.0)then
-  ! Convert second to day
-  tunitfac=SEC2DAY
-elseif(index(tunit,'month').gt.0)then
-  ! Convert second to month
-  tunitfac=SEC2MONTH
-elseif(index(tunit,'yr').gt.0 .or. index(tunit,'year').gt.0)then
-  ! Convert second to year
-  tunitfac=SEC2YEAR
-else
-  write(logunit,*)'ERROR: unrecognized time unit: ',trim(tunit)
-  flush(logunit)
-endif
-! compute relax time
-iviscoelas=0
-do i=1,nmatblk_viscoelas
-!  if(mat_domain(i)==VISCOELASTIC_DOMAIN .or. &
-!    mat_domain(i)==VISCOELASTIC_TRINFDOMAIN .or. &
-!    mat_domain(i)==VISCOELASTIC_INFDOMAIN)then
-!    iviscoelas=iviscoelas+1
-    imat=imatve_to_imat(i)
-    ! Variables viscosity_blk and shearmod_blk are NOT nondimensionalized.
-    ! Therefore the relaxtime will be in seconds.
-    ! If nondimensionalized it may be better to dimensionalize again to compute
-    ! the relax time without any confusion.
-    ! WRONG
-    !relaxtime(:,iviscoelas)=tunitfac*viscosity_blk(:,iviscoelas)/shearmod_blk(imat)
-    ! APPROXIMATE
-    ! CORRECT
-    if(trim(devel_example).eq.'axial_rod')then
-      relaxtime(:,i)=tunitfac*viscosity_blk(:,i)/ym_blk(imat)
-    else  
-      !relaxtime(:,i)=tunitfac*TWO*viscosity_blk(:,i)/shearmod_blk(imat)
-      relaxtime(:,i)=devel_rtfac*tunitfac*viscosity_blk(:,i)/shearmod_blk(imat)
-    endif
-!  endif
-enddo
-min_relaxtime=minscal(minval(relaxtime))
-max_relaxtime=maxscal(maxval(relaxtime))
-if(myrank.eq.0)then
-  write(logunit,'(a,g0.6,1x,a,g0.6)')'Relax time => min: ',min_relaxtime,' max: ',max_relaxtime
-  write(logunit,'(a)')'Time unit: '//trim(tunit)
-  flush(logunit)
-endif
+call calc_relaxation_time(relaxtime, tunitfac, muratio, tratio, min_relaxtime, max_relaxtime)
 
-! count elastic and viscoelastic elements
-nelmt_elas=0; nelmt_viscoelas=0
-do i_elmt=1,nelmt
-  mdomain=mat_domain(mat_id(i_elmt))
-  ! infinite elements included in elastic domain
-  if(mdomain==ELASTIC_DOMAIN .or.  &
-    mdomain==ELASTIC_TRINFDOMAIN .or.  &
-    mdomain==ELASTIC_INFDOMAIN)then
-    nelmt_elas=nelmt_elas+1
-  elseif(mdomain==VISCOELASTIC_DOMAIN .or. &
-    mdomain==VISCOELASTIC_TRINFDOMAIN .or. &
-    mdomain==VISCOELASTIC_INFDOMAIN)then
-    nelmt_viscoelas=nelmt_viscoelas+1
-  else
-    write(logunit,*)'ERROR: unrecognized material domain',mdomain,'!'
-    flush(logunit)
-    stop
-  endif
-enddo
-if(nelmt/=nelmt_elas+nelmt_viscoelas)then
-  write(logunit,*)'ERROR: total number of elements mismatch!'
-  flush(logunit)
-  stop
-endif
-tot_nelmt_elas=sumscal(nelmt_elas)
-max_nelmt_elas=maxscal(nelmt_elas)
-min_nelmt_elas=minscal(nelmt_elas)
 
-tot_nelmt_viscoelas=sumscal(nelmt_viscoelas)
-max_nelmt_viscoelas=maxscal(nelmt_viscoelas)
-min_nelmt_viscoelas=minscal(nelmt_viscoelas)
-if(myrank==0)then
-  write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')'elements elastic => total: ', &
-  tot_nelmt_elas,' max: ',max_nelmt_elas,' min: ',min_nelmt_elas
-  write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')'elements viscoelastic => total: ', &
-  tot_nelmt_viscoelas,' max: ',max_nelmt_viscoelas,' min: ',min_nelmt_viscoelas
-  flush(logunit)
-endif
-allocate(eid_elas(nelmt_elas),eid_viscoelas(nelmt_viscoelas))
+!Count number of viscoelastic and elastic elements 
+call count_elmts(errcode, nelmt_elas, nelmt_viscoelas, & 
+mdomain, tot_nelmt_elas, max_nelmt_elas, min_nelmt_elas, tot_nelmt_viscoelas, &
+max_nelmt_viscoelas, min_nelmt_viscoelas)
+
+
+! Split up IDs of elastic and viscoelastic elements into new arrays
+! New arrays: eid_elas and eid_viscoelas
+call split_elas_visco_eids(nelmt_elas, &
+nelmt_viscoelas, eid_elas, eid_viscoelas )
+
+
+! Create new elastic/viscoelastic arrays
 allocate(elas_e0(nst,ngll,nelmt_viscoelas), &
 visco_q0(nst,nmaxwell,ngll,nelmt_viscoelas),q0(nst,nmaxwell))
 
-! save element ID separately for elastic and viscoelastic elements
-ielmt_elas=0; ielmt_viscoelas=0
-do i_elmt=1,nelmt
-  mdomain=mat_domain(mat_id(i_elmt))
-  ! infinite elements included in elastic domain
-  if(mdomain==ELASTIC_DOMAIN .or.  &
-    mdomain==ELASTIC_TRINFDOMAIN .or.  &
-    mdomain==ELASTIC_INFDOMAIN)then
-    ielmt_elas=ielmt_elas+1
-    eid_elas(ielmt_elas)=i_elmt
-  elseif(mdomain==VISCOELASTIC_DOMAIN .or. &
-    mdomain==VISCOELASTIC_TRINFDOMAIN .or. &
-    mdomain==VISCOELASTIC_INFDOMAIN)then
-    ielmt_viscoelas=ielmt_viscoelas+1
-    eid_viscoelas(ielmt_viscoelas)=i_elmt
-  endif
-enddo
-! check element counts
 
 ! prepare ghost partitions for the communication
 if(nproc.gt.1)then
@@ -335,34 +248,30 @@ endif
 deallocate(g_num0)
 call sync_process
 
-! prepare fault
+
+
+! prepare fault - UNECESSARY FOR SEA LEVEL 
 if( iseqsource .and. (eqsource_type.eq.3 .or. eqsource_type.eq.4) )then
-  if(myrank==0)then
-    write(logunit,'(a)',advance='no')'preparing split fault...'
-    flush(logunit)
-  endif
+  log_msg = trim('preparing split fault...') ;   call write_ifproc0()
   call prepare_fault(errcode,errtag)
   call sync_process
   call control_error(errcode,errtag,stdout,myrank)
-  if(myrank==0)then
-    write(logunit,*)'complete!'
-    flush(logunit)
-  endif
+  log_msg = 'Complete!...' ;  call write_ifproc0() 
 endif
+
+
 
 ! Apply displacement boundary conditions
 allocate(bcnodalv(nndof,nnode))
 bcnodalv=ZERO
-if(myrank==0)then
-  write(logunit,'(a)',advance='no')'applying BC...'
-  flush(logunit)
-endif
+log_msg = 'applying bc...'; call write_ifproc0()
 allocate(gdof(nndof,nnode),stat=istat)
 if (istat/=0)then
   write(logunit,*)'ERROR: cannot allocate memory!'
   flush(logunit)
   stop
 endif
+
 
 allocate(infinite_iface(6,nelmt),infinite_face_idir(6,nelmt))
 infinite_iface=.false.
@@ -375,6 +284,7 @@ infinite_face_idir=-9999
 call activate_dof(errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
+
 
 ! This will ensure that the gdof IDs are same in the finite/infinite interface
 ! nodes if they lie across different processors.
@@ -392,144 +302,101 @@ call apply_bc(bcnodalv,errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
 
+
 !! Undo the unmatching dipalcement BCs. This may occur in fault implementation
 !call sync_process
 !call undo_unmatching_displacementBC(bcnodalv)
 !call sync_process
-
 call finalize_gdof(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
-if(myrank==0)then
-  write(logunit,*)'complete!'
-  flush(logunit)
-endif
-!-------------------------------------
-! modify ghost GDOFs
-if(nproc.gt.1)then
-  call prepare_ghost_gdof()
-endif
-allocate(num(nenode),coord(ngnode,ndim),jac(ndim,ndim),deriv(ndim,nenode),     &
-bmat(nst,nedofu),eld(nedofu),bload(nedofu),vload(nedofu),eload(nedofu),        &
-nodalu(nndofu,nnode),egdof(nedof),egdofu(nedofu),stat=istat)
-if (istat/=0)then
-  write(logunit,*)'ERROR: cannot allocate memory!'
-  flush(logunit)
-  stop
-endif
-if(ISPOT_DOF)then
-  allocate(nodalphi(nnode),nodalg(ndim,nnode),nodalB(ndim,nnode),stat=istat)
-  if(istat/=0)then
-    write(logunit,*)'ERROR: cannot allocate memory!'
-    flush(logunit)
-    stop
-  endif
-endif
-!--------------------------------
+log_msg = 'complete!' ; call write_ifproc0()
 
 
-!!-------------------------------------------------------------------------------
-!! TEST for map_point2naturalhex8 function
-!print*,hex8_gnode
-!num=g_num(:,1)
-!xelm=g_coord(:,num(hex8_gnode))
-!xp=xelm(:,1)
-!print*,'testing:'
-!print*,xp
-!print*,ngnode
-!print*,transpose(xelm)
-!print*,shape(xelm)
-!call  map_point2naturalhex8(xelm,xp,xip,errcode,errtag)
-!call control_error(errcode,errtag,stdout,myrank)
-!print*,'map location:',xp,xip
-!print*,'-----------------------------------------------------------------------'
-!xp=g_coord(:,num(27))
-!xelm=g_coord(:,num(hex8_gnode))
-!call  map_point2naturalhex8(xelm,xp,xip,errcode,errtag)
-!call control_error(errcode,errtag,stdout,myrank)
-!print*,'map location:',xp,xip
-!print*,'-----------------------------------------------------------------------'
-!xp=g_coord(:,num(2))
-!xelm=g_coord(:,num(hex8_gnode))
-!call  map_point2naturalhex8(xelm,xp,xip,errcode,errtag)
-!call control_error(errcode,errtag,stdout,myrank)
-!print*,'map location:',xp,xip
-!print*,'-----------------------------------------------------------------------'
-!stop
-!!-------------------------------------------------------------------------------
+call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
+        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB )
+
 
 ! store elemental global degrees of freedoms from nodal gdof
 ! this removes the repeated use of reshape later but it has larger size than
 ! gdof!!!
+
 allocate(gdof_elmt(nedof,nelmt))
 gdof_elmt=0
 do i_elmt=1,nelmt
   gdof_elmt(:,i_elmt)=reshape(gdof(:,g_num(:,i_elmt)),(/nedof/))
 enddo
 
+
+
+
 !---------------------------------------
 ! global indexing
 ! this process is necessary for petsc implementation and is done in a single
 ! processor
 call sync_process
-
 if(ismpi .and. nproc.gt.1 .and. myrank.eq.0)call gindex()
 call sync_process
 !----------------------------------------------
 
+
+
+! Output details to user 
 tot_neq=sumscal(neq); max_neq=maxscal(neq); min_neq=minscal(neq)
 if(myrank==0)then
   write(logunit,'(a,i0,a,i0,a,i0)')'degrees of freedoms => total:',tot_neq,&
                                   ' max:',max_neq,' min:',min_neq
   flush(logunit)
 endif
+log_msg = 'preprocessing...' ; call write_ifproc0()
 
-if(myrank==0)then
-  write(logunit,'(a)',advance='no')'preprocessing...'
-  flush(logunit)
-endif
 
-! compute initial stress assuming elastic domain
+
+
+! Calculate any prestress 
+!call calc_prestress(strain_elmt, strain_nodal, stress_elmt, &
+!                    stress_nodal, evpt, bodyload, slipload, &
+!                    extload, viscoload, ubcload, load, du,  & 
+!                    dprecon, kmat, storekmat, ksp_iter,     &
+!                    errcode, errtag)
+!! ALL OF THIS SHOULD BE IN PRESTRESS.f90
 if(savedata%stress.or.isplastic)then
   allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
   stress_elmt=ZERO
-endif
-if(savedata%strain)then
+  endif
+  if(savedata%strain)then
   allocate(strain_elmt(nst,ngll,nelmt),strain_nodal(nst,nnode))
   strain_elmt=ZERO
-endif
-if(isstress0)then
-if(s0_type==0)then
+  endif
+  
+  if(isstress0)then
+  if(s0_type==0)then
   ! compute initial stress using SEM itself
-
+  
   allocate(extload(0:neq),du(0:neq),dprecon(0:neq), &
   storekmat(nedof,nedof,nelmt),stat=istat)
   if (istat/=0)then
-    write(logunit,*)'ERROR: cannot allocate memory!'
-    flush(logunit)
-    stop
+  write(logunit,*)'ERROR: cannot allocate memory!'
+  flush(logunit)
+  stop
   endif
   extload=ZERO; isgravity=.true.; ispseudoeq=.false.
   call stiffness_bodyload(nelmt,neq,hex8_gnode,g_num,gdof_elmt,mat_id,gam_blk, &
   storekmat,dprecon,extload,isgravity,ispseudoeq)
-
-  if(myrank==0)then
-    write(logunit,*)'complete!'
-    flush(logunit)
-  endif
-  !-------------------------------
-
-  if(myrank==0)then
-    write(logunit,'(a)')'--------------------------------------------'
-    flush(logunit)
-  endif
-
+  
+  log_msg = 'complete...' ; call write_ifproc0()
+  log_msg = '--------------------------------------------' ; call write_ifproc0()
+  
+  
+  
   ! assemble from ghost partitions
   if(nproc.gt.1)then
-    call assemble_ghosts(nndof,neq,dprecon,dprecon)
+  call assemble_ghosts(nndof,neq,dprecon,dprecon)
   endif
-
+  
   dprecon(1:)=one/dprecon(1:); dprecon(0)=ZERO
-
+  
+  
+  
   ! compute displacement due to graviy loading to compute initial stress
   du=ZERO
   call ksp_pcg_solver(neq,nelmt,storekmat,du,extload,   &
@@ -537,19 +404,23 @@ if(s0_type==0)then
   call control_error(errcode,errtag,stdout,myrank)
   
   du(0)=ZERO
-
+  
   call elastic_stress(nelmt,neq,hex8_gnode,g_num,gdof_elmt,du,stress_elmt)
   deallocate(extload,dprecon,du,storekmat)
-elseif(s0_type==1)then
+  elseif(s0_type==1)then
   ! compute initial stress using simple relation for overburden pressure
   call overburden_stress(nelmt,g_num,z_datum,s0_datum,epk0,stress_elmt)
-else
+  else
   write(logunit,*)'ERROR: s0_type:',s0_type,' not supported!'
   flush(logunit)
   stop
-endif
-endif
-!-------------------------------
+  endif
+  endif
+!! ALL OF THIS SHOULD BE IN PRESTRESS.f90
+
+
+                    
+
 
 allocate(slipload(0:neq),extload(0:neq),rhoload(0:neq),ubcload(0:neq))
 
@@ -558,7 +429,9 @@ rhoload=ZERO
 
 allocate(node_valency(nnode))
 
-! compute node valency only once
+! compute node valency only once - needed for averaging value across interfaces
+! e.g a point may be shared by 4 nodes if on the corner of 4 elements (valence 4)
+! and so the stress is given as the average of these 4 
 node_valency=0
 do i_elmt=1,nelmt
   ielmt=i_elmt
@@ -567,6 +440,7 @@ do i_elmt=1,nelmt
 enddo
 ! assemble all node_valceny across the processors
 call assemble_ghosts_nodal_iscalar(node_valency,node_valency)
+
 
 ! open summary file
 if(myrank==0)then
@@ -579,6 +453,10 @@ if(myrank==0)then
   flush(logunit)
 endif
 
+
+
+
+
 allocate(load(0:neq),bodyload(0:neq),viscoload(0:neq),             &
 resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),            &
 storekmat(nedof,nedof,nelmt),storemmat(nedof,nelmt),stat=istat)
@@ -588,6 +466,8 @@ if(istat/=0)then
   stop
 endif
 
+
+! Timestepping only needed for plastic/viscoelastic situations
 if(isplastic)then
   allocate(olddu(0:neq),evpt(nst,ngll,nelmt))
 endif
@@ -618,27 +498,27 @@ u=ZERO
 !call sync_process
 !call control_error(errcode,errtag,stdout,myrank)
 
+
+! Prepare solver 
 if(solver_type.eq.petsc_solver)then
- ! Prepare sparsity of the stiffness matrix
-  call prepare_sparse()
+ ! Prepare sparsity of the stiffness matrix (working out size etc)
+  call prepare_sparse() 
 
  ! petsc solver
-  call petsc_initialize()
-  if(myrank==0)then
-    write(logunit,'(a)')'petsc_initialize: SUCCESS!'
-    flush(logunit)
-  endif
+  call petsc_initialize() 
+  log_msg = 'petsc_initialize: SUCCESS!' ; call write_ifproc0()
+
+
  ! Create sparse vector, matrix, and preallocate                                                         
  ! TODO: following call is not necessary for RECYCLE                            
   call petsc_create_vector()                                                     
   call petsc_matrix_preallocate_size()                                           
   call petsc_create_matrix()                                                     
   call petsc_create_solver()                                                     
-  if(myrank==0)then
-    write(logunit,'(a)')'petsc_preallocate_matrix_size: SUCCESS!'
-    flush(logunit)
-  endif
+  log_msg = 'petsc_preallocate_matrix_size: SUCCESS!' ; call write_ifproc0()
+
 endif
+
 
 ! WARNING: TODO
 ! slip gdof for split PC
@@ -662,10 +542,7 @@ if(ISDISP_DOF)then
     endif
   enddo
   if(nequ.ne.inum)then
-    if(myrank==0)then
-      write(logunit,'(a)')'ERROR: nequ & inum mismatch!'
-      flush(logunit)
-    endif
+    log_msg = 'ERROR: nequ & inum mismatch!' ; call write_ifproc0()
     call close_process
   endif
   deallocate(iseq)
@@ -757,10 +634,8 @@ loop_step: do i_step=istep0,nstep
     if(solver_type.eq.petsc_solver)then
       call petsc_set_stiffness_matrix_freq(storekmat,storemmat,ang_freq, &
       scale_ang_freq2,isscale_ang_freq)
-      if(myrank==0)then
-        write(logunit,'(a)')' petsc_set_stiffness_matrix: SUCCESS!'
-        flush(logunit)
-      endif
+      log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   call write_ifproc0()
+      
       call petsc_set_ksp_operator(reuse_pc=.false.)
     endif
   else ! if(steptype.eq.FREQSTEP)
@@ -774,10 +649,8 @@ loop_step: do i_step=istep0,nstep
       !endif
       if(solver_type.eq.petsc_solver)then
         call petsc_set_stiffness_matrix(storekmat)
-        if(myrank==0)then
-          write(logunit,'(a)')' petsc_set_stiffness_matrix: SUCCESS!'
-          flush(logunit)
-        endif
+        log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   call write_ifproc0()
+
         call petsc_set_ksp_operator(reuse_pc=.false.)
         call petsc_set_solver()
       endif
@@ -790,10 +663,9 @@ loop_step: do i_step=istep0,nstep
            dt,relaxtime,storekmat,errcode,errtag)
       if(solver_type.eq.petsc_solver)then
         call petsc_set_stiffness_matrix(storekmat)
-        if(myrank==0)then
-          write(logunit,'(a)')' petsc_set_stiffness_matrix: SUCCESS!'
-          flush(logunit)
-        endif
+        log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   call write_ifproc0()
+
+
         call petsc_set_ksp_operator(reuse_pc=.true.)
         call petsc_set_solver()
       endif
@@ -803,10 +675,9 @@ loop_step: do i_step=istep0,nstep
   ! apply traction boundary conditions
   ! WARNING: i_step==1 is ONLY for rod example
   if((istraction.or.isfstraction).and.i_step==1)then
-    if(myrank==0)then
-      write(logunit,'(a)',advance='no')'applying traction...'
-      flush(logunit)
-    endif
+    log_msg = trim('applying traction...') ;   call write_ifproc0()
+
+
     call apply_traction(extload,errcode,errtag)
     call control_error(errcode,errtag,stdout,myrank)
     if(myrank==0)then
@@ -819,10 +690,7 @@ loop_step: do i_step=istep0,nstep
   endif
   ! apply magnetic traction
   if(ismtraction)then
-    if(myrank==0)then
-      write(logunit,'(a)',advance='no')'applying magnetic traction...'
-      flush(logunit)
-    endif
+    log_msg = trim('applying magnetic traction...') ;   call write_ifproc0()
     call apply_mtraction(extload,errcode,errtag)
     call sync_process
     call control_error(errcode,errtag,stdout,myrank)
@@ -865,10 +733,8 @@ loop_step: do i_step=istep0,nstep
   ! moment-density tensor apparoch: compute equivalent moment-density tensor
   ! from the prescribe slip on the fault
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
-    if(myrank==0)then
-      write(logunit,'(a)')'  Earthquake source type: moment-density tensor'
-      flush(logunit)
-    endif
+     log_msg = trim(' Earthquake source type: moment-density tensor') ;   call write_ifproc0()
+
     call earthquake_load(neq,extload,errcode,errtag)
     call sync_process
     call control_error(errcode,errtag,stdout,myrank)
@@ -1033,20 +899,16 @@ loop_step: do i_step=istep0,nstep
       if(steptype.eq.FREQSTEP.and.isscale_ang_freq)then
         resload=scale_ang_freq2*resload
       endif
+
       call petsc_set_vector(resload)
-      if(myrank==0)then
-        write(logunit,'(a)')' petsc_set_vector: SUCCESS!'
-        flush(logunit)
-      endif
-      !call petsc_set_ksp_operator()
+      log_msg = trim(' petsc_set_vector: SUCCESS!') ;   call write_ifproc0()
 
       call petsc_solve(du(1:),ksp_iter,ksp_convreason)
-      if(myrank==0)then
-        write(logunit,'(a)')' petsc_solve: SUCCESS!'
-        flush(logunit)
-      endif
-     continue
+      log_msg = trim(' petsc_solve: SUCCESS!') ;   call write_ifproc0()
+
+      continue
     endif
+
     call cpu_time(cpu_tend)
     telap=cpu_tend-cpu_tstart
     if(myrank==0)then
@@ -1124,10 +986,9 @@ loop_step: do i_step=istep0,nstep
     bodyload=ZERO; !viscoload=ZERO
 
     if(ISDISP_DOF)then
-      if(myrank==0)then
-        write(logunit,*)'computing elemental stress'
-        flush(logunit)
-      endif
+      log_msg = trim('computing elemental stress') ;   call write_ifproc0()
+
+      
       ! Compute stress
       ! Elastic elements
       ! This part is repeated for the first step. We should change this for
