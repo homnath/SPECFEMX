@@ -45,6 +45,8 @@ IF(ISPARALLEL)
   SET(srcparsem
      set_precision_mpi.f90
      mpi_library.f90
+     other_forces.f90
+
      math_library_mpi.f90
      relaxation_time.f90
      ghost_library_mpi.f90

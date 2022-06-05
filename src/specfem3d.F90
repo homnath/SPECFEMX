@@ -39,7 +39,8 @@ use parsolver
 use count_elements  !WE
 use relaxation_time !WE
 use ghost           !WE
-!use prestress       !WE
+use other_forces    !WE 
+
 
 #if (USE_COMPLEX)
 use parsolver_petsc_complex
@@ -351,7 +352,7 @@ log_msg = 'preprocessing...' ; call write_ifproc0()
 
 
 
-
+! SPEAK TO HNG
 ! Calculate any prestress 
 !call calc_prestress(strain_elmt, strain_nodal, stress_elmt, &
 !                    stress_nodal, evpt, bodyload, slipload, &
@@ -386,16 +387,12 @@ if(savedata%stress.or.isplastic)then
   log_msg = 'complete...' ; call write_ifproc0()
   log_msg = '--------------------------------------------' ; call write_ifproc0()
   
-  
-  
   ! assemble from ghost partitions
   if(nproc.gt.1)then
   call assemble_ghosts(nndof,neq,dprecon,dprecon)
   endif
   
   dprecon(1:)=one/dprecon(1:); dprecon(0)=ZERO
-  
-  
   
   ! compute displacement due to graviy loading to compute initial stress
   du=ZERO
@@ -420,6 +417,8 @@ if(savedata%stress.or.isplastic)then
 
 
                     
+
+
 
 
 allocate(slipload(0:neq),extload(0:neq),rhoload(0:neq),ubcload(0:neq))
@@ -491,6 +490,8 @@ ubcload=ZERO
 load=ZERO
 u=ZERO
 
+
+
 !! WARNING: this is temporary
 !! WARNING: must remove this because it is already withing the time loop
 !! earthquake source
@@ -499,27 +500,28 @@ u=ZERO
 !call control_error(errcode,errtag,stdout,myrank)
 
 
-! Prepare solver 
+! WE Prepare petsc solver - try turning into function 
+! Have removed prepare_solver.f90 from Makefile for now 
 if(solver_type.eq.petsc_solver)then
- ! Prepare sparsity of the stiffness matrix (working out size etc)
+  ! Prepare sparsity of the stiffness matrix (working out size etc)
   call prepare_sparse() 
-
- ! petsc solver
-  call petsc_initialize() 
-  log_msg = 'petsc_initialize: SUCCESS!' ; call write_ifproc0()
-
-
- ! Create sparse vector, matrix, and preallocate                                                         
- ! TODO: following call is not necessary for RECYCLE                            
-  call petsc_create_vector()                                                     
-  call petsc_matrix_preallocate_size()                                           
-  call petsc_create_matrix()                                                     
-  call petsc_create_solver()                                                     
-  log_msg = 'petsc_preallocate_matrix_size: SUCCESS!' ; call write_ifproc0()
-
-endif
+  ! petsc solver
+      call petsc_initialize() 
+      log_msg = 'petsc_initialize: SUCCESS!' ; call write_ifproc0()
+  
+  
+  ! Create sparse vector, matrix, and preallocate                                                         
+  ! TODO: following call is not necessary for RECYCLE                            
+      call petsc_create_vector()                                                     
+      call petsc_matrix_preallocate_size()                                           
+      call petsc_create_matrix()                                                     
+      call petsc_create_solver()                                                     
+      log_msg = 'petsc_preallocate_matrix_size: SUCCESS!' ; call write_ifproc0()
+endif 
 
 
+
+! WE - only for a slipping fault with lobe split?? 
 ! WARNING: TODO
 ! slip gdof for split PC
 if(ISDISP_DOF)then
@@ -547,9 +549,16 @@ if(ISDISP_DOF)then
   endif
   deallocate(iseq)
 endif
+
+
 ! prepare background gravity data
+! I think this only works for a global model where it does radial integration
+! It can use a global model for g0 with local mesh but wont calc gravity
+! just from the local mesh (always relies on some glboal model)
 call prepare_gravity()
 
+
+! Built-in preconditioner stuff? 
 allocate(storederiv(ndim,ngll,ngll,nelmt),storejw(ngll,nelmt))
 if(solver_type.eq.builtin_solver .or. solver_diagscale)then
   allocate(dprecon(0:neq))
@@ -560,6 +569,7 @@ endif
 if(trim(devel_example).eq.'axial_rod')then
   open(77,file=trim(file_head)//"_strain.dat",action="write",status="replace")
 endif
+
 
 ! Note that the stepping starts from 
 !   1 for time domain.
@@ -577,7 +587,8 @@ if(steptype.eq.FREQSTEP)then
   endif
 endif
 
-! Compute mass matrix
+
+! Compute ELASTIC mass matrix once and for all 
 call compute_mass_elastic(storemmat,errcode,errtag)
 
 if(isplastic)then
@@ -586,10 +597,18 @@ if(isplastic)then
   ! find global dt_vp
   dt_vp=minscal(dt_vp)
 endif
+
+
+! This needs to be in its own file! 
 ! Starting time/frequency loop.
+! For elastic only one timestep 
+log_msg = trim(' Starting time loop!') ;   call write_ifproc0()
+
+
 loop_step: do i_step=istep0,nstep
   !t=dt*real(i_step,kreal)
   step=step0+dstep*real(i_step,kreal)
+  
   if(steptype.eq.TIMESTEP)then
     ! Time step.
     t=step
@@ -598,6 +617,7 @@ loop_step: do i_step=istep0,nstep
       write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' t: ',t
       flush(logunit)
     endif
+
   elseif(steptype.eq.FREQSTEP)then
     ! Frequency step.
     freq=step
@@ -605,6 +625,7 @@ loop_step: do i_step=istep0,nstep
       write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' f: ',freq
       flush(logunit)
     endif
+
     if(devel_nondim)then
       ang_freq=TWO*freq*DIM_T
     else
@@ -613,6 +634,7 @@ loop_step: do i_step=istep0,nstep
     scale_ang_freq2=ONE/(ang_freq*ang_freq)
   endif
 
+  ! Set initial values to 0 
   nodalu=ZERO
   if(ISPOT_DOF)then
     nodalphi=ZERO
@@ -621,6 +643,7 @@ loop_step: do i_step=istep0,nstep
   !extload=ZERO
   rhoload=ZERO
   
+
   if(steptype.eq.FREQSTEP)then
     ! compute elastic stiffness matrix for time = 0
     if(i_step==0)then
@@ -638,8 +661,10 @@ loop_step: do i_step=istep0,nstep
       
       call petsc_set_ksp_operator(reuse_pc=.false.)
     endif
-  else ! if(steptype.eq.FREQSTEP)
-    if(i_step==1)then
+
+
+  else ! TIMESTEPPING not freq
+    if(i_step==1)then 
       ! compute elastic stiffness matrix for time = 0
       call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
       !if(istraction.and.trcase.eq.TRACTION_INTERNAL)then
@@ -647,13 +672,16 @@ loop_step: do i_step=istep0,nstep
       !  symmetric_solver=.false.
       !  call control_error(errcode,errtag,stdout,myrank)
       !endif
+
+      ! The following is repeated below in the next elseif except for 
+      ! the reuse_pc flag being true - make into a function 
       if(solver_type.eq.petsc_solver)then
         call petsc_set_stiffness_matrix(storekmat)
         log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   call write_ifproc0()
-
         call petsc_set_ksp_operator(reuse_pc=.false.)
         call petsc_set_solver()
       endif
+
     elseif(i_step==2)then
       ! Since we use a uniform dt, following routine has to be called only once 
       ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
@@ -661,44 +689,42 @@ loop_step: do i_step=istep0,nstep
       ! This will simply overwrite the storekmat for viscoelastic elements.
       call compute_stiffness_viscoelastic(nelmt_viscoelas,eid_viscoelas,         &
            dt,relaxtime,storekmat,errcode,errtag)
+
       if(solver_type.eq.petsc_solver)then
         call petsc_set_stiffness_matrix(storekmat)
         log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   call write_ifproc0()
-
-
         call petsc_set_ksp_operator(reuse_pc=.true.)
         call petsc_set_solver()
       endif
     endif
+
   endif ! if(steptype.eq.FREQSTEP)
+
+  ! NOW WE ARE AT A POINT WHERE ANY STIFFNESS MATRICES HAVE BEEN CALCULATED 
+
 
   ! apply traction boundary conditions
   ! WARNING: i_step==1 is ONLY for rod example
   if((istraction.or.isfstraction).and.i_step==1)then
     log_msg = trim('applying traction...') ;   call write_ifproc0()
-
-
     call apply_traction(extload,errcode,errtag)
     call control_error(errcode,errtag,stdout,myrank)
+
     if(myrank==0)then
       write(logunit,*)'complete!',maxval(abs(extload))
       flush(logunit)
     endif
   endif
+
+  ! Rod example
   if(trim(devel_example).eq.'axial_rod')then
     if(i_step>600)extload=ZERO 
   endif
-  ! apply magnetic traction
-  if(ismtraction)then
-    log_msg = trim('applying magnetic traction...') ;   call write_ifproc0()
-    call apply_mtraction(extload,errcode,errtag)
-    call sync_process
-    call control_error(errcode,errtag,stdout,myrank)
-    if(myrank==0)then
-      write(logunit,*)'complete!',maxval(abs(extload))
-      flush(logunit)
-    endif
-  endif
+
+
+  call compute_magnetic_traction(errcode, errtag, extload)
+  
+
   ! compute load contributed by the earthquake slip
   ! split-node apparoch: prescribe the slip on the fault explicitly
   if(iseqsource.and.eqsource_type.eq.3)then
@@ -730,6 +756,7 @@ loop_step: do i_step=istep0,nstep
       extload=slipload
     endif
   endif
+  
   ! moment-density tensor apparoch: compute equivalent moment-density tensor
   ! from the prescribe slip on the fault
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
@@ -745,6 +772,8 @@ loop_step: do i_step=istep0,nstep
     endif
   endif
   
+
+
   ! Modify RHS vector for prescribed displacements
   ! WARNING: need to check for nedofu
   do i_elmt=1,nelmt
