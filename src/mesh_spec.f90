@@ -12,7 +12,7 @@ contains
 ! This subroutine convert all hexahedral meshes (8-noded) to spectral elements
 ! of arbitrary order defined by ngllx, nglly, and ngllz
 subroutine hex2spec(ndim,ngnod,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
-use global,only : g_coord,g_num
+use global,only : g_coord,g_num, logunit
 use shape_library,only : shape_function_hex8
 use gll_library,only:gllpx,gllpy,gllpz
 
@@ -40,43 +40,63 @@ integer, dimension(:), allocatable :: iglob
 errtag="ERROR: unknown!"
 errcode=-1
 
-ngll=ngllx*nglly*ngllz
+write(logunit,*)'Running hex2spec...'
 
+ngll=ngllx*nglly*ngllz
 xmin=minval(g_coord(1,:))
 xmax=maxval(g_coord(1,:))
-
 npoint=nelmt*(ngllx*nglly*ngllz)
+
+write(logunit,*)'   ngllx:', ngllx
+write(logunit,*)'   nglly:', nglly
+write(logunit,*)'   ngllz:', ngllz
+write(logunit,*)'   ngll (ngllx * nglly * ngllz):', ngll
+write(logunit,*)'   npoint (ngll * npoint): ', npoint
+
+
 allocate(xstore(npoint),ystore(npoint),zstore(npoint),stat=istat)
 if(istat/=0)then
   write(errtag,'(a)')'ERROR: cannot allocate memory!'
   return
+else
+  write(logunit,*)'   Created xstore, ystore, zstore each of length :', npoint
 endif
+
+
 
 ! get shape function for 8-noded hex
 call shape_function_hex8(ngnod,ngllx,nglly,ngllz,gllpx,gllpy,gllpz,shape_hex8)
 
+
+write(logunit,*)' Filling in xstore, ystore, zstore with coordinates of local gll points:'
 ! compute coordinates all local gll points
 xstore=zero
 ystore=zero
 zstore=zero
-
+write(logunit,*)''
 ipoint=0
 do i_elmt=1,nelmt
+  write(logunit,*)' element = ', i_elmt
   do k=1,ngllz
     do j=1,nglly
       do i=1,ngllx
+        !write(logunit,*)'   i: ', i, 'j: ', j, 'k: ', k
+
         xgll = zero
         ygll = zero
         zgll = zero
+        !write(logunit,*)'   reset xgll, ygll, zgll to 0'
 
+       ! write(logunit,*)'looping from i_gnod = 1 to ngnod: ', ngnod
         do i_gnod=1,ngnod
           xgll = xgll + shape_hex8(i_gnod,i,j,k)*g_coord(1,g_num(i_gnod,i_elmt))
           ygll = ygll + shape_hex8(i_gnod,i,j,k)*g_coord(2,g_num(i_gnod,i_elmt))
           zgll = zgll + shape_hex8(i_gnod,i,j,k)*g_coord(3,g_num(i_gnod,i_elmt))
+
+          !write(logunit,*)'   xgll += ', shape_hex8(i_gnod,i,j,k), ' * ', g_coord(1,g_num(i_gnod,i_elmt))
         enddo
 
         ipoint=ipoint+1
-
         xstore(ipoint) = xgll
         ystore(ipoint) = ygll
         zstore(ipoint) = zgll
@@ -85,8 +105,10 @@ do i_elmt=1,nelmt
     enddo
   enddo
 enddo
-deallocate(g_coord,g_num) ! no longer need these
 
+write(logunit,*)' Finished looping through all elements'
+
+deallocate(g_coord,g_num) ! no longer need these
 allocate(iglob(npoint))
 
 ! gets ibool indexing from local (gll points) to global points
@@ -118,6 +140,8 @@ do i_elmt=1,nelmt
 enddo
 
 deallocate(iglob,xstore,ystore,zstore)
+
+write(logunit, *)'Finished hex2spec'
 
 errcode=0
 return

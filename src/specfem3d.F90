@@ -40,6 +40,7 @@ use count_elements  !WE
 use relaxation_time !WE
 use ghost           !WE
 use other_forces    !WE 
+use prestress
 
 
 #if (USE_COMPLEX)
@@ -272,7 +273,6 @@ if (istat/=0)then
   flush(logunit)
   stop
 endif
-
 
 allocate(infinite_iface(6,nelmt),infinite_face_idir(6,nelmt))
 infinite_iface=.false.
@@ -722,55 +722,35 @@ loop_step: do i_step=istep0,nstep
   endif
 
 
-  call compute_magnetic_traction(errcode, errtag, extload)
-  
+  ! Calculate relevant force terms: 
+   
+  if(ismtraction)then
+    call compute_magnetic_traction(errcode, errtag, extload)
+  endif 
 
-  ! compute load contributed by the earthquake slip
-  ! split-node apparoch: prescribe the slip on the fault explicitly
   if(iseqsource.and.eqsource_type.eq.3)then
-    if(i_step==1)then
-      if(myrank==0)then
-        write(logunit,'(a)')'  Earthquake source type: slip with split node'
-        write(logunit,'(a,1x,i2)')'  Slip taper option: ',itaper_slip
-        flush(logunit)
-      endif
-      if(divide_slip)then
-        sfac=HALF
-        ! Plus side
-        call compute_fault_slip_load(-1,sfac,storekmat,slipload,errcode,errtag)
-        ! Minus side
-        call compute_fault_slip_load(1,sfac,storekmat,slipload,errcode,errtag)
-      else
-        sfac=ONE
-        ! Plus side
-        call compute_fault_slip_load(1,sfac,storekmat,slipload,errcode,errtag)
-      endif
-      ! The "sync" here is very important because some processors arrive this 
-      ! stage faster than other. This may hang going to control_error routine!
-      call sync_process
-      call control_error(errcode,errtag,stdout,myrank)
-    endif
-    if(srate)then
-      extload=t*slipload
-    else
-      extload=slipload
-    endif
-  endif
+    call compute_split_node_load(t, i_step, sfac, slipload, extload, &
+                                 storekmat, errcode, errtag)
+  endif 
   
-  ! moment-density tensor apparoch: compute equivalent moment-density tensor
-  ! from the prescribe slip on the fault
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
-     log_msg = trim(' Earthquake source type: moment-density tensor') ;   call write_ifproc0()
+    !call compute_moment_tensor(extload, errcode, errtag, &
+     !                          freq, sff)
+
+     ! moment-density tensor apparoch: compute equivalent moment-density tensor
+    ! from the prescribe slip on the fault
+    log_msg = trim(' Earthquake source type: moment-density tensor') ;   call write_ifproc0()
 
     call earthquake_load(neq,extload,errcode,errtag)
     call sync_process
     call control_error(errcode,errtag,stdout,myrank)
+
     if(steptype==FREQSTEP)then
       !WARNING: make it general for nsrc
       sff=source_frequency_function_complex(freq,source_hdur(1))
       extload=extload*sff
     endif
-  endif
+  endif 
   
 
 

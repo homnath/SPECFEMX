@@ -23,6 +23,7 @@ use free_surface
 #if (USE_MPI)
 use mpi_library
 use math_library_mpi
+use output_to_user
 #else
 use serial_library
 use math_library_serial
@@ -79,7 +80,10 @@ logical :: ismesh_only
 myrank=0; nproc=1;
 errtag=""; errcode=-1
 
+
+
 call start_process()
+
 
 call get_command_argument(0, prog)
 if (command_argument_count() <= 0) then
@@ -156,6 +160,7 @@ else
   ptail_inp=''
 endif
 
+
 proc_str=''
 if(ismpi.and.nproc.gt.1)then
   write(format_str,*)ceiling(log10(real(nproc)+1.))
@@ -163,16 +168,23 @@ if(ismpi.and.nproc.gt.1)then
   write(proc_str,fmt=format_str)myrank
 endif
 
+
 ! read input data
 call read_input(inp_fname,errcode,errtag)
 call sync_process()
 call control_error(errcode,errtag,stdout,myrank)
 
+
+
 ! check method
 if (trim(method)/='sem')then
   write(errtag,'(a)')'ERROR: wrong input for SPECFEM3D!'
   call control_error(errcode,errtag,stdout,myrank)
+else
+  write(logunit, '(a)')'Correct method: sem'
 endif
+
+
 
 ! Set coordinate extents of the finite model. This extent is later used in
 ! location routine.
@@ -218,17 +230,37 @@ if(infbc)then
     flush(logunit)
   endif
 else
+  write(logunit,*)'No infinite bc (infbc = F)...'
   pmodel_minx=minval(g_coord(1,:))
   pmodel_maxx=maxval(g_coord(1,:))
   pmodel_miny=minval(g_coord(2,:))
   pmodel_maxy=maxval(g_coord(2,:))
   pmodel_minz=minval(g_coord(3,:))
   pmodel_maxz=maxval(g_coord(3,:))
+
+  write(logunit,*)'  Proc model boundaries:'
+  write(logunit,*)'     pmodel_minx: ', pmodel_minx, ' rank: ', myrank
+  write(logunit,*) '    pmodel_maxx: ', pmodel_maxx, ' rank: ', myrank
+  write(logunit,*) '    pmodel_miny: ', pmodel_miny, ' rank: ', myrank
+  write(logunit,*) '    pmodel_maxy: ', pmodel_maxy, ' rank: ', myrank
+  write(logunit,*) '    pmodel_minz: ', pmodel_minz, ' rank: ', myrank
+  write(logunit,*) '    pmodel_maxz: ', pmodel_maxz, ' rank: ', myrank
+   
 endif
 
 tot_nelmt=sumscal(nelmt); tot_nnode=sumscal(nnode)
 max_nelmt=maxscal(nelmt); max_nnode=maxscal(nnode)
 min_nelmt=minscal(nelmt); min_nnode=minscal(nnode)
+
+
+write(logunit,*)'    tot_nelmt: ', tot_nelmt, ' rank: ', myrank
+write(logunit,*)'    max_nelmt: ', max_nelmt, ' rank: ', myrank
+write(logunit,*)'    min_nelmt: ', min_nelmt, ' rank: ', myrank
+write(logunit,*)'    tot_nnode: ', tot_nnode, ' rank: ', myrank
+write(logunit,*)'    max_nnode: ', max_nnode, ' rank: ', myrank
+write(logunit,*)'    min_nnode: ', min_nnode, ' rank: ', myrank
+
+
 
 ! Coordinate extents of whole model
 model_minx=minscal(minval(g_coord(1,:))); model_maxx=maxscal(maxval(g_coord(1,:)))
@@ -254,6 +286,8 @@ if(myrank==0)then
   flush(logunit)
 endif
 
+
+
 ! Reassign pole coordinates if it is "center" of the model.
 ! NOTE: check if the center should be taken for the finite region only.
 if(trim(pole0)=='center')then
@@ -262,7 +296,8 @@ if(trim(pole0)=='center')then
   pole_coord0(3)=HALF*(model_minz+model_maxz)
 endif
 
-! Initialize model
+
+! Initialize model - allocates shearmod/bulkmod/massdensity arrays
 call initialize_model(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
@@ -279,6 +314,7 @@ fs=0; fi=1
 ! nt for ensight file format must be > 0
 ns=max(1,nstep)
 twidth=ceiling(log10(real(ns)+1.))
+
 
 ! write original meshes
 if(myrank==0)then
@@ -352,6 +388,7 @@ else
   real(g_coord),g_num)
 endif
 
+
 ! write cell model for original mesh
 if(savedata%model_cell)then
   call write_model_cell(errcode,errtag)
@@ -367,6 +404,11 @@ endif
 ! store orginal connectivity which helps to identify ghost interfaces
 allocate(g_num0(ngnode,nelmt))
 g_num0=g_num
+
+
+
+
+
 
 ! precompute gll 1D
 call precompute_gll1d()
@@ -408,40 +450,9 @@ endif
 ! initialize and set element DOFs
 call initialize_dof()
 call set_element_dof()
-!! total number of degrees of freedom per node
-!nndof=0
-!nedofu=0
-!nedofphi=0
-!nedof=0
-!
-!! dof IDs
-!idof=0
-!idofu=0
-!idofphi=0
-!
-!! displacement
-!if(ISDISP_DOF)then
-!  nndof=nndof+nndofu
-!  nedofu=NNDOFU*nenode
-!  nedof=nedof+nedofu
-!  do i_dof=1,nndofu
-!    idof=idof+1
-!    idofu(i_dof)=idof
-!  enddo
-!  allocate(edofu(nedofu))
-!endif
-!! gravity
-!idof=idofu(nndofu)
-!if(ISPOT_DOF)then
-!  nndof=nndof+nndofphi
-!  nedofphi=NNDOFPHI*nenode
-!  nedof=nedof+nedofphi
-!  do i_dof=1,nndofphi
-!    idof=idof+1
-!    idofphi(i_dof)=idof
-!  enddo
-!  allocate(edofphi(nedofphi))
-!endif
+
+
+
 
 if(myrank==0)then
   write(logunit,'(a)')'-----------------------------------------------'
@@ -475,36 +486,45 @@ if(myrank==0)then
   flush(logunit)
 endif
 
+
+write(logunit,*)'Sorting 2D mesh stuff...'
 ngllxy=ngllx*nglly                                                               
 ngllyz=nglly*ngllz                                                               
 ngllzx=ngllz*ngllx                                                               
-                                                                                 
 maxngll2d=max(ngllxy,ngllyz,ngllzx)
+
+write(logunit,*)'   ngllxy: ', ngllxy
+write(logunit,*)'   ngllyz: ', ngllyz
+write(logunit,*)'   ngllzx: ', ngllzx
+write(logunit,*)'   max GLL 2D: ', maxngll2d
+
 
 ! prepare hexes
 call prepare_hex(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
+
+
 ! prepare hex faces
 call prepare_hexface(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
+
 ! prepare integration
 call prepare_integration(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
+
 ! prepare surface (2D) integration
 call prepare_integration2d(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
-! set model properties
-if(myrank==0)then
-  write(logunit,'(a)',advance='no')'setting model properties...'
-  flush(logunit)
-endif
+
+! Set model properties
 call set_model_properties(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
-if(myrank==0)then
-  write(logunit,*)'complete!'
-  flush(logunit)
-endif
+
+
+
+
+
 
 !-------------------------------------------------------------------------------
 ! set dimensionalize parameters
@@ -556,6 +576,8 @@ if(allocated(shearmod_elmt))then
     flush(logunit)
   endif
 endif
+
+
 
 if(.not.devel_nondim)then
   ! DO NOT nondimensionalize
@@ -620,6 +642,9 @@ else
 endif
 !-------------------------------------------------------------------------------
 
+
+
+
 ! Read and prepare free surface file.
 ! Information is later used to determine the elevation of the source point and
 ! to plot the free surface files.
@@ -637,6 +662,8 @@ add_tag=''
 call write_ensight_casefile_long(case_file,geo_file,add_tag,isgeo_change, &
 ts,ns,fs,fi,twidth,errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
+
+
 
 if(savedata%infinite)then
   infcase_file=trim(out_path)//trim(file_head)//'_inf'//trim(ptail)//'.case'
@@ -683,6 +710,9 @@ if(savedata%fsplot_plane)then
   call control_error(errcode,errtag,stdout,myrank)
 endif
 
+
+
+
 ! Format string
 write(tstep_sformat,*)twidth
 tstep_sformat='i'//trim(adjustl(tstep_sformat))//'.'// &
@@ -716,6 +746,8 @@ if(infbc)then
 else
   call write_ensight_geocoord(geo_file,ipart,spart,nnode,real(g_coord),iounit)
 endif
+
+
 
 ! Dimensionalize coordinates after they are written.
 ! Writes element information.
@@ -829,12 +861,16 @@ if(savedata%fsplot)then
   call write_ensight_geocoord_part1(fsgeo_file,ipart,spart_fs,1, &
   nnode_fs,gnode_fs,nnode,real(g_coord),iounit_fs)
 
+
+
   ! Writes element information.
   buffer=ensight_quad4
   write(iounit_fs)buffer
   ! WARNING: statement/segment below assumes that ngllx=nglly=ngllz.
   ! It must be modified for unequal GLL points along different axes.
   write(iounit_fs)nelmt_fs*(ngllx-1)*(nglly-1)
+
+
 
   ! Do not substract 1 for ensight file
   do i_elmt=1,nelmt_fs
@@ -901,6 +937,8 @@ endif
 
 call sync_process
 
+
+
 ! Nondimensionlize
 g_coord=g_coord*NONDIM_L
 if(ISDISP_DOF)then
@@ -914,6 +952,8 @@ axis_range=axis_range*NONDIM_L
 
 ! compute this after nondimensionlization
 call compute_max_elementsize()
+
+
 
 if(myrank==0)then
   write(logunit,'(a)')'--------------------------------------------'
@@ -948,6 +988,9 @@ else
     call control_error(errcode,errtag,logunit,myrank)
   endif
 endif
+
+
+write(logunit,*)'CALLING SPECFEM3D'
 ! call main routines
 call specfem3d()
 !if(nexcav==0)then

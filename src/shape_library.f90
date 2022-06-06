@@ -14,7 +14,7 @@ contains
 ! This subroutines computes the shape fucntions at gll
 ! points. the 8-noded hexahedra is conformed to the exodus/cubit numbering
 ! convention
-subroutine shape_function_hex8(ngnod,ngllx,nglly,ngllz,xigll,etagll,      &
+subroutine shape_function_hex8(ngnod,ngllx,nglly,ngllz, xigll,etagll,      &
 zetagll,shape_hex8)
 use set_precision
 use math_constants
@@ -38,14 +38,19 @@ double precision :: xip,xim,etap,etam,zetap,zetam
 
 ! for checking the 3d shape functions
 double precision :: sum_shape
-
+integer :: lgunit = 7
 double precision, parameter :: one_eighth = 0.125d0
+
+write(lgunit,*)'     Running shape_function_hex8' 
+write(lgunit,*)'     compute shape function values at gll pts.'
+
 
 ! check that the parameter file is correct
 if(ngnod /= 8)then
   write(*,*)'ERROR: elements must have 8 geometrical nodes!'
   stop
 endif
+
 
 ! compute shape functions
 ! case of a 3d 8-node element (dhatt-touzot p. 115)
@@ -99,6 +104,19 @@ do k=1,ngllz
   enddo
 enddo
 
+
+write(lgunit,*)'     Created the following:'
+write(lgunit,*)'         GLL points of integration: '
+write(lgunit,*)'           xi gll:', xigll
+write(lgunit,*)'           eta gll:', etagll
+write(lgunit,*)'           zeta gll:', zetagll
+write(lgunit,*)'         shape_hex8 array (4D with dimensions) (8, ngllx,nglly,ngllz)'
+write(lgunit,*)'         which holds the 3D shape functions. e.g:'
+
+
+write(lgunit,*)'     shape_function_hex8 completed. '
+
+
 end subroutine shape_function_hex8
 !===============================================================================
 
@@ -107,6 +125,7 @@ end subroutine shape_function_hex8
 ! convention
 subroutine dshape_function_hex8(ngnod,ngllx,nglly,ngllz,xigll,etagll,     &
 zetagll,dshape_hex8)
+use global, only: logunit
 use set_precision
 use math_constants
 implicit none
@@ -130,6 +149,9 @@ double precision :: sum_dshapexi,sum_dshapeeta,sum_dshapezeta
 
 double precision, parameter :: one_eighth = 0.125_kreal
 
+
+write(logunit, *)'Computes derivatives of the shape funcs at gll pts... '
+
 ! check that the parameter file is correct
 if(ngnod /= 8)then
   write(*,*)'ERROR: elements must have 8 geometrical nodes!'
@@ -137,6 +159,7 @@ if(ngnod /= 8)then
 endif
 
 ngll=ngllx*nglly*ngllz
+write(logunit, *)'    ngll = ', ngll
 
 ! compute the derivatives of 3d shape functions
 igll=0
@@ -214,6 +237,15 @@ do i=1,ngll
         stop
       endif
 enddo
+
+write(logunit, *)'    Resulting derivatives stored in dshape_hex8: '
+write(logunit, *)'      dshape_hex8(3, 8, ngll)'
+write(logunit, *)'      3 for 3D, 8 for 8 nodes in hexahedra '
+write(logunit, *)'      e.g.: dshape_hex8(1, 3, :)'
+write(logunit, *)dshape_hex8(1, 3, :)
+write(logunit, *)'      ------------------------------------------------'
+
+
 
 end subroutine dshape_function_hex8
 !===============================================================================
@@ -395,11 +427,11 @@ end subroutine dshape_function_hex8p
 ! points. the 8-noded hexahedra is conformed to the exodus/cubit numbering
 ! convention
 subroutine dshape_function_quad4(ngnod2d,ngllx,nglly,xigll,etagll,dshape_quad4)
+use global, only: logunit
 use set_precision
 use math_constants
 implicit none
 integer,intent(in) :: ngnod2d,ngllx,nglly
-
 ! gauss-lobatto-legendre points of integration
 double precision :: xigll(ngllx)
 double precision :: etagll(nglly)
@@ -418,6 +450,8 @@ double precision :: xip,xim,etap,etam
 double precision :: sum_dshapexi,sum_dshapeeta
 
 double precision, parameter :: one_fourth = 0.25_kreal
+
+write(logunit,*)'     Entered dshape_function_quad4.'
 
 ! check that the parameter file is correct
 if(ngnod2d /= 4)then
@@ -477,6 +511,10 @@ do j=1,nglly
       stop
     endif
   enddo
+
+
+write(logunit,*)'        Created dshape_quad4 dim: (2, ', ngnod2d, ', ', ngllx*nglly, ' )'
+write(logunit,*)'     Finished dshape_function_quad4.'
 
 end subroutine dshape_function_quad4
 !===============================================================================
