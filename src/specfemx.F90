@@ -28,6 +28,8 @@ use output_to_user
 use serial_library
 use math_library_serial
 #endif
+use nondimensionalisation
+use save_mesh
 use postprocess,only:write_scalar_to_file_freesurf
 use write_ensight
 
@@ -175,7 +177,6 @@ call sync_process()
 call control_error(errcode,errtag,stdout,myrank)
 
 
-
 ! check method
 if (trim(method)/='sem')then
   write(errtag,'(a)')'ERROR: wrong input for SPECFEM3D!'
@@ -316,11 +317,10 @@ ns=max(1,nstep)
 twidth=ceiling(log10(real(ns)+1.))
 
 
+
+
 ! write original meshes
-if(myrank==0)then
-  write(logunit,'(a)')'writing original mesh...'
-  flush(logunit)
-endif
+log_msg = trim('writing original mesh...') ;   call write_ifproc0()
 if(infbc)then
   ! classify finite/infinite elements for multiblock data plot
   npart=3
@@ -394,36 +394,34 @@ if(savedata%model_cell)then
   call write_model_cell(errcode,errtag)
 endif
 
-if(myrank==0)then
-  write(logunit,'(a)')'complete!'
-  flush(logunit)
-endif
+log_msg = trim('complete!') ;   call write_ifproc0()
+
+
+! If only saving mesh (not running simulation) then quit program at this point. 
 if(ismesh_only)then
   call close_process
 endif
+
+! ___________________________________________________________________________________
+
+
 ! store orginal connectivity which helps to identify ghost interfaces
 allocate(g_num0(ngnode,nelmt))
 g_num0=g_num
 
 
-
-
-
-
 ! precompute gll 1D
 call precompute_gll1d()
 
+
 ! create spectral elements
-if(myrank==0)then
-  write(logunit,'(a)',advance='no')'creating spectral elements...'
-  flush(logunit)
-endif
+log_msg = trim('creating spectral elements...') ;   call write_ifproc0()
+
 call hex2spec(ndim,ngnode,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
-if(myrank==0)then
-  write(logunit,*)'complete!'
-  flush(logunit)
-endif
+
+log_msg = trim('completed creating spectral elements') ;   call write_ifproc0()
+
 
 tot_nelmt=sumscal(nelmt); tot_nnode=sumscal(nnode)
 max_nelmt=maxscal(nelmt); max_nnode=maxscal(nnode)
@@ -436,10 +434,11 @@ if(myrank==0)then
   flush(logunit)
 endif
 
+
 ! number of elemental nodes (nodes per element)
 nenode=ngll !(ngllx*nglly*ngllz)
 
-! Reclassify (in)finite elements
+! Reclassify (in)finite elements if there is an infinite boundary condition
 if(infbc)then
   ! free memory for modified arrays
   deallocate(g_num_finite,g_num_trinfinite,g_num_infinite, &
@@ -452,57 +451,12 @@ call initialize_dof()
 call set_element_dof()
 
 
-
-
-if(myrank==0)then
-  write(logunit,'(a)')'-----------------------------------------------'
-  if(ISDISP_DOF)then
-    write(logunit,'(a)')'Displacement DOF: '//'ON'
-    write(logunit,'(a,i0)')' NNDOFU: ',nndofu
-    if(isplastic)then
-      write(logunit,'(a)')' Plasticity: ON'
-    else
-      write(logunit,'(a)')' Plasticity: OFF'
-    endif
-  else
-    write(logunit,'(a)')'Displacement DOF: '//'OFF'
-    write(logunit,'(a,i0)')' NNDOFU: ',nndofu
-  endif
-  if(ISPOT_DOF)then
-    write(logunit,'(a)')'Potential DOF: '//'ON'
-    write(logunit,'(a,i0)')' NNDOPHI: ',nndofphi
-    write(logunit,'(a)')' Potential DOF type: '//trim(POT_STRING)
-  else
-    write(logunit,'(a)')'Potential DOF: '//'OFF'
-    write(logunit,'(a,i0)')' NNDOPHI: ',nndofphi
-  endif
-  write(logunit,'(a,i0)')'Total DOFs per node: ',nndof
-  write(logunit,'(a,3(i0,1x))')'Displacement DOF indices: ',idofu
-  write(logunit,'(a,i0)')'Potential DOF indices: ',idofphi
-  write(logunit,'(a,i0)')'NEDOFU: ',nedofu
-  write(logunit,'(a,i0)')'NEDOFPHI: ',nedofphi
-  write(logunit,'(a,i0)')'Total DOFs per element: ',nedof
-  write(logunit,'(a)')'-----------------------------------------------'
-  flush(logunit)
-endif
-
-
-write(logunit,*)'Sorting 2D mesh stuff...'
-ngllxy=ngllx*nglly                                                               
-ngllyz=nglly*ngllz                                                               
-ngllzx=ngllz*ngllx                                                               
-maxngll2d=max(ngllxy,ngllyz,ngllzx)
-
-write(logunit,*)'   ngllxy: ', ngllxy
-write(logunit,*)'   ngllyz: ', ngllyz
-write(logunit,*)'   ngllzx: ', ngllzx
-write(logunit,*)'   max GLL 2D: ', maxngll2d
-
+! Write model details to log file for user 
+call print_model_details()
 
 ! prepare hexes
 call prepare_hex(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
-
 
 ! prepare hex faces
 call prepare_hexface(errcode,errtag)
@@ -516,132 +470,13 @@ call control_error(errcode,errtag,stdout,myrank)
 call prepare_integration2d(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
-
 ! Set model properties
 call set_model_properties(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
-
-
-
-
-
-!-------------------------------------------------------------------------------
-! set dimensionalize parameters
-! minimum, maximum density
-! density can be negative for gravity anomaly calculation
-! massdens_elmt is not allocated for the magnetic anomaly computation
-if(allocated(massdens_elmt))then
-  if(infbc)then
-    mindensity=minscal(minval(massdens_elmt(:,elmt_finite)))
-    maxdensity=maxscal(maxval(massdens_elmt(:,elmt_finite)))
-  else
-    mindensity=minscal(minval(massdens_elmt))
-    maxdensity=maxscal(maxval(massdens_elmt))
-  endif
-  if(myrank==0)then
-    write(logunit,'(a,g0.6,1x,g0.6)')'min, max density (kg/m3): ',mindensity,maxdensity
-    flush(logunit)
-  endif
-  ! Always use positive value for nondimensionalizing
-  maxdensity=max(abs(mindensity),abs(maxdensity))
-endif
-! minimum, maximum bulk modulus
-! bulkmod_elmt is not allocated for the magnetic anomaly computation
-if(allocated(bulkmod_elmt))then
-  if(infbc)then
-    minbulkmod=minscal(minval(bulkmod_elmt(:,elmt_finite)))
-    maxbulkmod=maxscal(maxval(bulkmod_elmt(:,elmt_finite)))
-  else
-    minbulkmod=minscal(minval(bulkmod_elmt))
-    maxbulkmod=maxscal(maxval(bulkmod_elmt))
-  endif
-  if(myrank==0)then
-    write(logunit,'(a,g0.6,1x,g0.6)')'min, max bulkmod (N/m2): ',minbulkmod,maxbulkmod
-    flush(logunit)
-  endif
-endif
-! minimum, maximum shear modulus
-! shearmod_elmt is not allocated for the magnetic anomaly computation
-if(allocated(shearmod_elmt))then
-  if(infbc)then
-    minshearmod=minscal(minval(shearmod_elmt(:,elmt_finite)))
-    maxshearmod=maxscal(maxval(shearmod_elmt(:,elmt_finite)))
-  else
-    minshearmod=minscal(minval(shearmod_elmt))
-    maxshearmod=maxscal(maxval(shearmod_elmt))
-  endif
-  if(myrank==0)then
-    write(logunit,'(a,g0.6,1x,g0.6)')'min, max shearmod (N/m2): ',minshearmod,maxshearmod
-    flush(logunit)
-  endif
-endif
-
-
-
-if(.not.devel_nondim)then
-  ! DO NOT nondimensionalize
-  if(myrank==0)then
-    write(logunit,*)'nondimensionalize: NO'
-    flush(logunit)
-  endif
-  DIM_DENSITY=ONE
-  NONDIM_DENSITY=ONE
-
-  DIM_L=ONE
-  NONDIM_L=ONE
-
-  NONDIM_T=ONE
-  DIM_T=ONE
-
-  DIM_VEL=ONE
-  DIM_ACCEL=ONE
-
-  DIM_M=ONE
-
-  DIM_MOD = ONE
-  NONDIM_MOD=ONE
-
-  DIM_MTENS=ONE
-  NONDIM_MTENS=ONE
-
-  DIM_GPOT=ONE
-  DIM_G=ONE
-
-  DIM_MPOT=ONE
-  DIM_B=ONE
-else
-  ! nondimensionalize
-  if(myrank==0)then
-    write(logunit,*)'nondimensionalize: YES'
-    flush(logunit)
-  endif
-  DIM_DENSITY=maxdensity                               
-  NONDIM_DENSITY=ONE/DIM_DENSITY                               
-
-  DIM_L=absmaxcoord
-  NONDIM_L=ONE/DIM_L
-
-  NONDIM_T=sqrt(PI*GRAV_CONS*maxdensity)
-  DIM_T=ONE/NONDIM_T
-
-  DIM_VEL=DIM_L*NONDIM_T
-  DIM_ACCEL=DIM_VEL*NONDIM_T
-  NONDIM_ACCEL=ONE/DIM_VEL
-
-  DIM_M=maxdensity*DIM_L*DIM_L*DIM_L
-
-  DIM_MOD = DIM_M*NONDIM_L*NONDIM_T*NONDIM_T
-  NONDIM_MOD=ONE/DIM_MOD                             
-
-  DIM_MTENS=DIM_DENSITY*(DIM_L**5)*NONDIM_T*NONDIM_T
-  NONDIM_MTENS=ONE/DIM_MTENS  
-
-  DIM_GPOT=PI*GRAV_CONS*maxdensity*DIM_L*DIM_L
-  DIM_G=PI*GRAV_CONS*maxdensity*DIM_L
-endif
-!-------------------------------------------------------------------------------
-
+! Nondimensionalisation 
+call set_nondimensional_params
+call calc_nondimensionalisation_vals
 
 
 
@@ -665,290 +500,18 @@ call control_error(errcode,errtag,stdout,myrank)
 
 
 
-if(savedata%infinite)then
-  infcase_file=trim(out_path)//trim(file_head)//'_inf'//trim(ptail)//'.case'
-  if(nexcav==0)then
-    infgeo_file=trim(file_head)//'_inf'//trim(ptail)//'.geo'
-  else
-    isgeo_change=.true.
-    infgeo_file=trim(file_head)//'_inf'//'_step'//wild_char(1:twidth)//trim(ptail)//'.geo'
-  endif
 
-  add_tag='_inf'
-  call write_ensight_casefile_long(infcase_file,infgeo_file,add_tag,isgeo_change, &
-  ts,ns,fs,fi,twidth,errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
-endif
-
-if(savedata%fsplot)then
-  fscase_file=trim(out_path)//trim(file_head)//'_free_surface'//trim(ptail)//'.case'
-  if(nexcav==0)then
-    fsgeo_file=trim(file_head)//'_free_surface'//trim(ptail)//'.geo'
-  else
-    isgeo_change=.true.
-    fsgeo_file=trim(file_head)//'_free_surface'//'_step'//wild_char(1:twidth)//trim(ptail)//'.geo'
-  endif
-
-  add_tag='_free_surface'
-  call write_ensight_casefile_long(fscase_file,fsgeo_file,add_tag,isgeo_change, &
-  ts,ns,fs,fi,twidth,errcode,errtag,freesurf=.true.,isplane=.false.)
-  call control_error(errcode,errtag,stdout,myrank)
-endif
-
-if(savedata%fsplot_plane)then
-  fspcase_file=trim(out_path)//trim(file_head)//'_free_surface_plane'//trim(ptail)//'.case'
-  if(nexcav==0)then
-    fspgeo_file=trim(file_head)//'_free_surface_plane'//trim(ptail)//'.geo'
-  else
-    isgeo_change=.true.
-    fspgeo_file=trim(file_head)//'_free_surface_plane'//'_step'//wild_char(1:twidth)//trim(ptail)//'.geo'
-  endif
-
-  add_tag='_free_surface_plane'
-  call write_ensight_casefile_long(fspcase_file,fspgeo_file,add_tag,isgeo_change, &
-  ts,ns,fs,fi,twidth,errcode,errtag,freesurf=.true.,isplane=.TRUE.)
-  call control_error(errcode,errtag,stdout,myrank)
-endif
-
-
-
-
-! Format string
-write(tstep_sformat,*)twidth
-tstep_sformat='i'//trim(adjustl(tstep_sformat))//'.'// &
-trim(adjustl(tstep_sformat))
-format_str='(a,'//trim(tstep_sformat)//',a)'
-! write geo file for inital stage (original)
-! open Ensight Gold geo file to store mesh data
-if(isgeo_change)then
-  write(geo_file,fmt=format_str)trim(out_path)//trim(file_head)// &
-  '_step',0,trim(ptail)//'.geo'
-else
-  write(geo_file,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.geo'
-endif
-if(savedata%infinite)then
-  if(isgeo_change)then
-    write(infgeo_file,fmt=format_str)trim(out_path)//trim(file_head)//'_inf'// &
-    '_step',0,trim(ptail)//'.geo'
-  else
-    write(infgeo_file,'(a)')trim(out_path)//trim(file_head)//'_inf'//trim(ptail)//'.geo'
-  endif
-endif
-
-if(infbc)then
-  ! write .geo file 
-  call write_ensight_geocoord_part1(geo_file,ipart,spart,1, &
-  nnode_finite,node_finite,nnode,real(g_coord),iounit)
-  if(savedata%infinite)then
-    call write_ensight_geocoord_part1(infgeo_file,ipart,spart,2, &
-    nnode_infinite,node_infinite,nnode,real(g_coord),iounit_inf)
-  endif
-else
-  call write_ensight_geocoord(geo_file,ipart,spart,nnode,real(g_coord),iounit)
-endif
-
-
-
-! Dimensionalize coordinates after they are written.
-! Writes element information.
-buffer=ensight_hex8
-if(infbc)then
-  write(iounit)buffer
-  write(iounit)nelmt_finite*(ngllx-1)*(nglly-1)*(ngllz-1)
-
-  ! do not substract 1 for ensight file
-  do i_elmt=1,nelmt_finite
-    do k=1,ngllz-1
-      do j=1,nglly-1
-        do i=1,ngllx-1
-          ! corner nodes in a sequential numbering
-          node_hex8(1)=(k-1)*ngllxy+(j-1)*ngllx+i
-          node_hex8(2)=node_hex8(1)+1
-
-          node_hex8(3)=node_hex8(1)+ngllx
-          node_hex8(4)=node_hex8(3)+1
-
-          node_hex8(5)=node_hex8(1)+ngllxy
-          node_hex8(6)=node_hex8(5)+1
-
-          node_hex8(7)=node_hex8(5)+ngllx
-          node_hex8(8)=node_hex8(7)+1
-          ! map to exodus/cubit numbering and write
-          gnum_hex8=g_num_finite(node_hex8(map2exodus_hex8),i_elmt)
-          write(iounit)gnum_hex8
-        enddo
-      enddo
-    enddo
-  enddo
-  close(iounit)
-  ! deallocate variables
-  deallocate(g_num_finite)!,g_num_infinite,node_finite,node_infinite)
-  ! infinite region
-  if(savedata%infinite)then
-    write(iounit_inf)buffer
-    write(iounit_inf)nelmt_infinite*(ngllx-1)*(nglly-1)*(ngllz-1)
-
-    ! do not substract 1 for ensight file
-    do i_elmt=1,nelmt_infinite
-      do k=1,ngllz-1
-        do j=1,nglly-1
-          do i=1,ngllx-1
-            ! corner nodes in a sequential numbering
-            node_hex8(1)=(k-1)*ngllxy+(j-1)*ngllx+i
-            node_hex8(2)=node_hex8(1)+1
-
-            node_hex8(3)=node_hex8(1)+ngllx
-            node_hex8(4)=node_hex8(3)+1
-
-            node_hex8(5)=node_hex8(1)+ngllxy
-            node_hex8(6)=node_hex8(5)+1
-
-            node_hex8(7)=node_hex8(5)+ngllx
-            node_hex8(8)=node_hex8(7)+1
-            ! map to exodus/cubit numbering and write
-            gnum_hex8=g_num_infinite(node_hex8(map2exodus_hex8),i_elmt)
-            write(iounit_inf)gnum_hex8
-          enddo
-        enddo
-      enddo
-    enddo
-    close(iounit_inf)
-    ! deallocate variables
-    deallocate(g_num_infinite)!,g_num_infinite,node_finite,node_infinite)
-
-  endif
-else
-  write(iounit)buffer
-  write(iounit)nelmt*(ngllx-1)*(nglly-1)*(ngllz-1)
-
-  ! do not substract 1 for ensight file
-  do i_elmt=1,nelmt
-    do k=1,ngllz-1
-      do j=1,nglly-1
-        do i=1,ngllx-1
-          ! corner nodes in a sequential numbering
-          node_hex8(1)=(k-1)*ngllxy+(j-1)*ngllx+i
-          node_hex8(2)=node_hex8(1)+1
-
-          node_hex8(3)=node_hex8(1)+ngllx
-          node_hex8(4)=node_hex8(3)+1
-
-          node_hex8(5)=node_hex8(1)+ngllxy
-          node_hex8(6)=node_hex8(5)+1
-
-          node_hex8(7)=node_hex8(5)+ngllx
-          node_hex8(8)=node_hex8(7)+1
-          ! map to exodus/cubit numbering and write
-          gnum_hex8=g_num(node_hex8(map2exodus_hex8),i_elmt)
-          write(iounit)gnum_hex8
-        enddo
-      enddo
-    enddo
-  enddo
-  close(iounit)
-endif
-
-! Write GEO file for the free surface
-if(savedata%fsplot)then
-  if(isgeo_change)then
-    write(fsgeo_file,fmt=format_str)trim(out_path)//trim(file_head)//'_free_surface'// &
-    '_step',0,trim(ptail)//'.geo'
-  else
-    write(fsgeo_file,'(a)')trim(out_path)//trim(file_head)//'_free_surface'//trim(ptail)//'.geo'
-  endif
-  spart_fs(1)='free_surface'
-  ! write .geo file 
-  call write_ensight_geocoord_part1(fsgeo_file,ipart,spart_fs,1, &
-  nnode_fs,gnode_fs,nnode,real(g_coord),iounit_fs)
-
-
-
-  ! Writes element information.
-  buffer=ensight_quad4
-  write(iounit_fs)buffer
-  ! WARNING: statement/segment below assumes that ngllx=nglly=ngllz.
-  ! It must be modified for unequal GLL points along different axes.
-  write(iounit_fs)nelmt_fs*(ngllx-1)*(nglly-1)
-
-
-
-  ! Do not substract 1 for ensight file
-  do i_elmt=1,nelmt_fs
-      do j=1,nglly-1
-        do i=1,ngllx-1
-          ! Corner nodes in a sequential numbering
-          node_quad4(1)=(j-1)*ngllx+i
-          node_quad4(2)=node_quad4(1)+1
-
-          node_quad4(3)=node_quad4(1)+ngllx
-          node_quad4(4)=node_quad4(3)+1
-
-          ! Map to exodus/cubit numbering and write
-          gnum_quad4=rgnum_fs(node_quad4(map2exodus_quad4),i_elmt)
-          write(iounit_fs)gnum_quad4
-        enddo
-      enddo
-    enddo
-  close(iounit_fs)
-endif
-
-if(savedata%fsplot_plane)then
-  if(isgeo_change)then
-    write(fspgeo_file,fmt=format_str)trim(out_path)//trim(file_head)//'_free_surface_plane'// &
-    '_step',0,trim(ptail)//'.geo'
-  else
-    write(fspgeo_file,'(a)')trim(out_path)//trim(file_head)//'_free_surface_plane'//trim(ptail)//'.geo'
-  endif
-  spart_fs(1)='free_surface'
-  ! write .geo file 
-  call write_ensight_geocoord_plane_part1(fspgeo_file,ipart,spart_fs,1,3, &
-  nnode_fs,gnode_fs,nnode,real(g_coord),iounit_fs)
-
-  ! Writes element information.
-  buffer=ensight_quad4
-  write(iounit_fs)buffer
-  ! WARNING: statement/segment below assumes that ngllx=nglly=ngllz.
-  ! It must be modified for unequal GLL points along different axes.
-  write(iounit_fs)nelmt_fs*(ngllx-1)*(nglly-1)
-
-  ! Do not substract 1 for ensight file
-  do i_elmt=1,nelmt_fs
-      do j=1,nglly-1
-        do i=1,ngllx-1
-          ! Corner nodes in a sequential numbering
-          node_quad4(1)=(j-1)*ngllx+i
-          node_quad4(2)=node_quad4(1)+1
-
-          node_quad4(3)=node_quad4(1)+ngllx
-          node_quad4(4)=node_quad4(3)+1
-
-          ! Map to exodus/cubit numbering and write
-          gnum_quad4=rgnum_fs(node_quad4(map2exodus_quad4),i_elmt)
-          write(iounit_fs)gnum_quad4
-        enddo
-      enddo
-    enddo
-  close(iounit_fs)
-
-  ! Write Z-coordinate file
-  call write_scalar_to_file_freesurf(nnode_fs,g_coord(3,gnode_fs),ext='z', &
-  plane=.true.) 
-endif
-
+call save_mesh_ensight(infcase_file,infgeo_file,trinfcase_file, &
+                       trinfgeo_file,isgeo_change,add_tag, twidth, &
+                       fscase_file,fsgeo_file, fspcase_file,fspgeo_file, &
+                       ns,fi,fs,ts, errcode, errtag, ext,format_str, &
+                       case_file,geo_file, ipart, spart,spart_fs, buffer, node_hex8, gnum_hex8, &
+                       gnum_quad4,node_quad4)
 call sync_process
 
 
-
-! Nondimensionlize
-g_coord=g_coord*NONDIM_L
-if(ISDISP_DOF)then
-  massdens_elmt=massdens_elmt*NONDIM_DENSITY
-  bulkmod_elmt=bulkmod_elmt*NONDIM_MOD
-  shearmod_elmt=shearmod_elmt*NONDIM_MOD
-endif
-pole_coord0=pole_coord0*NONDIM_L
-pole_coord1=pole_coord1*NONDIM_L
-axis_range=axis_range*NONDIM_L
+! Actually apply non-dimensionalisation
+call apply_nondimensionalisation
 
 ! compute this after nondimensionlization
 call compute_max_elementsize()
@@ -1002,6 +565,8 @@ call specfem3d()
 !endif
 !-----------------------------------
 
+
+! Clean up and deallocate 
 if(ISDISP_DOF)then
   deallocate(edofu)
 endif
@@ -1053,6 +618,12 @@ call sync_process
 call close_process()
 contains
 !-------------------------------------------------------------------------------
+
+
+
+
+
+
 
 ! Routine must be called before converting hex8 to spectral elements
 subroutine compute_max_elementsize

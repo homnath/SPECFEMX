@@ -24,6 +24,9 @@ doc/*.out
 doc/*.synctex.gz
 doc/*.toc
 
+src_bkup/*
+src/src/*
+src/.vscode/*
 #log files
 *.log
 

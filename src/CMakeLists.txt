@@ -4,7 +4,7 @@
 # Source files for sem library
 SET(srcsem
   global.f90
-  output_to_user.f90
+  output_to_user.F90
   package_version.f90
   string_library.f90
   math_library.f90
@@ -46,7 +46,6 @@ IF(ISPARALLEL)
      set_precision_mpi.f90
      mpi_library.f90
      other_forces.f90
-
      math_library_mpi.f90
      relaxation_time.f90
      ghost_library_mpi.f90
@@ -90,7 +89,9 @@ SET(srcboth
    cmtsolution.F90
    earthquake_load.F90
    station.F90
-   benchmark.F90)
+   benchmark.F90
+   save_mesh.F90
+   nondimensionalisation.F90)
 # Compiler preprocessor directives
 #ADD_DEFINITIONS(CMAKE_Fortran_FLAGS "-DUSE_MPI")
 IF(ISPARALLEL)
