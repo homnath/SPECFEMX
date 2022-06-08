@@ -40,7 +40,7 @@ use count_elements  !WE
 use relaxation_time !WE
 use ghost           !WE
 use other_forces    !WE 
-use prestress
+!use prestress
 
 
 #if (USE_COMPLEX)

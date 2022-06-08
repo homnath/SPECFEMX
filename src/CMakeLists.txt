@@ -51,7 +51,6 @@ IF(ISPARALLEL)
      ghost_library_mpi.f90
      ghost.f90
      count_elements.f90
-     prestress.f90
      prepare_sparse.f90
      parsolver.f90
      )
@@ -91,7 +90,10 @@ SET(srcboth
    station.F90
    benchmark.F90
    save_mesh.F90
-   nondimensionalisation.F90)
+   nondimensionalisation.F90
+   user_input.F90
+   prestress.F90
+   )
 # Compiler preprocessor directives
 #ADD_DEFINITIONS(CMAKE_Fortran_FLAGS "-DUSE_MPI")
 IF(ISPARALLEL)

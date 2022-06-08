@@ -6,7 +6,8 @@
 !  - Ordinary shear strain components can be obtained by multiplying the
 !    engineering strain with 0.5 if necessary.
 program specfemx
-! Import necessary modules.
+
+  ! Import necessary modules.
 use dimensionless
 use global
 use package_version
@@ -29,11 +30,18 @@ use serial_library
 use math_library_serial
 #endif
 use nondimensionalisation
+use user_input
 use save_mesh
 use postprocess,only:write_scalar_to_file_freesurf
 use write_ensight
 
+
+
+!******************************************************************************
+!******************************************************************************
+
 implicit none
+
 integer :: iounit,iounit_inf,iounit_fs,i,ios,j,k
 integer :: i_elmt
 
@@ -82,108 +90,17 @@ logical :: ismesh_only
 myrank=0; nproc=1;
 errtag=""; errcode=-1
 
+!******************************************************************************
+!******************************************************************************
 
-
+! Start up MPI 
 call start_process()
 
-
-call get_command_argument(0, prog)
-if (command_argument_count() <= 0) then
-  errcode=-1
-  errtag='ERROR: no input file!'
-  call control_error(errcode,errtag,stdout,myrank)
-endif
-
-call get_command_argument(1, arg1)
-if(trim(arg1)==('--help'))then
-  if(myrank==0)then
-    write(stdout,'(a)')'Usage: '//trim(prog)//' [Options] [input_file]'
-    write(stdout,'(a)')'Options:'
-    write(stdout,'(a)')'    --help        : Display this information.'
-    write(stdout,'(a)')'    --version     : Display version information.'
-  endif
-  !call sync_process
-  call close_process()
-elseif(trim(arg1)==('--version'))then
-  if(myrank==0)then
-    write(stdout,'(a)')trim(packname)//' '//trim(packver)//' '//trim(packtype)
-    write(stdout,'(a)')'This is free software; see the source for copying '
-    write(stdout,'(a)')'conditions.  There is NO warranty; not even for '
-    write(stdout,'(a)')'MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.'
-  endif
-  !call sync_process
-  call close_process()
-endif
-ismesh_only=.false.
-call get_command_argument(2, arg2)
-if(trim(arg2)==('--mesh-only'))then
-  ismesh_only=.true.
-endif
-
-! get input file name
-call get_command_argument(1, inp_fname)
-
-! parse input file name for future use
-call parse_file(inp_fname,path,file_head,ext)
-
-! open log file
-! log file must be opened after parsing the input file name since it uses
-! file_head!
-! log file must be stored in the current directory since out_path isn't known
-! at this stage!
-if(myrank==0)then
-  log_file = trim(file_head)//'.log'
-  open(unit=logunit,file=trim(log_file),status='replace',action='write',iostat=ios)
-  if(ios.ne.0)then
-    print*,ios,trim(log_file)
-    write(errtag,'(a)')'ERROR: cannot open log file: '//trim(log_file)
-    call control_error(errcode,errtag,stdout,myrank)
-  endif
-  write(logunit,'(a)')'--------------------------------------------'
-  write(logunit,'(a)')'Result summary produced by '//&
-  trim(packname)//' '//trim(packver)//' '//trim(packtype)
-  write(logunit,'(a)')'--------------------------------------------'
-  write(logunit,'(a)')'DATE(CCYYMMDD) TIME(HHMMSS.SSS) ZONE(+-HHMM)'
-  call date_and_time(tdate,ttime,tzone)
-  write(logunit,'(3x,a,7x,a,7x,a)')tdate,ttime,tzone
-  call get_command(cmd)
-  write(logunit,'(a)')trim(cmd)
-  flush(logunit)
-endif
-
-! starting timer
-call cpu_time(cpu_tstart)
-
-! get processor tag
-ptail=proc_tag()
-if(ismpi.and.nproc.gt.1)then
-  ptail_inp=trim(ptail)
-else
-  ptail_inp=''
-endif
-
-
-proc_str=''
-if(ismpi.and.nproc.gt.1)then
-  write(format_str,*)ceiling(log10(real(nproc)+1.))
-  format_str='(i'//trim(adjustl(format_str))//')'
-  write(proc_str,fmt=format_str)myrank
-endif
-
-
-! read input data
-call read_input(inp_fname,errcode,errtag)
-call sync_process()
-call control_error(errcode,errtag,stdout,myrank)
-
-
-! check method
-if (trim(method)/='sem')then
-  write(errtag,'(a)')'ERROR: wrong input for SPECFEM3D!'
-  call control_error(errcode,errtag,stdout,myrank)
-else
-  write(logunit, '(a)')'Correct method: sem'
-endif
+! Read cmd line/process input file etc ... 
+call process_user_input(cmd, tdate, ttime, tzone, ios, path, &
+                        ext, format_str, errcode, errtag, &
+                        ismesh_only,arg1,arg2,inp_fname,prog, &
+                        cpu_tstart)
 
 
 ! Calculate model extents for individual processors/whole model
@@ -192,13 +109,12 @@ call calc_model_coord_extents(tot_nelmt,max_nelmt,min_nelmt, &
                               absmaxx,absmaxy,absmaxz)
 
 
-
 ! Initialize model - allocates shearmod/bulkmod/massdensity arrays
 call initialize_model(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
 
-
+! STILL NOT SURE WHAT THIS IS FOR! 
 isgeo_change=.false.
 ts=1 ! time set
 fs=0; fi=1
@@ -213,8 +129,13 @@ fs=0; fi=1
 ns=max(1,nstep)
 twidth=ceiling(log10(real(ns)+1.))
 
-! NEED TO EDIT LOCAL VARIABLES STILL 
-call write_original_mesh
+
+! Write original mesh to Ensight file 
+call write_original_mesh(ipart, spart, npart, &
+                         geo_file, infcase_file,& 
+                         infgeo_file, &
+                         add_tag, errcode, errtag, case_file,&
+                         trinfcase_file,trinfgeo_file)
 
 
 ! If only saving mesh (not running simulation) then quit program at this point. 
@@ -236,10 +157,8 @@ call precompute_gll1d()
 
 ! create spectral elements
 log_msg = trim('creating spectral elements...') ;   call write_ifproc0()
-
 call hex2spec(ndim,ngnode,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
-
 log_msg = trim('completed creating spectral elements') ;   call write_ifproc0()
 
 
@@ -301,10 +220,11 @@ call calc_nondimensionalisation_vals
 
 
 ! Read and prepare free surface file.
-! Information is later used to determine the elevation of the source point and
-! to plot the free surface files.
+! Information is later used to determine the elevation 
+! of the source point and to plot the free surface files.
 call prepare_free_surface(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
+
 case_file=trim(out_path)//trim(file_head)//trim(ptail)//'.case'
 if(nexcav==0)then
   geo_file=trim(file_head)//trim(ptail)//'.geo'
@@ -320,11 +240,11 @@ call control_error(errcode,errtag,stdout,myrank)
 
 
 
-
+! Save the mesh to the EnSight files. 
 call save_mesh_ensight(infcase_file,infgeo_file,trinfcase_file, &
                        trinfgeo_file,isgeo_change,add_tag, twidth, &
                        fscase_file,fsgeo_file, fspcase_file,fspgeo_file, &
-                       ns,fi,fs,ts, errcode, errtag, ext,format_str, &
+                       ns,fi,fs,ts, errcode, errtag, format_str, &
                        case_file,geo_file, ipart, spart,spart_fs, buffer, node_hex8, gnum_hex8, &
                        gnum_quad4,node_quad4)
 call sync_process
@@ -333,15 +253,11 @@ call sync_process
 ! Actually apply non-dimensionalisation
 call apply_nondimensionalisation
 
-! compute this after nondimensionlization
+! compute (nondimensionalised) max element size. 
 call compute_max_elementsize()
 
 
 
-if(myrank==0)then
-  write(logunit,'(a)')'--------------------------------------------'
-  flush(logunit)
-endif
 
 ! solver type
 if(solver_type.eq.smart_solver)then
