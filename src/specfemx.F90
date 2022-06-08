@@ -186,121 +186,18 @@ else
 endif
 
 
+! Calculate model extents for individual processors/whole model
+call calc_model_coord_extents(tot_nelmt,max_nelmt,min_nelmt, &
+                              tot_nnode,max_nnode,min_nnode, &
+                              absmaxx,absmaxy,absmaxz)
 
-! Set coordinate extents of the finite model. This extent is later used in
-! location routine.
-if(infbc)then
-  ! classify (in)finite elements
-  call classify_finite_infinite_elements(0)
-  ! Finite region
-  ! Element and node count
-  tot_nelmt=sumscal(nelmt_finite); tot_nnode=sumscal(nnode_finite)
-  max_nelmt=maxscal(nelmt_finite); max_nnode=maxscal(nnode_finite)
-  min_nelmt=minscal(nelmt_finite); min_nnode=minscal(nnode_finite)
-  ! Coordinate extents of partitioned model
-  pmodel_minx=minval(g_coord(1,node_finite))
-  pmodel_maxx=maxval(g_coord(1,node_finite))
-  pmodel_miny=minval(g_coord(2,node_finite))
-  pmodel_maxy=maxval(g_coord(2,node_finite))
-  pmodel_minz=minval(g_coord(3,node_finite))
-  pmodel_maxz=maxval(g_coord(3,node_finite))
-  ! Coordinate extents of finite model 
-  model_minx=minscal(pmodel_minx)
-  model_maxx=maxscal(pmodel_maxx)
-  model_miny=minscal(pmodel_miny)
-  model_maxy=maxscal(pmodel_maxy)
-  model_minz=minscal(pmodel_minz)
-  model_maxz=maxscal(pmodel_maxz)
-  mincoord=min(model_minx,model_miny,model_minz)
-  maxcoord=max(model_maxx,model_maxy,model_maxz)
-  absmaxx=maxscal(maxval(abs(g_coord(1,:))))
-  absmaxy=maxscal(maxval(abs(g_coord(2,:))))
-  absmaxz=maxscal(maxval(abs(g_coord(3,:))))
-  absmaxcoord=max(absmaxx,absmaxy,absmaxz)
-  if(myrank==0)then
-    write(logunit,'(a)')'Original model size: Finite region'
-    write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' elements => total: ',tot_nelmt, &
-    'max: ',max_nelmt,'min: ',min_nelmt
-    write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' nodes    => total: ',tot_nnode, &
-    'max: ',max_nnode,'min: ',min_nnode
-    write(logunit,'(a,g0.6,1x,g0.6)')' x extent min max: ',model_minx,model_maxx
-    write(logunit,'(a,g0.6,1x,g0.6)')' y extent min max: ',model_miny,model_maxy
-    write(logunit,'(a,g0.6,1x,g0.6)')' z extent min max: ',model_minz,model_maxz
-    write(logunit,'(a,g0.6,1x,g0.6)')' min/max coord: ',mincoord,maxcoord
-    write(logunit,'(a,g0.6)')' abs max coord: ',absmaxcoord
-    flush(logunit)
-  endif
-else
-  write(logunit,*)'No infinite bc (infbc = F)...'
-  pmodel_minx=minval(g_coord(1,:))
-  pmodel_maxx=maxval(g_coord(1,:))
-  pmodel_miny=minval(g_coord(2,:))
-  pmodel_maxy=maxval(g_coord(2,:))
-  pmodel_minz=minval(g_coord(3,:))
-  pmodel_maxz=maxval(g_coord(3,:))
-
-  write(logunit,*)'  Proc model boundaries:'
-  write(logunit,*)'     pmodel_minx: ', pmodel_minx, ' rank: ', myrank
-  write(logunit,*) '    pmodel_maxx: ', pmodel_maxx, ' rank: ', myrank
-  write(logunit,*) '    pmodel_miny: ', pmodel_miny, ' rank: ', myrank
-  write(logunit,*) '    pmodel_maxy: ', pmodel_maxy, ' rank: ', myrank
-  write(logunit,*) '    pmodel_minz: ', pmodel_minz, ' rank: ', myrank
-  write(logunit,*) '    pmodel_maxz: ', pmodel_maxz, ' rank: ', myrank
-   
-endif
-
-tot_nelmt=sumscal(nelmt); tot_nnode=sumscal(nnode)
-max_nelmt=maxscal(nelmt); max_nnode=maxscal(nnode)
-min_nelmt=minscal(nelmt); min_nnode=minscal(nnode)
-
-
-write(logunit,*)'    tot_nelmt: ', tot_nelmt, ' rank: ', myrank
-write(logunit,*)'    max_nelmt: ', max_nelmt, ' rank: ', myrank
-write(logunit,*)'    min_nelmt: ', min_nelmt, ' rank: ', myrank
-write(logunit,*)'    tot_nnode: ', tot_nnode, ' rank: ', myrank
-write(logunit,*)'    max_nnode: ', max_nnode, ' rank: ', myrank
-write(logunit,*)'    min_nnode: ', min_nnode, ' rank: ', myrank
-
-
-
-! Coordinate extents of whole model
-model_minx=minscal(minval(g_coord(1,:))); model_maxx=maxscal(maxval(g_coord(1,:)))
-model_miny=minscal(minval(g_coord(2,:))); model_maxy=maxscal(maxval(g_coord(2,:)))
-model_minz=minscal(minval(g_coord(3,:))); model_maxz=maxscal(maxval(g_coord(3,:)))
-mincoord=min(model_minx,model_miny,model_minz)
-maxcoord=max(model_maxx,model_maxy,model_maxz)
-absmaxx=maxscal(maxval(abs(g_coord(1,:))))
-absmaxy=maxscal(maxval(abs(g_coord(2,:))))
-absmaxz=maxscal(maxval(abs(g_coord(3,:))))
-absmaxcoord=max(absmaxx,absmaxy,absmaxz)
-if(myrank==0)then
-  write(logunit,'(a)')'Original model size: Whole region'
-  write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' elements => total: ',tot_nelmt, &
-  'max: ',max_nelmt,'min: ',min_nelmt
-  write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' nodes    => total: ',tot_nnode, &
-  'max: ',max_nnode,'min: ',min_nnode
-  write(logunit,'(a,g0.6,1x,g0.6)')' x extent min max: ',model_minx,model_maxx
-  write(logunit,'(a,g0.6,1x,g0.6)')' y extent min max: ',model_miny,model_maxy
-  write(logunit,'(a,g0.6,1x,g0.6)')' z extent min max: ',model_minz,model_maxz
-  write(logunit,'(a,g0.6,1x,g0.6)')' min/max coord: ',mincoord,maxcoord
-  write(logunit,'(a,g0.6)')' abs max coord: ',absmaxcoord
-  flush(logunit)
-endif
-
-
-
-! Reassign pole coordinates if it is "center" of the model.
-! NOTE: check if the center should be taken for the finite region only.
-if(trim(pole0)=='center')then
-  pole_coord0(1)=HALF*(model_minx+model_maxx)
-  pole_coord0(2)=HALF*(model_miny+model_maxy)
-  pole_coord0(3)=HALF*(model_minz+model_maxz)
-endif
 
 
 ! Initialize model - allocates shearmod/bulkmod/massdensity arrays
 call initialize_model(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
+
+
 
 isgeo_change=.false.
 ts=1 ! time set
@@ -316,85 +213,8 @@ fs=0; fi=1
 ns=max(1,nstep)
 twidth=ceiling(log10(real(ns)+1.))
 
-
-
-
-! write original meshes
-log_msg = trim('writing original mesh...') ;   call write_ifproc0()
-if(infbc)then
-  ! classify finite/infinite elements for multiblock data plot
-  npart=3
-  allocate(ipart(npart),spart(npart))
-  ! Note: we will NOT write all parts in a single file. Therefore, ipart must be
-  ! 1 for all.
-  ipart=(/ (1,i=1,npart) /)
-  spart(1)='finite_domain'
-  spart(2)='trinfinite_domain'
-  spart(3)='infinite_domain'
-  ! classify (in)finite elements
-  !call classify_finite_infinite_elements(0)
-
-  ! finite region
-  ! write Ensight gold .case file
-  case_file=trim(out_path)//trim(file_head)//'_original'//trim(ptail)//'.case'
-  geo_file=trim(file_head)//'_original'//trim(ptail)//'.geo'
-  add_tag='_original'
-  call write_ensight_casefile(case_file,geo_file,add_tag,errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
-  ! write Ensight gold .geo file
-  geo_file=trim(out_path)//trim(geo_file)
-  call write_ensight_geo_part1(geo_file,ensight_hex8,ipart,spart,1, &
-  nelmt_finite,nnode_finite,node_finite,nnode,real(g_coord),g_num_finite)
-
-  ! trinfinite region
-  ! write Ensight gold .case file
-  trinfcase_file=trim(out_path)//trim(file_head)//'_original_trinf'//trim(ptail)//'.case'
-  trinfgeo_file=trim(file_head)//'_original_trinf'//trim(ptail)//'.geo'
-  add_tag='_original_trinf'
-  call write_ensight_casefile(trinfcase_file,trinfgeo_file,add_tag,errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
-  ! write Ensight gold .geo file
-  trinfgeo_file=trim(out_path)//trim(trinfgeo_file)
-  call write_ensight_geo_part1(trinfgeo_file,ensight_hex8,ipart,spart,2, &
-  nelmt_trinfinite,nnode_trinfinite,node_trinfinite,nnode,real(g_coord),g_num_trinfinite)
-
-  ! infinite region
-  ! write Ensight gold .case file
-  infcase_file=trim(out_path)//trim(file_head)//'_original_inf'//trim(ptail)//'.case'
-  infgeo_file=trim(file_head)//'_original_inf'//trim(ptail)//'.geo'
-  add_tag='_original_inf'
-  call write_ensight_casefile(infcase_file,infgeo_file,add_tag,errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
-  ! write Ensight gold .geo file
-  infgeo_file=trim(out_path)//trim(infgeo_file)
-  call write_ensight_geo_part1(infgeo_file,ensight_hex8,ipart,spart,3, &
-  nelmt_infinite,nnode_infinite,node_infinite,nnode,real(g_coord),g_num_infinite)
-
-else
-  npart=1
-  allocate(ipart(npart),spart(npart))
-  ipart=(/ (i,i=1,npart) /)
-  spart(1)='finite_domain'
-  ! write Ensight gold .case file
-  case_file=trim(out_path)//trim(file_head)//'_original'//trim(ptail)//'.case'
-  geo_file=trim(file_head)//'_original'//trim(ptail)//'.geo'
-  add_tag='_original'
-  call write_ensight_casefile(case_file,geo_file,add_tag,errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
-
-  ! write Ensight gold .geo file
-  geo_file=trim(out_path)//trim(geo_file)
-  call write_ensight_geo(geo_file,ensight_hex8,ipart,spart,nelmt,nnode,    &
-  real(g_coord),g_num)
-endif
-
-
-! write cell model for original mesh
-if(savedata%model_cell)then
-  call write_model_cell(errcode,errtag)
-endif
-
-log_msg = trim('complete!') ;   call write_ifproc0()
+! NEED TO EDIT LOCAL VARIABLES STILL 
+call write_original_mesh
 
 
 ! If only saving mesh (not running simulation) then quit program at this point. 

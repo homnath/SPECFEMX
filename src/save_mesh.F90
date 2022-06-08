@@ -3,6 +3,115 @@ module save_mesh
 contains 
 
 
+subroutine write_original_mesh()
+    ! USES
+    use global 
+    use output_to_user
+
+    
+    implicit none 
+    ! IO variables
+    ! Local variables
+    ! Code: 
+
+
+    ! write original meshes
+    log_msg = trim('writing original mesh...') ;   call write_ifproc0()
+    if(infbc)then
+    ! classify finite/infinite elements for multiblock data plot
+    npart=3
+    allocate(ipart(npart),spart(npart))
+    ! Note: we will NOT write all parts in a single file. Therefore, ipart must be
+    ! 1 for all.
+    ipart=(/ (1,i=1,npart) /)
+    spart(1)='finite_domain'
+    spart(2)='trinfinite_domain'
+    spart(3)='infinite_domain'
+    ! classify (in)finite elements
+    !call classify_finite_infinite_elements(0)
+
+    ! finite region
+    ! write Ensight gold .case file
+    case_file=trim(out_path)//trim(file_head)//'_original'//trim(ptail)//'.case'
+    geo_file=trim(file_head)//'_original'//trim(ptail)//'.geo'
+    add_tag='_original'
+    call write_ensight_casefile(case_file,geo_file,add_tag,errcode,errtag)
+    call control_error(errcode,errtag,stdout,myrank)
+    ! write Ensight gold .geo file
+    geo_file=trim(out_path)//trim(geo_file)
+    call write_ensight_geo_part1(geo_file,ensight_hex8,ipart,spart,1, &
+    nelmt_finite,nnode_finite,node_finite,nnode,real(g_coord),g_num_finite)
+
+    ! trinfinite region
+    ! write Ensight gold .case file
+    trinfcase_file=trim(out_path)//trim(file_head)//'_original_trinf'//trim(ptail)//'.case'
+    trinfgeo_file=trim(file_head)//'_original_trinf'//trim(ptail)//'.geo'
+    add_tag='_original_trinf'
+    call write_ensight_casefile(trinfcase_file,trinfgeo_file,add_tag,errcode,errtag)
+    call control_error(errcode,errtag,stdout,myrank)
+    ! write Ensight gold .geo file
+    trinfgeo_file=trim(out_path)//trim(trinfgeo_file)
+    call write_ensight_geo_part1(trinfgeo_file,ensight_hex8,ipart,spart,2, &
+    nelmt_trinfinite,nnode_trinfinite,node_trinfinite,nnode,real(g_coord),g_num_trinfinite)
+
+    ! infinite region
+    ! write Ensight gold .case file
+    infcase_file=trim(out_path)//trim(file_head)//'_original_inf'//trim(ptail)//'.case'
+    infgeo_file=trim(file_head)//'_original_inf'//trim(ptail)//'.geo'
+    add_tag='_original_inf'
+    call write_ensight_casefile(infcase_file,infgeo_file,add_tag,errcode,errtag)
+    call control_error(errcode,errtag,stdout,myrank)
+    ! write Ensight gold .geo file
+    infgeo_file=trim(out_path)//trim(infgeo_file)
+    call write_ensight_geo_part1(infgeo_file,ensight_hex8,ipart,spart,3, &
+    nelmt_infinite,nnode_infinite,node_infinite,nnode,real(g_coord),g_num_infinite)
+
+    else
+    npart=1
+    allocate(ipart(npart),spart(npart))
+    ipart=(/ (i,i=1,npart) /)
+    spart(1)='finite_domain'
+    ! write Ensight gold .case file
+    case_file=trim(out_path)//trim(file_head)//'_original'//trim(ptail)//'.case'
+    geo_file=trim(file_head)//'_original'//trim(ptail)//'.geo'
+    add_tag='_original'
+    call write_ensight_casefile(case_file,geo_file,add_tag,errcode,errtag)
+    call control_error(errcode,errtag,stdout,myrank)
+
+    ! write Ensight gold .geo file
+    geo_file=trim(out_path)//trim(geo_file)
+    call write_ensight_geo(geo_file,ensight_hex8,ipart,spart,nelmt,nnode,    &
+    real(g_coord),g_num)
+    endif
+
+
+    ! write cell model for original mesh
+    if(savedata%model_cell)then
+    call write_model_cell(errcode,errtag)
+    endif
+
+    log_msg = trim('complete!') ;   call write_ifproc0()
+
+end subroutine write_original_mesh
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 subroutine save_mesh_ensight(infcase_file,infgeo_file,trinfcase_file, &
     trinfgeo_file,isgeo_change,add_tag, twidth, &
     fscase_file,fsgeo_file, fspcase_file,fspgeo_file, &
