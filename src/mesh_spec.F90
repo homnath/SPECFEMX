@@ -9,6 +9,59 @@ private :: rank, get_global,get_global_indirect_addressing, swap_all
 contains
 !-------------------------------------------------------------------------------
 
+! This subroutine just runs a few commands to keep the driver file clean
+subroutine create_spec_elem(tot_nelmt,max_nelmt,min_nelmt, &
+                            tot_nnode,max_nnode,min_nnode, &
+                            errcode,errtag)
+
+! USES
+use global
+use output_to_user
+#if (USE_MPI)
+use mpi_library
+use math_library_mpi
+#else
+use serial_library
+use math_library_serial
+#endif
+use element
+implicit none 
+! IO variables
+character(len=250) :: errtag ! error message
+integer :: errcode
+integer :: tot_nelmt,max_nelmt,min_nelmt,tot_nnode,max_nnode,min_nnode
+
+! Local variables
+
+! Code: 
+  log_msg = trim('creating spectral elements...') ;   call write_ifproc0()
+  call hex2spec(ndim,ngnode,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
+  call control_error(errcode,errtag,stdout,myrank)
+  log_msg = trim('completed creating spectral elements') ;   call write_ifproc0()
+
+
+  tot_nelmt=sumscal(nelmt); tot_nnode=sumscal(nnode)
+  max_nelmt=maxscal(nelmt); max_nnode=maxscal(nnode)
+  min_nelmt=minscal(nelmt); min_nnode=minscal(nnode)
+  if(myrank==0)then
+    write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' spectral elements => total:',tot_nelmt, &
+    ' max:',max_nelmt,' min:',min_nelmt
+    write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' spectral nodes    => total:',tot_nnode, &
+    ' max:',max_nnode,' min:',min_nnode
+    flush(logunit)
+  endif
+
+  return
+
+end subroutine create_spec_elem
+
+
+
+
+
+
+
+
 ! This subroutine convert all hexahedral meshes (8-noded) to spectral elements
 ! of arbitrary order defined by ngllx, nglly, and ngllz
 subroutine hex2spec(ndim,ngnod,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)

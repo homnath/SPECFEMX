@@ -16,7 +16,6 @@ SET(srcsem
   recreate_fault.f90
   read_input.f90
   gll_library.f90
-  mesh_spec.f90
   integration.f90
   infinite_element.f90
   utmgeo.f90
@@ -84,6 +83,7 @@ ELSE(ISPARALLEL)
 ENDIF(ISPARALLEL)
 
 SET(srcboth
+   mesh_spec.F90
    model.F90
    cmtsolution.F90
    earthquake_load.F90

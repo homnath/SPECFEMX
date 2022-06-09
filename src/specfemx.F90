@@ -156,26 +156,13 @@ call precompute_gll1d()
 
 
 ! create spectral elements
-log_msg = trim('creating spectral elements...') ;   call write_ifproc0()
-call hex2spec(ndim,ngnode,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
-log_msg = trim('completed creating spectral elements') ;   call write_ifproc0()
+call create_spec_elem(tot_nelmt,max_nelmt,min_nelmt, &
+                      tot_nnode,max_nnode,min_nnode, &
+                      errcode,errtag)
 
 
-tot_nelmt=sumscal(nelmt); tot_nnode=sumscal(nnode)
-max_nelmt=maxscal(nelmt); max_nnode=maxscal(nnode)
-min_nelmt=minscal(nelmt); min_nnode=minscal(nnode)
-if(myrank==0)then
-  write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' spectral elements => total:',tot_nelmt, &
-  ' max:',max_nelmt,' min:',min_nelmt
-  write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' spectral nodes    => total:',tot_nnode, &
-  ' max:',max_nnode,' min:',min_nnode
-  flush(logunit)
-endif
-
-
-! number of elemental nodes (nodes per element)
-nenode=ngll !(ngllx*nglly*ngllz)
+! number of elemental nodes (nodes per element = ngllx*nglly*ngllz
+nenode=ngll 
 
 ! Reclassify (in)finite elements if there is an infinite boundary condition
 if(infbc)then
@@ -217,8 +204,6 @@ call control_error(errcode,errtag,stdout,myrank)
 call set_nondimensional_params
 call calc_nondimensionalisation_vals
 
-
-
 ! Read and prepare free surface file.
 ! Information is later used to determine the elevation 
 ! of the source point and to plot the free surface files.
@@ -247,15 +232,14 @@ call save_mesh_ensight(infcase_file,infgeo_file,trinfcase_file, &
                        ns,fi,fs,ts, errcode, errtag, format_str, &
                        case_file,geo_file, ipart, spart,spart_fs, buffer, node_hex8, gnum_hex8, &
                        gnum_quad4,node_quad4)
-call sync_process
+call sync_process()
 
 
 ! Actually apply non-dimensionalisation
-call apply_nondimensionalisation
+call apply_nondimensionalisation()
 
 ! compute (nondimensionalised) max element size. 
 call compute_max_elementsize()
-
 
 
 
@@ -289,64 +273,16 @@ else
 endif
 
 
-write(logunit,*)'CALLING SPECFEM3D'
+
 ! call main routines
+write(logunit,*)'CALLING SPECFEM3D'
 call specfem3d()
-!if(nexcav==0)then
-!  ! slope stability
-!  !call semslope3d()
-!else
-!  ! excavation
-!  !call semexcav3d()
-!endif
-!-----------------------------------
 
 
-! Clean up and deallocate 
-if(ISDISP_DOF)then
-  deallocate(edofu)
-endif
-if(ISPOT_DOF)then
-  deallocate(edofphi)
-endif
-! clean up                                                                       
-call cleanup_model(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
 
-call cleanup_gll1d()
 
-call cleanup_hexface(errcode,errtag)                                             
-call control_error(errcode,errtag,stdout,myrank)
-
-call cleanup_integration(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
-
-call cleanup_integration2d(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
-
-call cleanup_free_surface()
-
-! compute elapsed time
-call cpu_time(cpu_tend)
-telap=cpu_tend-cpu_tstart
-max_telap=maxscal(telap)
-mean_telap=sumscal(telap)/real(nproc,kreal)
-
-if(myrank==0)then
-  write(format_str,*)ceiling(log10(real(max_telap)+1.))+5 ! 1 . and 4 decimals
-  format_str='(3(f'//trim(adjustl(format_str))//'.4,1X))'
-  write(logunit,'(a)')'ELAPSED TIME, MAX ELAPSED TIME, MEAN ELAPSED TIME'
-  write(logunit,fmt=format_str)telap,max_telap,mean_telap
-  write(logunit,'(a)')'--------------------------------------------'
-  flush(logunit)
-  close(logunit)
-endif
-!-----------------------------------
-
-if(myrank==0)then
-  inquire(stdout,opened=isopen)
-  if(isopen)close(stdout)
-endif
+call print_completion_details(cpu_tstart,cpu_tend,telap,& 
+                              max_telap,mean_telap)
 
 errcode=0
 
