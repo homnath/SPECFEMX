@@ -37,6 +37,7 @@ SET(srcsem
   plastic_library.f90
   okada_solution.f90
   postprocess.f90)
+  
 ADD_LIBRARY(sem ${srcsem})
 
 # Build parsem library
@@ -93,6 +94,9 @@ SET(srcboth
    nondimensionalisation.F90
    user_input.F90
    prestress.F90
+   cleanup.F90
+   print_w_MPI.F90
+   determine_solver.F90
    )
 # Compiler preprocessor directives
 #ADD_DEFINITIONS(CMAKE_Fortran_FLAGS "-DUSE_MPI")

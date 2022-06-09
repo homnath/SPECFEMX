@@ -34,7 +34,9 @@ use user_input
 use save_mesh
 use postprocess,only:write_scalar_to_file_freesurf
 use write_ensight
-
+use print_w_MPI
+use cleanup
+use det_solver
 
 
 !******************************************************************************
@@ -138,12 +140,12 @@ call write_original_mesh(ipart, spart, npart, &
                          trinfcase_file,trinfgeo_file)
 
 
-! If only saving mesh (not running simulation) then quit program at this point. 
+! If only saving mesh then quit program at this point. 
 if(ismesh_only)then
   call close_process
 endif
 
-! ___________________________________________________________________________________
+! ___________________________________________________________________
 
 
 ! store orginal connectivity which helps to identify ghost interfaces
@@ -164,7 +166,7 @@ call create_spec_elem(tot_nelmt,max_nelmt,min_nelmt, &
 ! number of elemental nodes (nodes per element = ngllx*nglly*ngllz
 nenode=ngll 
 
-! Reclassify (in)finite elements if there is an infinite boundary condition
+! Reclassify (in)finite elements if there is an infinite BC
 if(infbc)then
   ! free memory for modified arrays
   deallocate(g_num_finite,g_num_trinfinite,g_num_infinite, &
@@ -230,8 +232,8 @@ call save_mesh_ensight(infcase_file,infgeo_file,trinfcase_file, &
                        trinfgeo_file,isgeo_change,add_tag, twidth, &
                        fscase_file,fsgeo_file, fspcase_file,fspgeo_file, &
                        ns,fi,fs,ts, errcode, errtag, format_str, &
-                       case_file,geo_file, ipart, spart,spart_fs, buffer, node_hex8, gnum_hex8, &
-                       gnum_quad4,node_quad4)
+                       case_file,geo_file, ipart, spart,spart_fs, buffer, &
+                       node_hex8, gnum_hex8, gnum_quad4,node_quad4)
 call sync_process()
 
 
@@ -241,51 +243,20 @@ call apply_nondimensionalisation()
 ! compute (nondimensionalised) max element size. 
 call compute_max_elementsize()
 
+! Work out which solver to use
+call determine_solver(errcode, errtag)
 
 
-! solver type
-if(solver_type.eq.smart_solver)then
-  if(ismpi)then
-    solver_type=petsc_solver
-  else
-    solver_type=builtin_solver
-  endif
-endif
-if(ismpi)then
-  if(solver_type.eq.builtin_solver)then
-    if(myrank==0)write(logunit,'(a)')'solver type: builtin parallel solver'
-  elseif(solver_type.eq.petsc_solver)then
-    if(myrank==0)write(logunit,'(a)')'solver type: PETSc parallel solver'
-  else
-    write(errtag,'(a,i4)')'ERROR: invalid solver type:',solver_type
-    call control_error(errcode,errtag,logunit,myrank)
-  endif
-else
-  if(solver_type.eq.builtin_solver)then
-    write(logunit,'(a)')'solver type: builtin serial solver'
-  elseif(solver_type.eq.petsc_solver)then
-    write(errtag,'(a,i4)')'ERROR: PETSc solver must be run with MPI:',solver_type
-    call control_error(errcode,errtag,logunit,myrank)
-  else
-    write(errtag,'(a,i4)')'ERROR: invalid solver type:',solver_type
-    call control_error(errcode,errtag,logunit,myrank)
-  endif
-endif
-
-
-
-! call main routines
+! Now, call main routine...
 write(logunit,*)'CALLING SPECFEM3D'
 call specfem3d()
 
 
-
-
-call print_completion_details(cpu_tstart,cpu_tend,telap,& 
-                              max_telap,mean_telap)
-
+! Print confirmation of completion/cpu time etc and cleanup
+call print_completion_details(cpu_tstart,cpu_tend,telap,&
+max_telap,mean_telap, format_str)
+call run_cleanup(errtag, errcode)
 errcode=0
-
 call sync_process
 call close_process()
 contains
