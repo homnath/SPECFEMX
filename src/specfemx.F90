@@ -1,6 +1,7 @@
 ! This is a main program SPECFEMX
 ! REVISION:
 !  HNG, Jul 14,2011; HNG, Jul 11,2011; Apr 09,2010
+!  WE Jun 8 2022 - cleaned up driver code into series of functions
 ! NOTE:
 !  - Shear strain components in the strain tensor are engineering strain.
 !  - Ordinary shear strain components can be obtained by multiplying the
@@ -255,7 +256,7 @@ call specfem3d()
 ! Print confirmation of completion/cpu time etc and cleanup
 call print_completion_details(cpu_tstart,cpu_tend,telap,&
 max_telap,mean_telap, format_str)
-call run_cleanup(errtag, errcode)
+call run_cleanup_specfemx(errtag, errcode)(errtag, errcode)
 errcode=0
 call sync_process
 call close_process()

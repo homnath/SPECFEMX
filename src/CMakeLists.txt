@@ -52,10 +52,7 @@ IF(ISPARALLEL)
      ghost.f90
      count_elements.f90
      prepare_sparse.f90
-     parsolver.f90
-     )
-     #parsolver_petsc.F90
-     #parsolver_petsc_complex.F90)
+     parsolver.f90)
      IF(USE_PETSC)
        IF(ISCOMPLEX)
          LIST(APPEND srcparsem
@@ -84,6 +81,7 @@ ELSE(ISPARALLEL)
 ENDIF(ISPARALLEL)
 
 SET(srcboth
+   prestress.F90
    mesh_spec.F90
    model.F90
    cmtsolution.F90
@@ -93,7 +91,6 @@ SET(srcboth
    save_mesh.F90
    nondimensionalisation.F90
    user_input.F90
-   prestress.F90
    cleanup.F90
    print_w_MPI.F90
    determine_solver.F90

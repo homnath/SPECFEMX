@@ -16,12 +16,26 @@ use global
 use preprocess
 use math_constants
 use output_to_user
+use element
+use postprocess
 #if (USE_MPI)
 use mpi_library
+use ghost_library_mpi
+use math_library_mpi
+use sparse
+use parsolver
+#if (USE_COMPLEX)
+use parsolver_petsc_complex
+#else
+use parsolver_petsc
+#endif
 #else
 use serial_library
+use math_library_serial
+use sparse_serial
+use solver
+use solver_petsc
 #endif
-use element
 
 implicit none
 ! IO Variables

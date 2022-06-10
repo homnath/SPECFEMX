@@ -40,9 +40,6 @@ use count_elements  !WE
 use relaxation_time !WE
 use ghost           !WE
 use other_forces    !WE 
-!use prestress
-
-
 #if (USE_COMPLEX)
 use parsolver_petsc_complex
 #else
@@ -55,11 +52,13 @@ use sparse_serial
 use solver
 use solver_petsc
 #endif
+use prestress
 use bc
 use free_surface
 use benchmark
 use write_ensight
 use postprocess
+use cleanup
 
 !use relaxation_time
 implicit none
@@ -274,6 +273,7 @@ if (istat/=0)then
   stop
 endif
 
+
 allocate(infinite_iface(6,nelmt),infinite_face_idir(6,nelmt))
 infinite_iface=.false.
 infinite_face_idir=-9999
@@ -295,7 +295,7 @@ call assemble_ghosts_gdof(nndof,gdof,gdof)
 where(gdof>0)gdof=1
 call sync_process
 
-! At this point, all godf IDs are consistent across the parallel interfaces
+! At this point, all gdof IDs are consistent across the parallel interfaces
 ! having the values either 0 or 1.
 
 ! Apply Dirichlet boundary conditions
@@ -317,10 +317,10 @@ call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
         eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB )
 
 
+
 ! store elemental global degrees of freedoms from nodal gdof
 ! this removes the repeated use of reshape later but it has larger size than
 ! gdof!!!
-
 allocate(gdof_elmt(nedof,nelmt))
 gdof_elmt=0
 do i_elmt=1,nelmt
@@ -352,71 +352,13 @@ log_msg = 'preprocessing...' ; call write_ifproc0()
 
 
 
-! SPEAK TO HNG
 ! Calculate any prestress 
-!call calc_prestress(strain_elmt, strain_nodal, stress_elmt, &
-!                    stress_nodal, evpt, bodyload, slipload, &
-!                    extload, viscoload, ubcload, load, du,  & 
-!                    dprecon, kmat, storekmat, ksp_iter,     &
-!                    errcode, errtag)
-!! ALL OF THIS SHOULD BE IN PRESTRESS.f90
-if(savedata%stress.or.isplastic)then
-  allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
-  stress_elmt=ZERO
-  endif
-  if(savedata%strain)then
-  allocate(strain_elmt(nst,ngll,nelmt),strain_nodal(nst,nnode))
-  strain_elmt=ZERO
-  endif
-  
-  if(isstress0)then
-  if(s0_type==0)then
-  ! compute initial stress using SEM itself
-  
-  allocate(extload(0:neq),du(0:neq),dprecon(0:neq), &
-  storekmat(nedof,nedof,nelmt),stat=istat)
-  if (istat/=0)then
-  write(logunit,*)'ERROR: cannot allocate memory!'
-  flush(logunit)
-  stop
-  endif
-  extload=ZERO; isgravity=.true.; ispseudoeq=.false.
-  call stiffness_bodyload(nelmt,neq,hex8_gnode,g_num,gdof_elmt,mat_id,gam_blk, &
-  storekmat,dprecon,extload,isgravity,ispseudoeq)
-  
-  log_msg = 'complete...' ; call write_ifproc0()
-  log_msg = '--------------------------------------------' ; call write_ifproc0()
-  
-  ! assemble from ghost partitions
-  if(nproc.gt.1)then
-  call assemble_ghosts(nndof,neq,dprecon,dprecon)
-  endif
-  
-  dprecon(1:)=one/dprecon(1:); dprecon(0)=ZERO
-  
-  ! compute displacement due to graviy loading to compute initial stress
-  du=ZERO
-  call ksp_pcg_solver(neq,nelmt,storekmat,du,extload,   &
-  dprecon,gdof_elmt,ksp_iter,errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
-  
-  du(0)=ZERO
-  
-  call elastic_stress(nelmt,neq,hex8_gnode,g_num,gdof_elmt,du,stress_elmt)
-  deallocate(extload,dprecon,du,storekmat)
-  elseif(s0_type==1)then
-  ! compute initial stress using simple relation for overburden pressure
-  call overburden_stress(nelmt,g_num,z_datum,s0_datum,epk0,stress_elmt)
-  else
-  write(logunit,*)'ERROR: s0_type:',s0_type,' not supported!'
-  flush(logunit)
-  stop
-  endif
-  endif
-!! ALL OF THIS SHOULD BE IN PRESTRESS.f90
-
-
-                    
+call calculate_prestress(strain_elmt, strain_nodal, &
+                                stress_elmt, stress_nodal, & 
+                                extload, du, dprecon, storekmat, &
+                                isgravity, ispseudoeq, &
+                                errcode, errtag, ksp_iter, istat)
+       
 
 
 
@@ -454,8 +396,6 @@ endif
 
 
 
-
-
 allocate(load(0:neq),bodyload(0:neq),viscoload(0:neq),             &
 resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),            &
 storekmat(nedof,nedof,nelmt),storemmat(nedof,nelmt),stat=istat)
@@ -473,9 +413,9 @@ endif
 
 allocate(ngpart_node(nnode))
 
+
 ! compute stable time step for implicit integration
 dt=dstep
-
 nl_tot=0
 
 elas_e0=ZERO
@@ -491,13 +431,6 @@ load=ZERO
 u=ZERO
 
 
-
-!! WARNING: this is temporary
-!! WARNING: must remove this because it is already withing the time loop
-!! earthquake source
-!call earthquake_load(neq,extload,errcode,errtag)
-!call sync_process
-!call control_error(errcode,errtag,stdout,myrank)
 
 
 ! WE Prepare petsc solver - try turning into function 
@@ -518,6 +451,8 @@ if(solver_type.eq.petsc_solver)then
       call petsc_create_solver()                                                     
       log_msg = 'petsc_preallocate_matrix_size: SUCCESS!' ; call write_ifproc0()
 endif 
+
+
 
 
 
@@ -558,6 +493,7 @@ endif
 call prepare_gravity()
 
 
+
 ! Built-in preconditioner stuff? 
 allocate(storederiv(ndim,ngll,ngll,nelmt),storejw(ngll,nelmt))
 if(solver_type.eq.builtin_solver .or. solver_diagscale)then
@@ -578,6 +514,7 @@ istep0=1
 if(steptype.eq.FREQSTEP)then
   istep0=0
 endif
+
 
 ! Angular frequency
 if(steptype.eq.FREQSTEP)then
@@ -1162,8 +1099,11 @@ loop_step: do i_step=istep0,nstep
       !viscoload(0)=ZERO
     endif !(ISDISP_DOF)
 
+
+    ! CONVERT TO SUBROUTINE 
     ! time step 0  and i_nliter 0 is entirely elastic
     ! write data for tiem step 0
+
     if(i_step==1.and.i_nliter==1)then
       if(ISDISP_DOF)then
         ! write displacement field
@@ -1316,6 +1256,9 @@ loop_step: do i_step=istep0,nstep
         endif
       endif
       
+
+
+
       if(nstep.le.1.and.NL_MAXITER.le.1)then
         exit loop_step 
       endif
@@ -1501,45 +1444,24 @@ loop_step: do i_step=istep0,nstep
     write(logunit,*)' ' 
     flush(logunit)
   endif
+  
 enddo loop_step ! i_step time/frequency stepping loop
 if(savedata%strain)then
   close(77)
   deallocate(strain_elmt,strain_nodal)
 endif
+
+
+
 ! cleanup solver
-if(solver_type.eq.petsc_solver)then
-  call petsc_destroy_vector()                                                      
-  call petsc_destroy_matrix()                                                      
-  call petsc_destroy_solver()                                                      
-  call petsc_finalize()
-endif
-
-call cleanup_fault()
-deallocate(egdof,egdofu)
-if(allocated(gdofu))deallocate(gdofu)
-deallocate(extload,load,resload,rhoload,ubcload)
-deallocate(du,u)
-deallocate(nodalu,bcnodalv)
-if(ISPOT_DOF)then
-  deallocate(nodalphi)
-endif
-
-if(isplastic)then
-  deallocate(olddu,evpt)
-endif
-if(solver_type.eq.builtin_solver .and.solver_diagscale)then
-  deallocate(dprecon,ndscale)
-endif
-deallocate(mat_id,mat_domain,gam_blk,ym_blk,coh_blk,nu_blk,phi_blk,psi_blk,srf)
-if(allocated(imat_to_imatve))deallocate(imat_to_imatve)
-if(allocated(imatve_to_imat))deallocate(imatve_to_imat)
-deallocate(g_coord,g_num)
-deallocate(node_valency)
-deallocate(bmat,deriv,eld,num)
-deallocate(kmat)
-if(allocated(infinite_iface))deallocate(infinite_iface)
-if(allocated(infinite_face_idir))deallocate(infinite_face_idir)
-call cleanup_ghost()
+call run_cleanup_specfem3d(strain_elmt, strain_nodal,  &
+evpt, egdof, egdofu, gdofu,&
+extload,  &
+ubcload, load, du, u, olddu, bcnodalv,  &
+nodalu, nodalphi,  dprecon,& 
+ndscale, num, node_valency, bmat, & 
+deriv, kmat, rhoload, &
+resload, eld)
 
 return
 end subroutine specfem3d
