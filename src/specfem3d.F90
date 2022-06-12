@@ -1087,7 +1087,7 @@ loop_step: do i_step=istep0,nstep
       endif
     endif
     nl_isconv=uerr.le.NL_TOL
-    if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROtol)nl_isconv=.true.
+    if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROTOL)nl_isconv=.true.
     if(myrank==0)then
       write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',maxdu/maxu,'maxu:',maxu
       flush(logunit)
@@ -1195,7 +1195,7 @@ loop_step: do i_step=istep0,nstep
               !if(sf<scf(num(i)))scf(num(i))=sf
             endif
 
-          else
+          else ! if(isplastic)then
             eload=matmul(sigma,bmat)
             bload=bload+eload*jacw
           endif
