@@ -29,7 +29,7 @@ real(kind=kreal),parameter :: SMALL_VAL_ANGLE = 1.d-10
 ! Gravitational constant: G ( m^3 kg^{-1} s^{-2} )
 ! source: 2014 CODATA recommended values
 ! http://www.physics.nist.gov/cgi-bin/cuu/Value?bg
-real(kind=kreal),parameter :: GRAV_CONS=6.67408e-11_kreal
+real(kind=kreal),parameter :: GRAV_CONS=6.67430e-11_kreal
 ! vacuum permeability, permeability of free space, permeability of vacuum,
 ! or magnetic constant
 real(kind=kreal),parameter :: MAG_CONS=FOUR*PI*1.0e-7_kreal
@@ -212,7 +212,8 @@ integer :: nedofu
 integer :: nedofphi
 
 ! acceleration due to gravity
-real(kind=kreal),parameter :: agrav=9.82_kreal
+! https://physics.nist.gov/cgi-bin/cuu/Value?gn
+real(kind=kreal),parameter :: agrav=9.80665_kreal
 real(kind=kreal),allocatable :: g_coord(:,:) ! global coordinates
 ! coordinate extents of partitioned model of the finite region
 real(kind=kreal) :: pmodel_minx,pmodel_maxx,pmodel_miny,pmodel_maxy, &

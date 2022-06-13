@@ -552,7 +552,22 @@ submerged materialID\\
 ...\\
 ...\\}
 
-The \emph{materilID} must be in a sequential order starting from 1. The \emph{doaminID} represents the material domain (e.g., 1 = elastic or 11 = viscoelastic), and \emph{type} represents the type of material properties input (0 = Homogeneous material block $\Rightarrow$ define $\gamma$, $E$, $\nu$, $\phi$, $c$, and $\psi$; -1 = Tomographic model input defined on the structured grid $\Rightarrow$ define file name). Similarly, $\gamma$ represents the unit weight in kN/m\tsup{3}, $E$ the Young's modulus of elasticity in kN/m\tsup{2}, $\phi$ the angle of internal friction in degrees, $c$ the cohesion in kN/m\tsup{2}, and $\psi$ the angle of dilation in degrees. Finally, \emph{file} is the file name of the tomographic structured grid input.\\
+\begin{itemize}
+ \item The \emph{materialID} must be in a sequential order starting from 1.
+ \item The \emph{doaminID} represents the material domain (e.g., 1 = elastic or 11 = viscoelastic).
+ \item The \emph{type} represents the type of material properties input.
+ \begin{itemize}
+  \item \emph{type}=0: Homogeneous material block $\Rightarrow$ define $\gamma$, $E$, $\nu$, $\phi$, $c$, and $\psi$.
+  \item \emph{type}=-1: Tomographic model input defined on the structured grid $\Rightarrow$ define file name, \emph{file}.
+  \end{itemize}
+
+  \item The $\gamma$ represents the unit weight in N/m\tsup{3}.
+  \item The $E$ the Young's modulus of elasticity in N/m\tsup{2}.
+  \item The $\phi$ the angle of internal friction in degrees.
+  \item The $c$ the cohesion in N/m\tsup{2}.
+  \item The $\psi$ the angle of dilation in degrees.
+  \item The \emph{file} is the file name of the tomographic structured grid input.
+\end{itemize}
 
 Example:\\
 \\
