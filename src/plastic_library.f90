@@ -98,7 +98,6 @@ implicit none
 real(kind=kreal),intent(in)::phi,c,sigm,dsbar,theta
 real(kind=kreal),intent(out)::f
 real(kind=kreal)::phir,snph,csph,csth,snth,r3=3.0_kreal
-
 phir=phi*deg2rad
 snph=sin(phir)
 csph=cos(phir)
