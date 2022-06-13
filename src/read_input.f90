@@ -1161,6 +1161,7 @@ read(11,*)nmatblk
 allocate(isempty_blk(nmatblk),mat_domain(nmatblk),type_blk(nmatblk), &
 gam_blk(nmatblk),rho_blk(nmatblk),ym_blk(nmatblk),coh_blk(nmatblk),  &
 nu_blk(nmatblk),phi_blk(nmatblk),psi_blk(nmatblk),water(nmatblk))
+allocate(isplastic_blk(nmatblk))
 allocate(mfile_blk(nmatblk))
 ! initilize
 isempty_blk=.false.
@@ -1173,6 +1174,7 @@ nu_blk=-inftol
 coh_blk=-inftol
 phi_blk=-inftol
 psi_blk=-inftol
+isplastic_blk=.false.
 allocate(ismat(nmatblk))
 ismat=.false.
 do i=1,nmatblk
@@ -1201,6 +1203,10 @@ do i=1,nmatblk
     coh_blk(imat)=str2real(lineword(8))
     psi_blk(imat)=str2real(lineword(9))
 
+    if(phi_blk(imat).gt.ZERO .or. coh_blk(imat).gt.ZERO)then
+      !print*,'blk is platic:',imat
+      isplastic_blk(imat)=.true.
+    endif
     if(rho_blk(imat).eq.ZERO .and. ym_blk(imat).eq.ZERO)then
       isempty_blk(imat)=.true.
     endif

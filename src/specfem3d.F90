@@ -1157,7 +1157,7 @@ loop_step: do i_step=istep0,nstep
           if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
           if(savedata%stress .and. .not.isplastic)stress_elmt(:,i,ielmt)=sigma
 
-          if(isplastic)then
+          if(isplastic.and.isplastic_blk(imat))then
             effsigma=sigma+stress_elmt(:,i,ielmt)
             call stress_invariant(effsigma,sigm,dsbar,lode_theta)
             ! check whether yield is violated
