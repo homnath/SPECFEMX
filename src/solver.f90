@@ -1,6 +1,6 @@
 ! collection of solvers
 ! REVISION
-!   HNG, Jul 12,2011; HNG, Apr 09,2010
+!   HNG, Jul 12,2011; HNG, Apr 09,2010; WE Jun 14 2022
 module solver
 use set_precision
 use global, only : g_num,nedof
@@ -8,7 +8,6 @@ use ksp_constants, only : KSP_MAXITER,KSP_RTOL
 use math_constants, only : zero,zerotol
 
 contains
-
 
 
 

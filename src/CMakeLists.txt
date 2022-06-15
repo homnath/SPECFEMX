@@ -38,10 +38,12 @@ SET(srcsem
   okada_solution.f90
   postprocess.f90)
   
+# Name of library is 'sem' and contains all of the srcsem files? 
 ADD_LIBRARY(sem ${srcsem})
 
 # Build parsem library
 IF(ISPARALLEL)
+  # Variable name is srcparsem 
   SET(srcparsem
      set_precision_mpi.f90
      mpi_library.f90
@@ -53,6 +55,7 @@ IF(ISPARALLEL)
      count_elements.f90
      prepare_sparse.f90
      parsolver.f90)
+     # If using PETSC then add relevant f90 to the list srcparsem
      IF(USE_PETSC)
        IF(ISCOMPLEX)
          LIST(APPEND srcparsem
@@ -62,12 +65,18 @@ IF(ISPARALLEL)
             parsolver_petsc.F90)
        ENDIF(ISCOMPLEX)
      ENDIF(USE_PETSC)
+  # Add a library called parsem with the files held in srcparsem 
   ADD_LIBRARY(parsem ${srcparsem})
+  # Add dependencies - Parsem library depends on sem library 
   ADD_DEPENDENCIES(parsem sem)
+
+  # If using PETSC then we need to link the directory in which the petsc libraries are, for PARSEM 
   IF(USE_PETSC)
   TARGET_INCLUDE_DIRECTORIES(parsem PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
-  TARGET_LINK_LIBRARIES(parsem ${PETSC_ARCH}/lib/libpetsc.so)
+  TARGET_LINK_LIBRARIES(parsem ${PETSC_ARCH}/lib/libpetsc.so) # Links this library to the executable parsem 
   ENDIF(USE_PETSC)
+
+
 # Build serial library
 ELSE(ISPARALLEL)
   SET(srcserial
@@ -80,8 +89,11 @@ ELSE(ISPARALLEL)
   ADD_DEPENDENCIES(serial sem)
 ENDIF(ISPARALLEL)
 
+
+
 SET(srcboth
    prestress.F90
+   prepare_solver.F90
    mesh_spec.F90
    model.F90
    cmtsolution.F90
@@ -94,13 +106,19 @@ SET(srcboth
    cleanup.F90
    print_w_MPI.F90
    determine_solver.F90
+   save_variables.F90
+   nonlinearloop.F90
    )
+
+
+
 # Compiler preprocessor directives
 #ADD_DEFINITIONS(CMAKE_Fortran_FLAGS "-DUSE_MPI")
 IF(ISPARALLEL)
   SET_PROPERTY(SOURCE ${srcboth} PROPERTY COMPILE_DEFINITIONS USE_MPI)
   #SET_PROPERTY(SOURCE ${srcboth} PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
 ENDIF(ISPARALLEL)
+
 ADD_LIBRARY(both ${srcboth})
 IF(ISPARALLEL)
   ADD_DEPENDENCIES(both sem parsem)
@@ -109,10 +127,9 @@ ELSE(ISPARALLEL)
 ENDIF(ISPARALLEL)
 
 IF(ISCOMPLEX)
-
 ELSE(ISCOMPLEX)
-
 ENDIF(ISCOMPLEX)
+
 
 # Build geotech library
 #SET(srcgeotech "")
@@ -132,6 +149,7 @@ IF(ISPARALLEL)
   SET_PROPERTY(SOURCE ${srcgeotech} APPEND PROPERTY COMPILE_DEFINITIONS USE_MPI)
   #SET_PROPERTY(SOURCE ${srcgeotech} PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
 ENDIF(ISPARALLEL)
+
 IF(USE_PETSC)
   SET_PROPERTY(SOURCE ${srcgeotech} APPEND PROPERTY COMPILE_DEFINITIONS USE_PETSC)
   IF(ISCOMPLEX)
@@ -139,6 +157,7 @@ IF(USE_PETSC)
   ENDIF(ISCOMPLEX)
 ENDIF(USE_PETSC)
 ADD_LIBRARY(geotech ${srcgeotech})
+
 # Following PETSC link is necessary due to the PETSC module called in the
 # specfem3d.F90
 IF(USE_PETSC)
@@ -150,6 +169,9 @@ IF(ISPARALLEL)
 ELSE(ISPARALLEL)
   ADD_DEPENDENCIES(geotech sem serial both)
 ENDIF(ISPARALLEL)
+
+
+
 
 # Build specfemx
 #TARGET_LINK_LIBRARIES(geotech ${semall})
@@ -163,15 +185,35 @@ ELSE(ISPARALLEL)
   SET(LIBS geotech both serial sem)
   SET(mainprog specfemx)
 ENDIF(ISPARALLEL)
+
 ADD_EXECUTABLE(${mainprog}
               specfemx.F90)
 TARGET_LINK_LIBRARIES(${mainprog} ${LIBS})
+
+# WE - ADDED THE FOLLOWING: 
+IF(USE_PETSC)
+  SET_PROPERTY(SOURCE specfemx.F90 APPEND PROPERTY COMPILE_DEFINITIONS USE_PETSC)
+  IF(ISCOMPLEX)
+    SET_PROPERTY(SOURCE specfemx.F90 APPEND PROPERTY COMPILE_DEFINITIONS USE_COMPLEX)
+  ENDIF(ISCOMPLEX)
+ENDIF(USE_PETSC)
+IF(USE_PETSC)
+  TARGET_INCLUDE_DIRECTORIES(both PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
+  TARGET_LINK_LIBRARIES(both ${PETSC_ARCH}/lib/libpetsc.so)
+ENDIF(USE_PETSC)
+
+
+
+
+
 #IF(ISPARALLEL)
 #  SET(semall geotech parsem sem)
 #ELSE(ISPARALLEL)
 #  SET(semall geotech serial sem)
 #ENDIF(ISPARALLEL)
 #TARGET_LINK_LIBRARIES(specfemx ${semall} ${MPI_Fortran_LIBRARIES})
+
+
 
 # Build partmesh program
 # partmesh program partitions the mesh for the parallel processing

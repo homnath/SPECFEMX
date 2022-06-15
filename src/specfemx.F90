@@ -256,7 +256,7 @@ call specfem3d()
 ! Print confirmation of completion/cpu time etc and cleanup
 call print_completion_details(cpu_tstart,cpu_tend,telap,&
 max_telap,mean_telap, format_str)
-call run_cleanup_specfemx(errtag, errcode)(errtag, errcode)
+call run_cleanup_specfemx(errtag, errcode)
 errcode=0
 call sync_process
 call close_process()

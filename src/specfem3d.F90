@@ -54,11 +54,14 @@ use solver_petsc
 #endif
 use prestress
 use bc
+use prepare_solver !WE
 use free_surface
 use benchmark
 use write_ensight
 use postprocess
 use cleanup
+use save_variables 
+use nonlinearloop
 
 !use relaxation_time
 implicit none
@@ -536,6 +539,8 @@ if(isplastic)then
 endif
 
 
+! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
+
 ! This needs to be in its own file! 
 ! Starting time/frequency loop.
 ! For elastic only one timestep 
@@ -544,8 +549,11 @@ log_msg = trim(' Starting time loop!') ;   call write_ifproc0()
 
 loop_step: do i_step=istep0,nstep
   !t=dt*real(i_step,kreal)
-  step=step0+dstep*real(i_step,kreal)
   
+
+  ! _______DETERMINE TIME/FREQ STEP AND OUTPUT TO USER__________
+  step=step0+dstep*real(i_step,kreal)
+
   if(steptype.eq.TIMESTEP)then
     ! Time step.
     t=step
@@ -570,6 +578,8 @@ loop_step: do i_step=istep0,nstep
     endif
     scale_ang_freq2=ONE/(ang_freq*ang_freq)
   endif
+  ! ________________________________________________________________________
+
 
   ! Set initial values to 0 
   nodalu=ZERO
@@ -581,16 +591,13 @@ loop_step: do i_step=istep0,nstep
   rhoload=ZERO
   
 
+  ! CALCULATING ELASTIC/ LIENAR VISCOELASIC STIFFNESS MATRIX  
   if(steptype.eq.FREQSTEP)then
     ! compute elastic stiffness matrix for time = 0
     if(i_step==0)then
       call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
-      !if(istraction.and.trcase.eq.TRACTION_INTERNAL)then
-      !  call compute_surface_stiffness(storekmat,errcode,errtag)
-      !  symmetric_solver=.false.
-      !  call control_error(errcode,errtag,stdout,myrank)
-      !endif
     endif
+
     if(solver_type.eq.petsc_solver)then
       call petsc_set_stiffness_matrix_freq(storekmat,storemmat,ang_freq, &
       scale_ang_freq2,isscale_ang_freq)
@@ -604,11 +611,7 @@ loop_step: do i_step=istep0,nstep
     if(i_step==1)then 
       ! compute elastic stiffness matrix for time = 0
       call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
-      !if(istraction.and.trcase.eq.TRACTION_INTERNAL)then
-      !  call compute_surface_stiffness(storekmat,errcode,errtag)
-      !  symmetric_solver=.false.
-      !  call control_error(errcode,errtag,stdout,myrank)
-      !endif
+    
 
       ! The following is repeated below in the next elseif except for 
       ! the reuse_pc flag being true - make into a function 
@@ -637,8 +640,12 @@ loop_step: do i_step=istep0,nstep
 
   endif ! if(steptype.eq.FREQSTEP)
 
-  ! NOW WE ARE AT A POINT WHERE ANY STIFFNESS MATRICES HAVE BEEN CALCULATED 
 
+
+
+
+
+  ! NOW WE ARE AT A POINT WHERE ANY STIFFNESS MATRICES HAVE BEEN CALCULATED 
 
   ! apply traction boundary conditions
   ! WARNING: i_step==1 is ONLY for rod example
@@ -660,8 +667,7 @@ loop_step: do i_step=istep0,nstep
 
 
   ! Calculate relevant force terms: 
-   
-  if(ismtraction)then
+     if(ismtraction)then
     call compute_magnetic_traction(errcode, errtag, extload)
   endif 
 
@@ -670,13 +676,17 @@ loop_step: do i_step=istep0,nstep
                                  storekmat, errcode, errtag)
   endif 
   
+
+  ! ____________________________________________________________________________
+  ! FINISH OFF COMPUTE_MOMENT_TENSOR subroutine
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
     !call compute_moment_tensor(extload, errcode, errtag, &
      !                          freq, sff)
 
      ! moment-density tensor apparoch: compute equivalent moment-density tensor
     ! from the prescribe slip on the fault
-    log_msg = trim(' Earthquake source type: moment-density tensor') ;   call write_ifproc0()
+    log_msg = trim(' Earthquake source type: moment-density tensor')
+    call write_ifproc0()
 
     call earthquake_load(neq,extload,errcode,errtag)
     call sync_process
@@ -688,10 +698,11 @@ loop_step: do i_step=istep0,nstep
       extload=extload*sff
     endif
   endif 
-  
+  ! ____________________________________________________________________________
 
 
   ! Modify RHS vector for prescribed displacements
+  ! i.e. if boundary dispalcements are not equal to zero
   ! WARNING: need to check for nedofu
   do i_elmt=1,nelmt
     ielmt=i_elmt ! all elements
@@ -709,65 +720,15 @@ loop_step: do i_step=istep0,nstep
       enddo
     enddo
   enddo ! i_elmt
-  if(solver_type.eq.builtin_solver)then
-    ! Compute diagonal precoditioner
-    dprecon=ZERO
-    do i_elmt=1,nelmt
-      ielmt=i_elmt ! all elements
-      egdof=gdof_elmt(:,ielmt)
-      do j=1,nedof
-        dprecon(egdof(j))=dprecon(egdof(j))+storekmat(j,j,ielmt)
-      enddo
-    enddo ! i_elmt
-    dprecon(0)=ZERO
 
-    ! assemble diagonal preconditioner
-    if(nproc.gt.1)then
-      call assemble_ghosts(nndof,neq,dprecon,dprecon)
-    endif
-    call sync_process()
-    dprecon(0)=ZERO
-    nzero_dprecon=count(dprecon(1:).eq.ZERO)
-    if(nzero_dprecon.gt.0)then
-      write(logunit,*)'WARNING: nzero in dprecon:', &
-      nzero_dprecon,minval(abs(dprecon(1:))),maxval(abs(dprecon(1:)))
-      flush(logunit)
-    endif
 
-    if(solver_diagscale)then
-      ! regularize linear equations,
-      ndscale=ONE
-      do i=1,neq
-        ndscale(i)=one/sqrt(abs(dprecon(i)))
-      enddo
-      ! nondimensionalize stiffness matrix
-      ! elastic region
-      do i_elmt=1,nelmt_elas
-        ielmt=eid_elas(i_elmt)
-        egdof=gdof_elmt(:,ielmt)
-        do i=1,nedof
-          do j=1,nedof
-            storekmat(i,j,ielmt)=ndscale(egdof(i))*storekmat(i,j,ielmt)*       &
-            ndscale(egdof(j))
-          enddo
-        enddo
-      enddo
-      ! viscoelastic region
-      do i_elmt=1,nelmt_viscoelas
-        ielmt=eid_viscoelas(i_elmt)
-        egdof=gdof_elmt(:,ielmt)
-        do i=1,nedof
-          do j=1,nedof
-            storekmat(i,j,ielmt)=ndscale(egdof(i))*storekmat(i,j,ielmt)*       &
-            ndscale(egdof(j))
-          enddo
-        enddo
-      enddo
-    else
-      dprecon(1:)=one/dprecon(1:)
-    endif
-  endif !(solver_type.eq.builtin_solver)
+  ! PREPARE BUILT IN SOLVER
+  call prep_inbuilt_solver(dprecon, egdof, storekmat, ndscale,     &
+                           nzero_dprecon, nelmt_elas, eid_elas,    &
+                           nelmt_viscoelas, eid_viscoelas)
 
+
+  ! ALSO TO DO WITH NON ZERO BOUNDARY CONDITIONS? 
   extload(0)=ZERO
   ! set BC nodal displacements to nodalu array
   if(ISDISP_DOF)then
@@ -778,6 +739,7 @@ loop_step: do i_step=istep0,nstep
       enddo
     enddo
   endif
+
   ! set BC nodal potential to nodalphi array
   if(ISPOT_DOF)then
     do i=1,nndofphi
@@ -787,6 +749,8 @@ loop_step: do i_step=istep0,nstep
       enddo
     enddo
   endif
+
+  ! Reset/initialise the count of ksp and non linear iterations 
   ksp_tot=0; nl_iter=0
 
   ! only for fault
@@ -801,6 +765,10 @@ loop_step: do i_step=istep0,nstep
     olddu=ZERO
     bodyload=ZERO
   endif
+
+
+
+  ! ===================== RUN NON LINEAR ITERATIONS =====================
   !bodyload=ZERO; bodyload(0)=ZERO
   ! nonlinear iteration loop
   nonlinear: do i_nliter=1,NL_MAXITER
@@ -815,54 +783,28 @@ loop_step: do i_step=istep0,nstep
     resload(0)=ZERO
     maxresload=maxscal(maxval(abs(resload)))
     maxbodyload=maxscal(maxval(abs(bodyload)))
+
+
     if(myrank==0)then
       write(logunit,'(a,i0,1x,e12.5,1x,e12.5)')' Residual NL: ',i_nliter, &
       maxresload,maxbodyload
       flush(logunit)
     endif
 
+
     ! starting timer
     call cpu_time(cpu_tstart)
-    if(solver_type.eq.builtin_solver)then
-      ! builtin solver
-      if(solver_diagscale)then
-        ! nondimensionlize load
-        resload=ndscale*resload
-        call ksp_cg_solver(neq,nelmt,storekmat,du,resload,     &
-        gdof_elmt,ksp_iter,errcode,errtag)
-        du=ndscale*du
-        call control_error(errcode,errtag,stdout,myrank)
-      else
-        ! pcg solver
-        call ksp_pcg_solver(neq,nelmt,storekmat,du,resload,    &
-        dprecon,gdof_elmt,ksp_iter,errcode,errtag)
-        call control_error(errcode,errtag,stdout,myrank)
-      endif
-    else
-      !petsc solver
-      !call petsc_set_stiffness_matrix(storekmat)
-      !if(myrank==0)print*,'petsc_set_stiffness_matrix: SUCCESS!'
-      if(steptype.eq.FREQSTEP.and.isscale_ang_freq)then
-        resload=scale_ang_freq2*resload
-      endif
 
-      call petsc_set_vector(resload)
-      log_msg = trim(' petsc_set_vector: SUCCESS!') ;   call write_ifproc0()
+    ! Run the solver! 
+    call run_solver(resload, dprecon, ndscale, storekmat, du, &
+                    scale_ang_freq2, ksp_iter, errcode, ksp_convreason, &
+                    errtag, isscale_ang_freq)
+    
+    ! Output time details
+    call write_cpu_timer(format_str,cpu_tstart,cpu_tend,telap)
 
-      call petsc_solve(du(1:),ksp_iter,ksp_convreason)
-      log_msg = trim(' petsc_solve: SUCCESS!') ;   call write_ifproc0()
 
-      continue
-    endif
-
-    call cpu_time(cpu_tend)
-    telap=cpu_tend-cpu_tstart
-    if(myrank==0)then
-      write(format_str,*)ceiling(log10(real(telap)+1.))+5 ! 1 . and 4 decimals
-      format_str='(a,1x,f'//trim(adjustl(format_str))//'.4)'
-      write(logunit,fmt=format_str)' Solver Elapsed Time:',telap
-    endif
-
+    ! Update total iterations and max values for outputting 
     ksp_tot=ksp_tot+ksp_iter
     du(0)=ZERO
     maxdu=maxscal(maxval(abs(du)))
@@ -881,136 +823,33 @@ loop_step: do i_step=istep0,nstep
       u=u+du
     endif
 
-    maxu=maxscal(maxval(abs(u)))
-    ! check convergence
-    if(isplastic)then
-      uerr=maxscal(maxval(abs(u-olddu)))/maxu    
-      olddu=u
-    else
-      uerr=ZERO
-      if(maxu.eq.ZERO)then
-        uerr=one
-      else
-        uerr=maxdu/maxu
-      endif
-    endif
-    nl_isconv=uerr.le.NL_TOL
-    if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROtol)nl_isconv=.true.
-    if(myrank==0)then
-      write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',maxdu/maxu,'maxu:',maxu
-      flush(logunit)
-    endif
+    maxu=maxscal(maxval(abs(u))) ! Get max across all processors. 
+    
+    call check_convergence(uerr, maxu, maxdu, u, & 
+                           olddu, resload, nl_isconv, i_nliter)
 
     call sync_process()
-    ! update total nodal solution vector
-    ! time steps are not incremental!!
-    ! therefore, NO u(t+1)=u(t)+du
-    ! u contains both diaplacement and/or gravity
-    ! displacement
-    if(ISDISP_DOF)then
-      do i=1,nndofu
-        idof=idofu(i)
-        do i_node=1,nnode
-          if(gdof(idof,i_node)/=0)then
-            nodalu(i,i_node)=u(gdof(idof,i_node))
-          endif
-        enddo
-      enddo
-    endif
-    ! gravity
-    if(ISPOT_DOF)then
-      do i=1,nndofphi
-        idof=idofphi(i)
-        do i_node=1,nnode
-          if(gdof(idof,i_node)/=0)then
-            ! \phi is a scalar
-            nodalphi(i_node)=u(gdof(idof,i_node))
-          endif
-        enddo
-      enddo
-    endif
+
+
+    call update_nodal_u_vector(nodalu, u, nodalphi)
+    
     bodyload=ZERO; !viscoload=ZERO
 
+
     if(ISDISP_DOF)then
-      log_msg = trim('computing elemental stress') ;   call write_ifproc0()
-
-      
-      ! Compute stress
-      ! Elastic elements
-      ! This part is repeated for the first step. We should change this for
-      ! efficiency.
+      log_msg = trim('computing elemental stress') ;   call write_ifproc0() 
+     
       if(isplastic)bload=ZERO
-      do i_elmt=1,nelmt_elas
-        ielmt=eid_elas(i_elmt)
-        imat=mat_id(ielmt)
-        num=g_num(:,ielmt)
-        egdofu=gdof_elmt(edofu,ielmt)
-        eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
-        bload=ZERO
-        do i=1,ngll ! Integration loop
-          call compute_cmat_elastic(bulkmod_elmt(i,ielmt), &
-          shearmod_elmt(i,ielmt),cmat)
-          
-          deriv=storederiv(:,:,i,ielmt)
-          jacw=storejw(i,ielmt)
-        
-          call compute_bmat_stress(deriv,bmat)
-          estrain=matmul(bmat,eld)
-          if(isplastic)then
-            estrain=estrain-evpt(:,i,ielmt)
-          endif
-          sigma=matmul(cmat,estrain)
 
-          if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
-          if(savedata%stress .and. .not.isplastic)stress_elmt(:,i,ielmt)=sigma
+      ! Calculate elastic/plastic stress & strain  
+      call calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
+                             m1, m2, m3, nelmt_elas, nl_isconv, num,   &
+                             eld, eload, bload, nodalu, erate,eid_elas,&
+                             cmat, estrain, bodyload, sigma, effsigma, &
+                             bmat, deriv, jacw, strain_elmt, evpt ,    &
+                             stress_elmt, dq1, dq2, dq3, dsbar, f,     &
+                             fmax,lode_theta,sigm)
 
-          if(isplastic)then
-            effsigma=sigma+stress_elmt(:,i,ielmt)
-            call stress_invariant(effsigma,sigm,dsbar,lode_theta)
-            ! check whether yield is violated
-            call mohcouf(phi_blk(imat),coh_blk(imat),sigm,dsbar,lode_theta,f)
-            if(f>fmax)fmax=f
-
-            if(f>=zero)then !.or.(nl_isconv.or.nl_iter==nl_maxiter))then
-              call mohcouq(psi_blk(imat),dsbar,lode_theta,dq1,dq2,dq3)
-              call formm(effsigma,m1,m2,m3)
-              flow=f*(m1*dq1+m2*dq2+m3*dq3)
-
-              erate=matmul(flow,effsigma)
-              evp=erate*dt_vp
-              evpt(:,i,ielmt)=evpt(:,i,ielmt)+evp
-              devp=matmul(cmat,evp)
-              
-              ! if not converged we need body load for next iteration
-              if(.not.nl_isconv .and. nl_iter/=nl_maxiter)then
-                !devp(1:3)=devp(1:3)-wpressure(num(i))
-                eload=matmul(devp,bmat)
-                bload=bload+eload*jacw
-              endif
-            endif!(f>=zero)
-            if(nl_isconv.or.nl_iter==nl_maxiter)then
-              devp=sigma
-              ! compute von Mises effective plastic strain
-              !vmeps(num(i))=vmeps(num(i))+sqrt(two_third*                         &
-              !dot_product(evpt(:,i,ielmt),evpt(:,i,ielmt)))
-              ! update stresses
-              stress_elmt(:,i,ielmt)=effsigma
-              !phif_blkr=atan(tnph/srf(i_srf))
-              !sf=(sigm*sin(phif_blkr)-cohf_blk*cos(phif_blkr))/&
-              !(-dsbar*(cos(lode_theta)/      &
-              !sqrt(r3)-sin(lode_theta)*sin(phif_blkr)/r3))
-              !if(sf<scf(num(i)))scf(num(i))=sf
-            endif
-
-          else
-            eload=matmul(sigma,bmat)
-            bload=bload+eload*jacw
-          endif
-        enddo ! i=1,ngll
-        if(nl_isconv .or. nl_iter==nl_maxiter)cycle
-        bodyload(egdofu)=bodyload(egdofu)+bload
-        !print*,maxval(abs(bload)),maxval(abs(bodyload))
-      enddo ! i_elmt
 
       fmax=maxscal(fmax)                                                           
       if(myrank==0)then                                                            
@@ -1020,90 +859,29 @@ loop_step: do i_step=istep0,nstep
         flush(logunit) 
       endif
 
-      !---------------------------------------------------------------------------
-      
+      ! If only elastic elements then only need 1 iteration and no 
+      ! viscoelastic calculations needed so exit entire loop      
       if(allelastic)exit nonlinear
 
-      ! Viscoelastic elements
-      do i_elmt=1,nelmt_viscoelas
-        ielmt=eid_viscoelas(i_elmt)
-        imat=mat_id(ielmt)
-        imatve=imat_to_imatve(imat)
-
-        muratio=muratio_blk(:,imatve)
-        tratio=dt/relaxtime(:,imatve)
-        num=g_num(:,ielmt)
-        egdofu=gdof_elmt(edofu,ielmt)
-        eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
-        bload=ZERO; vload=ZERO
-        do i=1,ngll ! integration loop
-          K=bulkmod_elmt(i,ielmt) 
-          G=shearmod_elmt(i,ielmt)
-          !call compute_cmat_maxwell(K,G,tratio,cmat)
-          !call compute_cmat_elastic(K,G,cmat)
-          deriv=storederiv(:,:,i,ielmt)
-          jacw=storejw(i,ielmt)
-        
-          call compute_bmat_stress(deriv,bmat)
-          estrain=matmul(bmat,eld) ! strain at current time step
-          if(savedata%strain.and.i_step==1.and.i_nliter==1)then
-            ! store elastic strain
-            strain_elmt(:,i,ielmt)=estrain
-          endif
-          trace_strain=estrain(1)+estrain(2)+estrain(3)
-          dev_strain(1:3)=(estrain(1:3)-ONE_THIRD*trace_strain)
-          dev_strain(4:6)=estrain(4:6)*HALF
-          if(savedata%stress.and.i_step==1.and.i_nliter==1)then
-            ! store elastic stress
-            esigma=TWO*G*dev_strain
-            esigma(1:3)=esigma(1:3)+K*trace_strain
-            stress_elmt(:,i,ielmt)=esigma
-          endif
-          !esigma=matmul(cmat,estrain)
-          !esigma=TWO*G*dev_strain
-          !esigma(1:3)=esigma(1:3)+K*trace_strain
-
-          !----------------------------ZIENCKIEWICZ---------------------------
-          e0=elas_e0(:,i,i_elmt)
-          q0=visco_q0(:,:,i,i_elmt)
-          if(i_step==1)then !.and.i_nliter==1)then
-            ! initialize
-            e0=dev_strain
-            do i_maxwell=1,nmaxwell                                                
-              q0(:,i_maxwell)=e0                                                     
-            enddo
-          endif
-          ! compute stress and update state variables
-          call compute_stress_genmaxwell(K,G,tratio,muratio,estrain,e0,q0,&
-          vesigma,vsigma)
-          ! compute load
-          !eload=matmul(vsigma,bmat)
-          !vload=vload+eload*jacw
-          eload=matmul(vesigma,bmat)
-          bload=bload+eload*jacw
-          ! update
-          if(nl_isconv.or.nl_iter==NL_MAXITER)then
-            elas_e0(:,i,i_elmt)=e0
-            visco_q0(:,:,i,i_elmt)=q0
-            if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
-            if(savedata%stress)stress_elmt(:,i,ielmt)=vesigma
-          endif
-          !----------------------------ZIENCKIEWICZ---------------------------
-        enddo ! i
-        !----compute the total bodyload vector----
-        !viscoload(egdofu)=viscoload(egdofu)+vload
-        bodyload(egdofu)=bodyload(egdofu)+bload
-      enddo ! i_elmt
-
+      ! Calculate stress and strain for viscoelastic elements
+      call visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
+                              elas_e0, e0, i_step, bmat, deriv, eload, &
+                              bload, K, G, strain_elmt, i_nliter,      & 
+                              stress_elmt, estrain, dev_strain, jacw,  &
+                              trace_strain, esigma, vsigma, bodyload,  &
+                              vload, imatve, nelmt_viscoelas,relaxtime,& 
+                              egdofu, eld, nodalu, muratio, tratio,    &
+                              eid_viscoelas, dt, num, q0)
       bodyload(0)=ZERO
-      !viscoload(0)=ZERO
     endif !(ISDISP_DOF)
 
 
-    ! CONVERT TO SUBROUTINE 
+
+
+    ! CONVERT TO SUBROUTINE - have we already written subroutines that 
+    ! can be called for some of these? 
     ! time step 0  and i_nliter 0 is entirely elastic
     ! write data for tiem step 0
-
     if(i_step==1.and.i_nliter==1)then
       if(ISDISP_DOF)then
         ! write displacement field
@@ -1176,6 +954,7 @@ loop_step: do i_step=istep0,nstep
           call compute_okada_solution()
         endif
       endif
+
       if(ISPOT_DOF)then
         ! plot gravity potential
         if(savedata%gpot)then
@@ -1267,6 +1046,12 @@ loop_step: do i_step=istep0,nstep
     if(nl_isconv)exit nonlinear
   enddo nonlinear ! i_nliter=1,NL_MAXITER
 
+  ! =========================END NON LINEAR ITERATIONS LOOP =============================
+
+
+
+
+
   !!compute nodal strain--------------------------------------------------
   !if(ISDISP_DOF)then
   !  ! strain 
@@ -1298,170 +1083,37 @@ loop_step: do i_step=istep0,nstep
   endif
   nl_tot=nl_tot+nl_iter
 
+
+  ! ---------------- Save variables to EnSight: -------------------
   if(ISDISP_DOF)then
-    ! plot displacement
-    if(savedata%disp)then
-      call write_vector_to_file(nnode,DIM_L*nodalu,ext='dis',istep=i_step) 
-      ! On the free surface
-      if(savedata%fsplot)then
-        call write_vector_to_file_freesurf(nnode_fs,DIM_L*nodalu(:,gnode_fs),&
-        ext='dis',istep=i_step)
-      endif
-      if(savedata%fsplot_plane)then
-        call write_vector_to_file_freesurf(nnode_fs,DIM_L*nodalu(:,gnode_fs),&
-        ext='dis',istep=i_step,plane=.true.)
-      endif
-    endif
-    ! plot stress
-    if(savedata%stress)then
-      call compute_nodal_tensor(stress_elmt,stress_nodal)  
-      if(nproc.gt.1)then
-        call assemble_ghosts_nodal_vectorn(NST,stress_nodal,stress_nodal)
-      endif
-      ! compute average on the sharing nodes
-      do i_comp=1,NST
-        stress_nodal(i_comp,:)=stress_nodal(i_comp,:)/real(node_valency,kreal)
-      enddo
-      call write_vector_to_file(nnode,DIM_MOD*stress_nodal,&
-      ext='sig',istep=i_step)
-      ! On the free surface
-      if(savedata%fsplot)then
-        call write_vector_to_file_freesurf(nnode_fs,DIM_MOD*stress_nodal(:,gnode_fs),&
-        ext='sig',istep=i_step)
-      endif
-      if(savedata%fsplot_plane)then
-        call write_vector_to_file_freesurf(nnode_fs,DIM_MOD*stress_nodal(:,gnode_fs),&
-        ext='sig',istep=i_step,plane=.true.)
-      endif
-    endif
-    ! plot strain
-    if(savedata%strain)then
-      call compute_nodal_tensor(strain_elmt,strain_nodal)  
-      if(nproc.gt.1)then
-        call assemble_ghosts_nodal_vectorn(NST,strain_nodal,strain_nodal)
-      endif
-      ! compute average on the sharing nodes
-      do i_comp=1,NST
-        strain_nodal(i_comp,:)=strain_nodal(i_comp,:)/real(node_valency,kreal)
-      enddo
-      call write_vector_to_file(nnode,strain_nodal,&
-      ext='eps',istep=i_step)
-      ! On the free surface
-      if(savedata%fsplot)then
-        call write_vector_to_file_freesurf(nnode_fs,strain_nodal(:,gnode_fs),&
-        ext='eps',istep=i_step)
-      endif
-      if(savedata%fsplot_plane)then
-        call write_vector_to_file_freesurf(nnode_fs,strain_nodal(:,gnode_fs),&
-        ext='eps',istep=i_step,plane=.true.)
-      endif
-    endif
-    !if(devel_mgll)then
-    !  call compute_save_density_perturbation(nodalu,errcode,errtag)
-    !endif
+    call save_displacement_variables(strain_elmt, strain_nodal, &
+                                     stress_elmt, stress_nodal, & 
+                                     nodalu, node_valency, i_step)
   endif
+
   if(ISPOT_DOF)then
-    ! plot gravity potential
-    if(savedata%gpot)then
-      call write_scalar_to_file(nnode,DIM_GPOT*nodalphi,ext='gpot',istep=i_step) 
-      ! On the free surface
-      if(savedata%fsplot)then
-        call write_scalar_to_file_freesurf(nnode_fs,DIM_GPOT*nodalphi(gnode_fs), &
-        ext='gpot',istep=i_step) 
-      endif
-      if(savedata%fsplot_plane)then
-        call write_scalar_to_file_freesurf(nnode_fs,DIM_GPOT*nodalphi(gnode_fs), &
-        ext='gpot',istep=i_step,plane=.true.) 
-      endif
-    endif
-    if(savedata%mpot)then
-      call write_scalar_to_file(nnode,DIM_MPOT*nodalphi,ext='mpot',istep=i_step) 
-      ! On the free surface
-      if(savedata%fsplot)then
-        call write_scalar_to_file_freesurf(nnode_fs,DIM_MPOT*nodalphi(gnode_fs), &
-        ext='mpot',istep=i_step) 
-      endif
-      if(savedata%fsplot_plane)then
-        call write_scalar_to_file_freesurf(nnode_fs,DIM_MPOT*nodalphi(gnode_fs), &
-        ext='mpot',istep=i_step,plane=.true.) 
-      endif
-    endif
-    
-    ! Gravitational
-    if(savedata%agrav)then
-      ! Compute acceleration due to gravity
-      call compute_gradient_of_scalar(nodalphi,nodalg)
-      if(nproc.gt.1)then
-        call assemble_ghosts_nodal_vector(nodalg,nodalg)
-      endif
-      ! compute average on the sharing nodes
-      do i_comp=1,ndim
-        nodalg(i_comp,:)=nodalg(i_comp,:)/real(node_valency,kreal)
-      enddo
-      ! Plot gravity accelration
-      if(savedata%agrav)then
-        call write_vector_to_file(nnode,DIM_G*nodalg,ext='grav',istep=i_step)
-        ! On the free surface
-        if(savedata%fsplot)then
-          call write_vector_to_file_freesurf(nnode_fs,DIM_G*nodalg(:,gnode_fs), &
-          ext='grav',istep=i_step)
-        endif
-        if(savedata%fsplot_plane)then
-          call write_vector_to_file_freesurf(nnode_fs,DIM_G*nodalg(:,gnode_fs), &
-          ext='grav',istep=i_step,plane=.true.)
-        endif
-      endif
-    endif
-    ! Magnetic
-    if(savedata%magb)then
-      ! Compute magnetic field
-      call compute_premagnetic_field(nodalphi,nodalB)
-      if(nproc.gt.1)then
-        call assemble_ghosts_nodal_vector(nodalB,nodalB)
-      endif
-      ! Compute average on the sharing nodes
-      do i_comp=1,ndim
-        nodalB(i_comp,:)=nodalB(i_comp,:)/real(node_valency,kreal)
-      enddo
-      ! Multiply by \mu_0
-      nodalB=MAG_CONS*nodalB
-      ! Plot magnetic field
-      if(savedata%magb)then
-        call write_vector_to_file(nnode,DIM_B*nodalB,ext='magb',istep=i_step)
-        ! On the free surface
-        if(savedata%fsplot)then
-          call write_vector_to_file_freesurf(nnode_fs,DIM_B*nodalB(:,gnode_fs), &
-          ext='magb',istep=i_step)
-        endif
-        if(savedata%fsplot_plane)then
-          call write_vector_to_file_freesurf(nnode_fs,DIM_B*nodalB(:,gnode_fs), &
-          ext='magb',istep=i_step,plane=.true.)
-        endif
-      endif
-    endif
+    call save_potential_variables(nodalphi,nodalg, nodalB, &
+                                  node_valency, i_step)
   endif
-  if(myrank==0)then
-    write(logunit,*)' ' 
-    flush(logunit)
+  ! -------------------------------------------------------------
+  
+  ! Seperate loop steps in log file
+  if(myrank==0)then 
+    write(logunit,*)' '
+     flush(logunit)
   endif
   
 enddo loop_step ! i_step time/frequency stepping loop
-if(savedata%strain)then
-  close(77)
-  deallocate(strain_elmt,strain_nodal)
-endif
-
 
 
 ! cleanup solver
-call run_cleanup_specfem3d(strain_elmt, strain_nodal,  &
-evpt, egdof, egdofu, gdofu,&
-extload,  &
-ubcload, load, du, u, olddu, bcnodalv,  &
-nodalu, nodalphi,  dprecon,& 
-ndscale, num, node_valency, bmat, & 
-deriv, kmat, rhoload, &
-resload, eld)
+call run_cleanup_specfem3d(strain_elmt, strain_nodal,        &
+                           evpt, egdof, egdofu, gdofu,       &
+                           extload, ubcload, load, du, u,    &
+                           olddu, bcnodalv, nodalu, nodalphi,&
+                           dprecon, ndscale, num,            &
+                           node_valency, bmat, deriv, kmat,  &
+                           rhoload, resload, eld)
 
 return
 end subroutine specfem3d

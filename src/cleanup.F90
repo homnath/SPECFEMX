@@ -95,12 +95,13 @@ real(kind=kreal), allocatable :: strain_elmt(:,:,:), strain_nodal(:,:),  &
 
   !CODE:
 
+  ! cleanup solver
   if(savedata%strain)then
     close(77)
     deallocate(strain_elmt,strain_nodal)
   endif
-  
-  ! cleanup solver
+
+
   if(solver_type.eq.petsc_solver)then
     call petsc_destroy_vector()                                                      
     call petsc_destroy_matrix()                                                      
