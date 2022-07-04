@@ -93,6 +93,7 @@ real(kind=kreal) :: DIM_L
 real(kind=kreal) :: NONDIM_L
 ! velocity
 real(kind=kreal) :: DIM_VEL
+real(kind=kreal) :: NONDIM_VEL
 ! acceleration
 real(kind=kreal) :: DIM_ACCEL
 real(kind=kreal) :: NONDIM_ACCEL
@@ -285,10 +286,12 @@ real(kind=kreal) :: cmodel_zref
 ! alpha parameter, density anomaly on the top
 real(kind=kreal) :: cmodel_alpha,cmodel_drho0
 
+logical,allocatable :: element_is_infinite(:)
 real(kind=kreal),allocatable :: storederiv(:,:,:,:)
 real(kind=kreal),allocatable :: storejw(:,:)
+real(kind=kreal),allocatable :: storeinterpf_infinite(:,:,:)
 
-logical :: allelastic,iseqload,iseqsource,iswater,phinu
+logical :: allelastic,isselfweight,isbodyload,ispseudoeq,iseqsource,iswater,phinu
 ! pseudostatic coefficients for earthquake loading eqkh=ah/g, eqkv=av/g
 real(kind=kreal) :: eqkx,eqky,eqkz
 ! where ah and av are horizontal and vertical pseudostatic accelerations
@@ -456,7 +459,7 @@ logical,parameter ::  solver_diagscale=.false.
 integer,parameter :: smart_solver=0  ! select appropriate solver automatically
 integer,parameter :: builtin_solver=1! select builtin conjugate gradient solver
 integer,parameter :: petsc_solver=2  ! select PETSC solver
-integer :: solver_type=smart_solver !builtin_solver !petsc_solver !smart_solver 
+integer :: solver_type=1 !smart_solver !builtin_solver !petsc_solver !smart_solver 
 ! By default solver is symmetric but it may be changed later depending on the
 ! conditions.
 logical :: symmetric_solver=.true.
