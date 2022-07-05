@@ -1238,6 +1238,14 @@ do i=1,nmatblk
     stop
   endif
 enddo
+
+!! Nondimensionalization is NOT fully implemented for plasticity
+!if(isplastic.and.devel_nondim)then
+!  write(*,'(a,a)')'WARNING: nondim=1 is NOT valid for plastic case!', &
+!                         'Changing to nondim=0!'
+!  devel_nondim=.false.
+!endif
+
 if(count(.not.ismat).gt.0)then
   write(errtag,'(a,a)')'ERROR: some material blocks are undefined!'//new_line('a'), &
                          'HINT: please check material list file!'

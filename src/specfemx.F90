@@ -573,7 +573,10 @@ if(.not.devel_nondim)then
   DIM_T=ONE
 
   DIM_VEL=ONE
+  NONDIM_VEL=ONE/DIM_VEL
+  
   DIM_ACCEL=ONE
+  NONDIM_ACCEL=ONE/DIM_ACCEL
 
   DIM_M=ONE
 
@@ -914,6 +917,10 @@ if(ISDISP_DOF)then
   massdens_elmt=massdens_elmt*NONDIM_DENSITY
   bulkmod_elmt=bulkmod_elmt*NONDIM_MOD
   shearmod_elmt=shearmod_elmt*NONDIM_MOD
+  ym_blk=ym_blk*NONDIM_MOD 
+  coh_blk=coh_blk*NONDIM_MOD 
+  rho_blk=rho_blk*NONDIM_DENSITY 
+  gam_blk=gam_blk*(NONDIM_DENSITY*NONDIM_ACCEL) 
 endif
 pole_coord0=pole_coord0*NONDIM_L
 pole_coord1=pole_coord1*NONDIM_L

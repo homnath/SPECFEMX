@@ -459,7 +459,7 @@ logical,parameter ::  solver_diagscale=.false.
 integer,parameter :: smart_solver=0  ! select appropriate solver automatically
 integer,parameter :: builtin_solver=1! select builtin conjugate gradient solver
 integer,parameter :: petsc_solver=2  ! select PETSC solver
-integer :: solver_type=1 !smart_solver !builtin_solver !petsc_solver !smart_solver 
+integer :: solver_type=smart_solver !builtin_solver !petsc_solver !smart_solver 
 ! By default solver is symmetric but it may be changed later depending on the
 ! conditions.
 logical :: symmetric_solver=.true.
