@@ -17,7 +17,7 @@ material: matfile='validation1_material_list',plastic=1
 bodyload: selfweight=1
 
 #control parameters
-control: cg_tol=1e-6, cg_maxiter=1000, nl_tol=0.0005, nl_maxiter=30
+control: cg_tol=1e-8, cg_maxiter=1000, nl_tol=0.0005, nl_maxiter=30
 
 #save data options
 save: disp=1

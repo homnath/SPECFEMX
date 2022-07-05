@@ -1102,7 +1102,7 @@ loop_step: do i_step=istep0,nstep
     nl_isconv=uerr.le.NL_TOL
     if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROTOL)nl_isconv=.true.
     if(myrank==0)then
-      write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',maxdu/maxu,'maxu:',maxu
+      write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',uerr,'maxu:',maxu
       flush(logunit)
     endif
 
@@ -1135,8 +1135,9 @@ loop_step: do i_step=istep0,nstep
       enddo
     endif
 
-    ! Reset bodyload to ZERO.
-    bodyload=ZERO; !viscoload=ZERO
+    ! Reset bodyload to ZERO for Viscoelastic iteration.
+    ! We need to reconcile platic and viscoelastic iterations.
+    if(.not.isplastic)bodyload=ZERO; !viscoload=ZERO
 
     if(ISDISP_DOF)then
       if(myrank==0)then
@@ -1198,7 +1199,7 @@ loop_step: do i_step=istep0,nstep
             if(nl_isconv.or.nl_iter==nl_maxiter)then
               devp=sigma
               ! compute von Mises effective plastic strain
-              !vmeps(num(i))=vmeps(num(i))+sqrt(two_third*                         &
+              !vmeps(num(i))=vmeps(num(i))+sqrt(two_third*                     &
               !dot_product(evpt(:,i,ielmt),evpt(:,i,ielmt)))
               ! update stresses
               stress_elmt(:,i_gll,ielmt)=effsigma
@@ -1216,18 +1217,16 @@ loop_step: do i_step=istep0,nstep
         enddo ! i=1,ngll
         if(nl_isconv .or. nl_iter==nl_maxiter)cycle
         bodyload(egdofu)=bodyload(egdofu)+bload
-        !print*,maxval(abs(bload)),maxval(abs(bodyload))
       enddo ! i_elmt
-
+      bodyload(0)=ZERO
       fmax=maxscal(fmax)                                                           
       if(myrank==0)then                                                            
-        write(logunit,'(a,i4,a,f0.6,a,f12.6,a,f12.6)') &                           
-        ' nl_iter:',nl_iter,' f_max:',fmax,' uerr:',uerr,' umax:',maxdu
+        write(logunit,'(a,f0.6)') &                           
+        ' f_max:',fmax
         write(logunit,'(a)')'--------------------------------------------'
         flush(logunit) 
       endif
-
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       
       if(allelastic)exit nonlinear
 
