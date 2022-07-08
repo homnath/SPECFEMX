@@ -36,6 +36,7 @@ integer :: hex8_gnode(8)
 real(kind=kreal) :: hexface_sign(6)
 ! face sign or normal orientation (outward +, inward -)
 
+! Face of a Hex element
 type hex_face
   integer,allocatable :: node(:)
   integer :: gnode(4) ! geometric (corner) nodes only
@@ -43,10 +44,14 @@ type hex_face
 end type hex_face
 type (hex_face) :: hexface(6)
 
+! Edge of a Face of a Hex element
 type hex_face_edge
-  ! node index in ngllx * nglly * ngllz
+  ! node index in 3D indexing: ngllx*nglly*ngllz.
+  ! stores all Edge node indices in 3D indexing: ngllx*nglly*ngllz mapping.
   integer,allocatable :: node(:)
-  ! node index in ngllx * nglly or nglly * ngllz, etc.
+  ! node index in 2D indexing: ngllx*nglly or nglly*ngllz or ngllx*ngllz.
+  ! stores all Edge node index in 2D indexing: 
+  ! ngllx*nglly or nglly*ngllz or ngllx*ngllz mapping.
   integer,allocatable :: fnode(:)
 end type hex_face_edge
 type (hex_face_edge) :: hexface_edge(6,4) ! each of 6 HEX faces has 4 edges 
