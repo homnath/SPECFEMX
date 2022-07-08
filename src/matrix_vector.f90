@@ -729,7 +729,6 @@ real(kind=kreal) :: detjac !determinant of Jacobian
 real(kind=kreal) :: coord(ngnode,NDIM),jac(NDIM,NDIM)
 
 real(kind=kreal) :: xval
-real(kind=kreal) :: mass
 real(kind=kreal) :: interpf(NGLL),deriv(NDIM,nenode)
 
 ! jacw=jacobian*weight
@@ -745,26 +744,20 @@ storemmat=zero
 ! Following loops through nelmt
 do i_elmt=1,nelmt
   ielmt=i_elmt
-  num=g_num(:,ielmt)
-  coord=transpose(g_coord(:,num(hex8_gnode)))
   nip=ngll
   
-  mass=ZERO
   do i=1,nip
       ignode=num(i)
-      ! standard element
-      interpf=lagrange_gll(i,:)
-    
-      jac=matmul(dshape_hex8(:,:,i),coord)
-      detjac=determinant(jac)
-      call invert(jac)
-      deriv=matmul(jac,dlagrange_gll(:,i,:))
-      
-      jacw=detjac*gll_weights(i)
-     
-      mass=mass+massdens_elmt(i,ielmt)*jacw
+      jacw=storejw(i,ielmt)
+      ! The mass matrix element for X, Y, and Z degrees of freedom at 
+      ! a GLL point is same.
+      ! Therefore, we store only the one value per GLL point.
+
+      ! NOTE: there is no quadrature summation in the following statement
+      ! because the summation results in the Kronecker's delta giving 
+      ! a simple GLL point-wise expression for the mass matrix element. 
+      storemmat(i,i_elmt)=storemmat(i,i_elmt)+massdens_elmt(i,ielmt)*jacw
   enddo
-  storemmat(:,i_elmt)=mass
 enddo ! i_elmt
 
 end subroutine compute_mass_elastic
@@ -820,15 +813,10 @@ do i_elmt=1,nelmt
 
   do i=1,nip
       ignode=num(i)
-      ! standard element
-      interpf=lagrange_gll(i,:)
-    
-      jac=matmul(dshape_hex8(:,:,i),coord)
-      detjac=determinant(jac)
-      call invert(jac)
-      deriv=matmul(jac,dlagrange_gll(:,i,:))
-      
-      jacw=detjac*gll_weights(i)
+      jacw=storejw(i,ielmt)
+      ! NOTE: there is no quadrature summation in the following statement
+      ! because the summation results in the Kronecker's delta giving 
+      ! a simple GLL point-wise expression for the mass matrix element. 
      
       storemmat_global(ignode)=storemmat_global(ignode)+massdens_elmt(i,ielmt)*jacw
   enddo

@@ -587,7 +587,11 @@ endif
 
 allocate(load(0:neq),bodyload(0:neq),selfload(0:neq),viscoload(0:neq),         &
 resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),            &
-storekmat(nedof,nedof,nelmt),storemmat(nedof,nelmt),stat=istat)
+storekmat(nedof,nedof,nelmt), &
+! The mass matrix element for X, Y, and Z degrees of freedom at a GLL point is same.
+! Therefore, we store only the one value per GLL point.
+storemmat(ngll,nelmt), &
+stat=istat)
 if(istat/=0)then
   write(logunit,*)'ERROR: cannot allocate memory!'
   flush(logunit)
