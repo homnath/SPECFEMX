@@ -18,7 +18,6 @@ real(kind=kreal),intent(in) :: ymf(nmatblk),phif(nmatblk),nuf(nmatblk) ! phif in
 logical,optional,intent(in) :: ismat(nmatblk)
 real(kind=kreal) :: dt_min
 real(kind=kreal) :: dt,snphi
-real(kind=kreal),parameter :: r4=4.0_kreal
 integer :: i_mat
 logical :: ismat_on(nmatblk)
 ismat_on=.true.
@@ -28,7 +27,7 @@ dt_min=inftol
 do i_mat=1,nmatblk
   if(.not.ismat_on(i_mat))cycle
   snphi=sin(phif(i_mat)*deg2rad)
-  dt=r4*(one+nuf(i_mat))*(one-two*nuf(i_mat))/(ymf(i_mat)*(one-two*nuf(i_mat)+ &
+  dt=FOUR*(ONE+nuf(i_mat))*(ONE-TWO*nuf(i_mat))/(ymf(i_mat)*(ONE-TWO*nuf(i_mat)+ &
   snphi**2))
   if(dt<dt_min)dt_min=dt
 enddo
@@ -98,7 +97,6 @@ implicit none
 real(kind=kreal),intent(in)::phi,c,sigm,dsbar,theta
 real(kind=kreal),intent(out)::f
 real(kind=kreal)::phir,snph,csph,csth,snth,r3=3.0_kreal
-
 phir=phi*deg2rad
 snph=sin(phir)
 csph=cos(phir)

@@ -54,8 +54,8 @@ character(len=80),dimension(50) :: args
 integer :: id,ind,ios,narg,slen
 
 integer :: bc_stat,preinfo_stat,mesh_stat,material_stat,step_stat,control_stat,&
-eqload_stat,stress0_stat,traction_stat,mtraction_stat,water_stat,save_stat,    &
-eqsource_stat,benchmark_stat,station_stat,devel_stat,mag_stat
+bodyload_stat,stress0_stat,traction_stat,mtraction_stat,water_stat,&
+save_stat,eqsource_stat,benchmark_stat,station_stat,devel_stat,mag_stat
 integer :: mat_count
 integer :: ielmt,i_node,inode,imat,tmp_nelmt,tmp_nnode !,mat_domain
 
@@ -102,7 +102,7 @@ preinfo_stat=-1
 bc_stat=-1
 traction_stat=0
 mtraction_stat=0
-eqload_stat=0
+bodyload_stat=0
 water_stat=0
 mesh_stat=-1
 material_stat=-1
@@ -129,7 +129,9 @@ isfstraction=.false.
 isfstraction0=.false.
 trcase=TRACTION_EXTERNAL
 ismtraction=.false.
-iseqload=.false.
+isbodyload=.false.
+isselfweight=.false.
+ispseudoeq=.false.
 iseqsource=.false.
 iswater=.false.
 isstress0=.false.
@@ -689,18 +691,24 @@ do
     cycle
   endif
 
-  ! read earthquake loading information
-  if (trim(token)=='eqload:')then
-    if(eqload_stat==1)then
-      write(errtag,*)'ERROR: copy of line type eqload: not permitted!'
+  ! read body loading information
+  if (trim(token)=='bodyload:')then
+    if(bodyload_stat==1)then
+      write(errtag,*)'ERROR: copy of line type bodyload: not permitted!'
       return
     endif
     call split_string(tag,',',args,narg)
-    eqkx=get_real('eqkx',args,narg)
-    eqky=get_real('eqky',args,narg)
-    eqkz=get_real('eqkz',args,narg)
-    eqload_stat=1
-    iseqload=.true.
+    call seek_integer('selfweight',ival,args,narg,istat)
+    if(istat==0 .and. ival==1)isselfweight=.true.
+    call seek_integer('pseudoeq',ival,args,narg,istat)
+    if(istat==0 .and. ival==1)ispseudoeq=.true.
+    if(ispseudoeq)then
+      eqkx=get_real('eqkx',args,narg)
+      eqky=get_real('eqky',args,narg)
+      eqkz=get_real('eqkz',args,narg)
+    endif
+    bodyload_stat=1
+    isbodyload=.true.
     cycle
   endif
 
@@ -1161,6 +1169,7 @@ read(11,*)nmatblk
 allocate(isempty_blk(nmatblk),mat_domain(nmatblk),type_blk(nmatblk), &
 gam_blk(nmatblk),rho_blk(nmatblk),ym_blk(nmatblk),coh_blk(nmatblk),  &
 nu_blk(nmatblk),phi_blk(nmatblk),psi_blk(nmatblk),water(nmatblk))
+allocate(isplastic_blk(nmatblk))
 allocate(mfile_blk(nmatblk))
 ! initilize
 isempty_blk=.false.
@@ -1173,6 +1182,7 @@ nu_blk=-inftol
 coh_blk=-inftol
 phi_blk=-inftol
 psi_blk=-inftol
+isplastic_blk=.false.
 allocate(ismat(nmatblk))
 ismat=.false.
 do i=1,nmatblk
@@ -1201,6 +1211,19 @@ do i=1,nmatblk
     coh_blk(imat)=str2real(lineword(8))
     psi_blk(imat)=str2real(lineword(9))
 
+    ! Check phi_blk value
+    if(phi_blk(imat).gt.90.0_kreal)then
+      write(*,*)'ERROR: invalid internal friction angle:',phi_blk
+      stop
+    endif
+    if(psi_blk(imat).gt.90.0_kreal)then
+      write(*,*)'ERROR: invalid dilation angle:',psi_blk
+      stop
+    endif
+    if(phi_blk(imat).gt.ZERO .or. coh_blk(imat).gt.ZERO)then
+      !print*,'blk is platic:',imat
+      isplastic_blk(imat)=.true.
+    endif
     if(rho_blk(imat).eq.ZERO .and. ym_blk(imat).eq.ZERO)then
       isempty_blk(imat)=.true.
     endif
@@ -1215,6 +1238,14 @@ do i=1,nmatblk
     stop
   endif
 enddo
+
+!! Nondimensionalization is NOT fully implemented for plasticity
+!if(isplastic.and.devel_nondim)then
+!  write(*,'(a,a)')'WARNING: nondim=1 is NOT valid for plastic case!', &
+!                         'Changing to nondim=0!'
+!  devel_nondim=.false.
+!endif
+
 if(count(.not.ismat).gt.0)then
   write(errtag,'(a,a)')'ERROR: some material blocks are undefined!'//new_line('a'), &
                          'HINT: please check material list file!'

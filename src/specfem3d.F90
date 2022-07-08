@@ -19,6 +19,7 @@ use fault
 use weakform
 use gravity
 use preprocess
+use matrix_vector
 use elastic
 use traction
 use mtraction
@@ -57,13 +58,11 @@ implicit none
 character(len=250) :: myfname=' => specfem3d.f90'
 character(len=500) :: errsrc
 
-! i,j are dummy vars for interation
-integer :: i,j
 ! istat: status indicator for allocation (can be used in other contexts)
 integer :: istat
 
 ! do-loop indices
-integer :: i_elmt,i_nliter,i_node,i_comp
+integer :: i_dof,i_elmt,i_eq,i_gll,i_mat,i_nliter,i_node,i_comp,j_dof,j_node
 integer :: ielmt,imat,idof,iedof!element ID for gdof, node, etc.
 
 real(kind=kreal),dimension(nst),parameter :: unit_voigt=(/one,one,one,ZERO,    &
@@ -85,7 +84,7 @@ logical :: nl_isconv ! logical variable to check convergence of
 real(kind=kreal) :: G,K
 real(kind=kreal) :: cmat(nst,nst),estrain(nst),dev_strain(nst),  &
 esigma(nst),sigma(nst),effsigma(nst),vsigma(nst)
-real(kind=kreal) :: devp(nst),eps(nst),erate(nst),evp(nst),      &
+real(kind=kreal) :: devp(nst),erate(nst),evp(nst),      &
 flow(nst,nst),m1(nst,nst),m2(nst,nst),m3(nst,nst)
 real(kind=kreal) :: dq1,dq2,dq3,dsbar,f,fmax,lode_theta,sigm
 
@@ -129,7 +128,7 @@ vload(:),rhoload(:),resload(:)
 !extload: external load
 !ubcload: load contributed by displacement BC
 !load: like resload. Not currently used
-real(kind=kreal),allocatable :: slipload(:),extload(:),bodyload(:), &
+real(kind=kreal),allocatable :: slipload(:),extload(:),bodyload(:),selfload(:), &
 viscoload(:),ubcload(:),load(:)
 
 !strain_elmt: strain for all elements
@@ -145,6 +144,7 @@ real(kind=kreal),allocatable :: nodalphi(:),nodalg(:,:)
 real(kind=kreal),allocatable :: nodalB(:,:)
 !,psigma(:,:),psigma0(:,:),taumax(:),nsigma(:)
 !bodyload: load computed on all nodes of the element
+!selfload: self load computed on all nodes of the element
 !viscoload: load contributed (on all nodes) by visco elements
 !bmat: strain displacement matrix (per node). bmat*displacement vector = strain
 !bload: load computed on each dof on a particular element
@@ -162,8 +162,6 @@ integer,allocatable :: egdof(:),egdofu(:)
 ! Frequency
 logical :: isscale_ang_freq=.true.
 real(kind=kreal) :: freq,ang_freq,scale_ang_freq2
-
-logical :: isgravity,ispseudoeq ! gravity load and pseudostatic load
 
 ! Viscoelastic parameters
 integer :: mdomain
@@ -236,12 +234,12 @@ else
 endif
 ! compute relax time
 iviscoelas=0
-do i=1,nmatblk_viscoelas
-!  if(mat_domain(i)==VISCOELASTIC_DOMAIN .or. &
-!    mat_domain(i)==VISCOELASTIC_TRINFDOMAIN .or. &
-!    mat_domain(i)==VISCOELASTIC_INFDOMAIN)then
+do i_mat=1,nmatblk_viscoelas
+!  if(mat_domain(i_mat)==VISCOELASTIC_DOMAIN .or. &
+!    mat_domain(i_mat)==VISCOELASTIC_TRINFDOMAIN .or. &
+!    mat_domain(i_mat)==VISCOELASTIC_INFDOMAIN)then
 !    iviscoelas=iviscoelas+1
-    imat=imatve_to_imat(i)
+    imat=imatve_to_imat(i_mat)
     ! Variables viscosity_blk and shearmod_blk are NOT nondimensionalized.
     ! Therefore the relaxtime will be in seconds.
     ! If nondimensionalized it may be better to dimensionalize again to compute
@@ -251,10 +249,10 @@ do i=1,nmatblk_viscoelas
     ! APPROXIMATE
     ! CORRECT
     if(trim(devel_example).eq.'axial_rod')then
-      relaxtime(:,i)=tunitfac*viscosity_blk(:,i)/ym_blk(imat)
+      relaxtime(:,i_mat)=tunitfac*viscosity_blk(:,i_mat)/ym_blk(imat)
     else  
-      !relaxtime(:,i)=tunitfac*TWO*viscosity_blk(:,i)/shearmod_blk(imat)
-      relaxtime(:,i)=devel_rtfac*tunitfac*viscosity_blk(:,i)/shearmod_blk(imat)
+      !relaxtime(:,i_mat)=tunitfac*TWO*viscosity_blk(:,i_mat)/shearmod_blk(imat)
+      relaxtime(:,i_mat)=devel_rtfac*tunitfac*viscosity_blk(:,i_mat)/shearmod_blk(imat)
     endif
 !  endif
 enddo
@@ -488,6 +486,14 @@ if(myrank==0)then
   flush(logunit)
 endif
 
+! allocate variables to store elemetal derivative and integrtion factors.
+allocate(element_is_infinite(nelmt))
+allocate(storederiv(ndim,ngll,ngll,nelmt),storejw(ngll,nelmt))
+allocate(storeinterpf_infinite(ngll,ngll,nelmt_infinite))
+
+! computes and store elemental derivative and integration information.
+call precompute_derivative_integration(errcode,errtag)
+
 ! compute initial stress assuming elastic domain
 if(savedata%stress.or.isplastic)then
   allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
@@ -508,9 +514,9 @@ if(s0_type==0)then
     flush(logunit)
     stop
   endif
-  extload=ZERO; isgravity=.true.; ispseudoeq=.false.
+  extload=ZERO
   call stiffness_bodyload(nelmt,neq,hex8_gnode,g_num,gdof_elmt,mat_id,gam_blk, &
-  storekmat,dprecon,extload,isgravity,ispseudoeq)
+  storekmat,dprecon,extload,.true.,.false.)
 
   if(myrank==0)then
     write(logunit,*)'complete!'
@@ -565,7 +571,7 @@ do i_elmt=1,nelmt
   num=g_num(:,ielmt)
   node_valency(num)=node_valency(num)+1
 enddo
-! assemble all node_valceny across the processors
+! assemble all node_valency across the processors
 call assemble_ghosts_nodal_iscalar(node_valency,node_valency)
 
 ! open summary file
@@ -579,7 +585,7 @@ if(myrank==0)then
   flush(logunit)
 endif
 
-allocate(load(0:neq),bodyload(0:neq),viscoload(0:neq),             &
+allocate(load(0:neq),bodyload(0:neq),selfload(0:neq),viscoload(0:neq),         &
 resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),            &
 storekmat(nedof,nedof,nelmt),storemmat(nedof,nelmt),stat=istat)
 if(istat/=0)then
@@ -604,6 +610,7 @@ visco_q0=ZERO
 
 nodalu=ZERO
 bodyload=ZERO
+selfload=ZERO
 viscoload=ZERO
 slipload=ZERO ! slip load
 extload=ZERO ! incremental external load
@@ -646,8 +653,8 @@ if(ISDISP_DOF)then
   allocate(iseq(neq))
   iseq=.false.
   do i_node=1,nnode
-    do i=1,nndofu
-      geq=gdof(idofu(i),i_node)
+    do i_dof=1,nndofu
+      geq=gdof(idofu(i_dof),i_node)
       if(geq.gt.0)iseq(geq)=.true.
     enddo
   enddo
@@ -655,10 +662,10 @@ if(ISDISP_DOF)then
   allocate(gdofu(nequ))
   gdofu=-9999
   inum=0
-  do i=1,neq
-    if(iseq(i))then
+  do i_eq=1,neq
+    if(iseq(i_eq))then
       inum=inum+1
-      gdofu(inum)=i
+      gdofu(inum)=i_eq
     endif
   enddo
   if(nequ.ne.inum)then
@@ -673,7 +680,6 @@ endif
 ! prepare background gravity data
 call prepare_gravity()
 
-allocate(storederiv(ndim,ngll,ngll,nelmt),storejw(ngll,nelmt))
 if(solver_type.eq.builtin_solver .or. solver_diagscale)then
   allocate(dprecon(0:neq))
 endif
@@ -709,6 +715,12 @@ if(isplastic)then
   ! find global dt_vp
   dt_vp=minscal(dt_vp)
 endif
+
+! Compute body loads 
+if(isbodyload)then
+  call compute_bodyload(selfload,selfweight=isselfweight)
+endif
+!-------------------------------------------------------------------------------
 ! Starting time/frequency loop.
 loop_step: do i_step=istep0,nstep
   !t=dt*real(i_step,kreal)
@@ -888,11 +900,11 @@ loop_step: do i_step=istep0,nstep
    
     kmat=storekmat(:,:,ielmt)
     iedof=0
-    do j=1,nenode
-      do i=1,nndof !nndofu
+    do j_node=1,nenode
+      do i_dof=1,nndof !nndofu
         iedof=iedof+1
-        if(bcnodalv(i,num(j))/=ZERO)then
-          ubcload(egdof)=ubcload(egdof)-kmat(:,iedof)*bcnodalv(i,num(j))
+        if(bcnodalv(i_dof,num(j_node))/=ZERO)then
+          ubcload(egdof)=ubcload(egdof)-kmat(:,iedof)*bcnodalv(i_dof,num(j_node))
         endif
       enddo
     enddo
@@ -903,8 +915,8 @@ loop_step: do i_step=istep0,nstep
     do i_elmt=1,nelmt
       ielmt=i_elmt ! all elements
       egdof=gdof_elmt(:,ielmt)
-      do j=1,nedof
-        dprecon(egdof(j))=dprecon(egdof(j))+storekmat(j,j,ielmt)
+      do j_dof=1,nedof
+        dprecon(egdof(j_dof))=dprecon(egdof(j_dof))+storekmat(j_dof,j_dof,ielmt)
       enddo
     enddo ! i_elmt
     dprecon(0)=ZERO
@@ -925,18 +937,18 @@ loop_step: do i_step=istep0,nstep
     if(solver_diagscale)then
       ! regularize linear equations,
       ndscale=ONE
-      do i=1,neq
-        ndscale(i)=one/sqrt(abs(dprecon(i)))
+      do i_eq=1,neq
+        ndscale(i_eq)=one/sqrt(abs(dprecon(i_eq)))
       enddo
       ! nondimensionalize stiffness matrix
       ! elastic region
       do i_elmt=1,nelmt_elas
         ielmt=eid_elas(i_elmt)
         egdof=gdof_elmt(:,ielmt)
-        do i=1,nedof
-          do j=1,nedof
-            storekmat(i,j,ielmt)=ndscale(egdof(i))*storekmat(i,j,ielmt)*       &
-            ndscale(egdof(j))
+        do i_dof=1,nedof
+          do j_dof=1,nedof
+            storekmat(i_dof,j_dof,ielmt)=ndscale(egdof(i_dof))*storekmat(i_dof,j_dof,ielmt)*       &
+            ndscale(egdof(j_dof))
           enddo
         enddo
       enddo
@@ -944,10 +956,10 @@ loop_step: do i_step=istep0,nstep
       do i_elmt=1,nelmt_viscoelas
         ielmt=eid_viscoelas(i_elmt)
         egdof=gdof_elmt(:,ielmt)
-        do i=1,nedof
-          do j=1,nedof
-            storekmat(i,j,ielmt)=ndscale(egdof(i))*storekmat(i,j,ielmt)*       &
-            ndscale(egdof(j))
+        do i_dof=1,nedof
+          do j_dof=1,nedof
+            storekmat(i_dof,j_dof,ielmt)=ndscale(egdof(i_dof))*storekmat(i_dof,j_dof,ielmt)*       &
+            ndscale(egdof(j_dof))
           enddo
         enddo
       enddo
@@ -959,26 +971,26 @@ loop_step: do i_step=istep0,nstep
   extload(0)=ZERO
   ! set BC nodal displacements to nodalu array
   if(ISDISP_DOF)then
-    do i=1,nndofu
-      idof=idofu(i)
-      do j=1,nnode
-        if(bcnodalv(idof,j)/=ZERO)nodalu(i,j)=bcnodalv(idof,j)
+    do i_dof=1,nndofu
+      idof=idofu(i_dof)
+      do j_dof=1,nnode
+        if(bcnodalv(idof,j_dof)/=ZERO)nodalu(i_dof,j_dof)=bcnodalv(idof,j_dof)
       enddo
     enddo
   endif
   ! set BC nodal potential to nodalphi array
   if(ISPOT_DOF)then
-    do i=1,nndofphi
-      idof=idofphi(i)
-      do j=1,nnode
-        if(bcnodalv(idof,j)/=ZERO)nodalphi(j)=bcnodalv(idof,j)
+    do i_dof=1,nndofphi
+      idof=idofphi(i_dof)
+      do j_dof=1,nnode
+        if(bcnodalv(idof,j_dof)/=ZERO)nodalphi(j_dof)=bcnodalv(idof,j_dof)
       enddo
     enddo
   endif
   ksp_tot=0; nl_iter=0
 
   ! only for fault
-  load=extload+ubcload+rhoload
+  load=selfload+extload+ubcload+rhoload
 
   du=ZERO; u=ZERO
   
@@ -989,7 +1001,8 @@ loop_step: do i_step=istep0,nstep
     olddu=ZERO
     bodyload=ZERO
   endif
-  !bodyload=ZERO; bodyload(0)=ZERO
+  !bodyload=ZERO;
+  bodyload(0)=ZERO
   ! nonlinear iteration loop
   nonlinear: do i_nliter=1,NL_MAXITER
     fmax=0 ! failure indicator for plastic simulation.
@@ -1087,9 +1100,9 @@ loop_step: do i_step=istep0,nstep
       endif
     endif
     nl_isconv=uerr.le.NL_TOL
-    if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROtol)nl_isconv=.true.
+    if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROTOL)nl_isconv=.true.
     if(myrank==0)then
-      write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',maxdu/maxu,'maxu:',maxu
+      write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',uerr,'maxu:',maxu
       flush(logunit)
     endif
 
@@ -1100,19 +1113,19 @@ loop_step: do i_step=istep0,nstep
     ! u contains both diaplacement and/or gravity
     ! displacement
     if(ISDISP_DOF)then
-      do i=1,nndofu
-        idof=idofu(i)
+      do i_dof=1,nndofu
+        idof=idofu(i_dof)
         do i_node=1,nnode
           if(gdof(idof,i_node)/=0)then
-            nodalu(i,i_node)=u(gdof(idof,i_node))
+            nodalu(i_dof,i_node)=u(gdof(idof,i_node))
           endif
         enddo
       enddo
     endif
     ! gravity
     if(ISPOT_DOF)then
-      do i=1,nndofphi
-        idof=idofphi(i)
+      do i_dof=1,nndofphi
+        idof=idofphi(i_dof)
         do i_node=1,nnode
           if(gdof(idof,i_node)/=0)then
             ! \phi is a scalar
@@ -1121,7 +1134,10 @@ loop_step: do i_step=istep0,nstep
         enddo
       enddo
     endif
-    bodyload=ZERO; !viscoload=ZERO
+
+    ! Reset bodyload to ZERO for Viscoelastic iteration.
+    ! We need to reconcile platic and viscoelastic iterations.
+    if(.not.isplastic)bodyload=ZERO; !viscoload=ZERO
 
     if(ISDISP_DOF)then
       if(myrank==0)then
@@ -1140,30 +1156,29 @@ loop_step: do i_step=istep0,nstep
         egdofu=gdof_elmt(edofu,ielmt)
         eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
         bload=ZERO
-        do i=1,ngll ! Integration loop
-          call compute_cmat_elastic(bulkmod_elmt(i,ielmt), &
-          shearmod_elmt(i,ielmt),cmat)
+        do i_gll=1,ngll ! Integration loop
+          call compute_cmat_elastic(bulkmod_elmt(i_gll,ielmt), &
+          shearmod_elmt(i_gll,ielmt),cmat)
           
-          deriv=storederiv(:,:,i,ielmt)
-          jacw=storejw(i,ielmt)
+          deriv=storederiv(:,:,i_gll,ielmt)
+          jacw=storejw(i_gll,ielmt)
         
           call compute_bmat_stress(deriv,bmat)
           estrain=matmul(bmat,eld)
           if(isplastic)then
-            estrain=estrain-evpt(:,i,ielmt)
+            estrain=estrain-evpt(:,i_gll,ielmt)
           endif
           sigma=matmul(cmat,estrain)
 
-          if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
-          if(savedata%stress .and. .not.isplastic)stress_elmt(:,i,ielmt)=sigma
+          if(savedata%strain)strain_elmt(:,i_gll,ielmt)=estrain
+          if(savedata%stress .and. .not.isplastic)stress_elmt(:,i_gll,ielmt)=sigma
 
-          if(isplastic)then
-            effsigma=sigma+stress_elmt(:,i,ielmt)
+          if(isplastic.and.isplastic_blk(imat))then
+            effsigma=sigma+stress_elmt(:,i_gll,ielmt)
             call stress_invariant(effsigma,sigm,dsbar,lode_theta)
             ! check whether yield is violated
             call mohcouf(phi_blk(imat),coh_blk(imat),sigm,dsbar,lode_theta,f)
             if(f>fmax)fmax=f
-
             if(f>=zero)then !.or.(nl_isconv.or.nl_iter==nl_maxiter))then
               call mohcouq(psi_blk(imat),dsbar,lode_theta,dq1,dq2,dq3)
               call formm(effsigma,m1,m2,m3)
@@ -1171,7 +1186,7 @@ loop_step: do i_step=istep0,nstep
 
               erate=matmul(flow,effsigma)
               evp=erate*dt_vp
-              evpt(:,i,ielmt)=evpt(:,i,ielmt)+evp
+              evpt(:,i_gll,ielmt)=evpt(:,i_gll,ielmt)+evp
               devp=matmul(cmat,evp)
               
               ! if not converged we need body load for next iteration
@@ -1184,10 +1199,10 @@ loop_step: do i_step=istep0,nstep
             if(nl_isconv.or.nl_iter==nl_maxiter)then
               devp=sigma
               ! compute von Mises effective plastic strain
-              !vmeps(num(i))=vmeps(num(i))+sqrt(two_third*                         &
+              !vmeps(num(i))=vmeps(num(i))+sqrt(two_third*                     &
               !dot_product(evpt(:,i,ielmt),evpt(:,i,ielmt)))
               ! update stresses
-              stress_elmt(:,i,ielmt)=effsigma
+              stress_elmt(:,i_gll,ielmt)=effsigma
               !phif_blkr=atan(tnph/srf(i_srf))
               !sf=(sigm*sin(phif_blkr)-cohf_blk*cos(phif_blkr))/&
               !(-dsbar*(cos(lode_theta)/      &
@@ -1195,25 +1210,23 @@ loop_step: do i_step=istep0,nstep
               !if(sf<scf(num(i)))scf(num(i))=sf
             endif
 
-          else
+          else ! if(isplastic)then
             eload=matmul(sigma,bmat)
             bload=bload+eload*jacw
           endif
         enddo ! i=1,ngll
         if(nl_isconv .or. nl_iter==nl_maxiter)cycle
         bodyload(egdofu)=bodyload(egdofu)+bload
-        !print*,maxval(abs(bload)),maxval(abs(bodyload))
       enddo ! i_elmt
-
+      bodyload(0)=ZERO
       fmax=maxscal(fmax)                                                           
       if(myrank==0)then                                                            
-        write(logunit,'(a,i4,a,f12.6,a,f12.6,a,f12.6)') &                           
-        ' nl_iter:',nl_iter,' f_max:',fmax,' uerr:',uerr,' umax:',maxdu
+        write(logunit,'(a,f0.6)') &                           
+        ' f_max:',fmax
         write(logunit,'(a)')'--------------------------------------------'
         flush(logunit) 
       endif
-
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       
       if(allelastic)exit nonlinear
 
@@ -1229,19 +1242,19 @@ loop_step: do i_step=istep0,nstep
         egdofu=gdof_elmt(edofu,ielmt)
         eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
         bload=ZERO; vload=ZERO
-        do i=1,ngll ! integration loop
-          K=bulkmod_elmt(i,ielmt) 
-          G=shearmod_elmt(i,ielmt)
+        do i_gll=1,ngll ! integration loop
+          K=bulkmod_elmt(i_gll,ielmt) 
+          G=shearmod_elmt(i_gll,ielmt)
           !call compute_cmat_maxwell(K,G,tratio,cmat)
           !call compute_cmat_elastic(K,G,cmat)
-          deriv=storederiv(:,:,i,ielmt)
-          jacw=storejw(i,ielmt)
+          deriv=storederiv(:,:,i_gll,ielmt)
+          jacw=storejw(i_gll,ielmt)
         
           call compute_bmat_stress(deriv,bmat)
           estrain=matmul(bmat,eld) ! strain at current time step
           if(savedata%strain.and.i_step==1.and.i_nliter==1)then
             ! store elastic strain
-            strain_elmt(:,i,ielmt)=estrain
+            strain_elmt(:,i_gll,ielmt)=estrain
           endif
           trace_strain=estrain(1)+estrain(2)+estrain(3)
           dev_strain(1:3)=(estrain(1:3)-ONE_THIRD*trace_strain)
@@ -1250,15 +1263,15 @@ loop_step: do i_step=istep0,nstep
             ! store elastic stress
             esigma=TWO*G*dev_strain
             esigma(1:3)=esigma(1:3)+K*trace_strain
-            stress_elmt(:,i,ielmt)=esigma
+            stress_elmt(:,i_gll,ielmt)=esigma
           endif
           !esigma=matmul(cmat,estrain)
           !esigma=TWO*G*dev_strain
           !esigma(1:3)=esigma(1:3)+K*trace_strain
 
           !----------------------------ZIENCKIEWICZ---------------------------
-          e0=elas_e0(:,i,i_elmt)
-          q0=visco_q0(:,:,i,i_elmt)
+          e0=elas_e0(:,i_gll,i_elmt)
+          q0=visco_q0(:,:,i_gll,i_elmt)
           if(i_step==1)then !.and.i_nliter==1)then
             ! initialize
             e0=dev_strain
@@ -1276,10 +1289,10 @@ loop_step: do i_step=istep0,nstep
           bload=bload+eload*jacw
           ! update
           if(nl_isconv.or.nl_iter==NL_MAXITER)then
-            elas_e0(:,i,i_elmt)=e0
-            visco_q0(:,:,i,i_elmt)=q0
-            if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
-            if(savedata%stress)stress_elmt(:,i,ielmt)=vesigma
+            elas_e0(:,i_gll,i_elmt)=e0
+            visco_q0(:,:,i_gll,i_elmt)=q0
+            if(savedata%strain)strain_elmt(:,i_gll,ielmt)=estrain
+            if(savedata%stress)stress_elmt(:,i_gll,ielmt)=vesigma
           endif
           !----------------------------ZIENCKIEWICZ---------------------------
         enddo ! i

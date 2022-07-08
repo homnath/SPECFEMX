@@ -9,8 +9,8 @@ use partmesh_library
 use string_library,only:str2int,str2real
 implicit none
 
-!include './scotchf.h'
-include "ptscotchf.h"
+include 'scotchf.h'
+!include "ptscotchf.h"
 
 ! number of partitions
 integer :: npart ! e.g. 4 for partitioning for 4 CPUs or 4 processes
@@ -158,6 +158,16 @@ end subroutine check_valence
 ! divides model into partitions using scotch library functions
 subroutine scotch_partitioning
 implicit none
+! Declare external scotch functions
+external scotchfstratinit
+external scotchfrandomReset
+external scotchfgraphinit
+external scotchfgraphbuild
+external scotchfgraphcheck
+external scotchfgraphpart
+external scotchfgraphexit
+external scotchfstratexit
+
 integer :: istat
 
 g_num = g_num - 1
@@ -196,6 +206,9 @@ call scotchfstratinit (scotchstrat(1), istat)
   if (istat /= 0) then
     stop 'ERROR : MAIN : Cannot initialize strat'
 endif
+
+! resets SCOTCH random number generator to produce deterministic partitions
+call scotchfrandomReset()
 
 ! no need to use this for default strategy
 !call scotchfstratgraphmap (scotchstrat(1), trim(scotch_strategy), istat)

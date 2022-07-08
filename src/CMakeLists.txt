@@ -26,6 +26,7 @@ SET(srcsem
   prepare_gravity.f90
   apply_bc.f90
   preprocess.f90
+  matrix_vector.f90
   gindex.f90
   apply_traction.f90
   apply_mtraction.f90
