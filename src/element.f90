@@ -76,6 +76,8 @@ hex8_gnode(6)=hex8_gnode(5)+ngllx-1
 hex8_gnode(7)=ngll;
 hex8_gnode(8)=hex8_gnode(7)-ngllx+1
 
+
+write(*,*)'hex8_gnode:  ', hex8_gnode
 errcode=0
 return
 
@@ -119,54 +121,50 @@ write(logunit,*)'Allocated hexfaces.'
 inode=0
 i1=0; i2=0; i3=0; i4=0; i5=0; i6=0
 do k=1,ngllz
+  
   do j=1,nglly
+
     do i=1,ngllx
-      !write(logunit,*)'i: ', i, '   j: ', j, '   k: ', k
       inode=inode+1
-      !write(logunit,*)'inode: ', inode
       
+
       if (i==1)then
-        !write(logunit,*)'i==1 so Face 4'
         i4=i4+1
         hexface(4)%node(i4)=inode
-        !write(logunit,*)'hexface(4).node(',i4,') = ', inode
+
       endif
 
       if (i==ngllx)then
-        !write(logunit,*)'i==ngllx so Face 2'
         i2=i2+1
         hexface(2)%node(i2)=inode
-        !write(logunit,*)'hexface(2).node(',i2,') = ', inode
+
       endif
 
       if (j==1)then
-        !write(logunit,*)'j==1 so Face 1'
         i1=i1+1
         hexface(1)%node(i1)=inode
-        !write(logunit,*)'hexface(1).node(',i1,') = ', inode
+
       endif
 
       if (j==nglly)then
-        !write(logunit,*)'j==nglly so Face 3'
         i3=i3+1
         hexface(3)%node(i3)=inode
-        !write(logunit,*)'hexface(3).node(',i3,') = ', inode
+
       endif
 
       if (k==1)then
-        !write(logunit,*)'k==1 so Face 5'
         i5=i5+1
         hexface(5)%node(i5)=inode
+
         !write(logunit,*)'hexface(5).node(',i5,') = ', inode
       endif
 
       if (k==ngllz)then
-        !write(logunit,*)'k==ngllz so Face 6'
         i6=i6+1
         hexface(6)%node(i6)=inode
-        !write(logunit,*)'hexface(6).node(',i6,') = ', inode
       endif
     enddo
+
   enddo
 enddo
 
@@ -266,25 +264,41 @@ ny=ngllz
 
 ! edge 1 => [1,2]
 iedge=1
+write(*,*)' looping from 1 to 1: '
 do j=1,1
+  write(*,*)'  j = ', j 
   jm1=j-1
+
   do i=1,nx
     indx(i)=jm1*nx+i
+
   enddo
 enddo
+
+
 hexface_edge(iface,iedge)%fnode=indx
 hexface_edge(iface,iedge)%node=hexface(iface)%node(indx)
 
+
+
 ! edge 2 => [2,6]
 iedge=2
+write(*,*)' looping from 1 to  ', ny 
+
 do j=1,ny
+
   jm1=j-1
+
+
   do i=nx,nx
+
     indy(j)=jm1*nx+i
+
   enddo
 enddo
 hexface_edge(iface,iedge)%fnode=indy
 hexface_edge(iface,iedge)%node=hexface(iface)%node(indy)
+
 
 ! edge 3 => [6,5]
 iedge=3

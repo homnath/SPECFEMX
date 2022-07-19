@@ -115,16 +115,33 @@ write(logunit,*) gll_points(:,:)
 write(logunit,*)'   Weights of GLL points: (1 x n)'
 write(logunit,*) gll_weights(:)
 
+write(*,*)' _______Computing lagrange 1D: _______'
 
 do ii=1,ngll ! ngllx*nglly*ngllz
   xi=gll_points(1,ii)
   eta=gll_points(2,ii)
   zeta=gll_points(3,ii)
 
+
+  write(*,*)'ii = ', ii
+  write(*,*)'   xi = ', xi
+  write(*,*)'   eta = ', eta
+  write(*,*)'   zeta = ', zeta
+
   ! compute 1d lagrange polynomials
   call lagrange1d(ngllx,xi,lagrange_x,lagrange_dx)
+  write(*,*)'     lagrange_x is now = '
+  write(*,*)'      ',lagrange_x
+
   call lagrange1d(nglly,eta,lagrange_y,lagrange_dy)
+  write(*,*)'     lagrange_y is now = '
+  write(*,*)'      ',lagrange_y
   call lagrange1d(ngllz,zeta,lagrange_z,lagrange_dz)
+  write(*,*)'     lagrange_z is now = '
+  write(*,*)'      ',lagrange_z
+
+
+
 
   n=0
   do k=1,ngllz
@@ -132,13 +149,24 @@ do ii=1,ngll ! ngllx*nglly*ngllz
       do i=1,ngllx
         n=n+1
         lagrange_gll(ii,n)=lagrange_x(i)*lagrange_y(j)*lagrange_z(k)
+
+
         dlagrange_gll(1,ii,n)=lagrange_dx(i)*lagrange_y(j)*lagrange_z(k)
+        
+
+
         dlagrange_gll(2,ii,n)=lagrange_x(i)*lagrange_dy(j)*lagrange_z(k)
         dlagrange_gll(3,ii,n)=lagrange_x(i)*lagrange_y(j)*lagrange_dz(k)
+      
+        
+      
       enddo
     enddo
   enddo
 enddo
+
+
+
 
 write(logunit,*)'    Lagrange GLL is stored in  (ngll, ngll) array:'
 write(logunit,*)lagrange_gll(:,:) 
@@ -346,7 +374,7 @@ end subroutine gll_quadrature1d
 ! this subroutine computes the 1d lagrange interpolation functions and their
 ! derivatives at a given point xi.
 subroutine lagrange1d(nenode,xi,phi,dphi_dxi)
-implicit none
+implicit none 
 integer,intent(in) :: nenode ! number of nodes in an 1d element
 integer :: i,j,k
 real(kind=kreal),intent(in) :: xi ! point where to calculate lagrange function and

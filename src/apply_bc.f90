@@ -11,7 +11,7 @@ contains
 ! global degrees of freedom. the modification on the RHS vector due to the
 ! prescribed displacement field is done during stiffnesss computation.
 ! REVISION
-!   HNG, Jul 12,2011; ; HNG, Apr 09,2010
+!   HNG, Jul 12,2011; ; HNG, Apr 09,2010; WE 2022 Jun 18
 subroutine apply_bc(bcnodalv,errcode,errtag)
 use global
 use math_constants, only:zero
@@ -76,10 +76,13 @@ if(ISDISP_DOF.and.isubc)then
       write(errtag,*)'ERROR: edge displacement BC not implemented!'
       return
     elseif(bctype==2)then ! face
+
       read(11,*)nelpart
+
       do i_elpart=1,nelpart
         read(11,*)ielmt,iface ! This will read a line and proceed to next line
         gdof(1,g_num(hexface(iface)%node,ielmt))=0
+
         bcnodalv(1,g_num(hexface(iface)%node,ielmt))=val
       enddo
     elseif(bctype==21)then ! face fault
@@ -232,6 +235,9 @@ if(ISDISP_DOF.and.isubc)then
   close(11)
 endif ! if(ISDISP_DOF)
 
+
+
+
 ! Surface displacement defined on the surface SEM points 
 if(ISDISP_DOF.and.isfsubc.and.nnode_fs>0)then
   fname=trim(ufspath)//trim(ufsfile)//trim(ptail_inp)//'.dis'
@@ -248,12 +254,11 @@ if(ISDISP_DOF.and.isfsubc.and.nnode_fs>0)then
   read(11)char80
   read(11)ufs
   close(11)
-  
   gdof(idofu,gnode_fs)=0
   bcnodalv(idofu,gnode_fs)=NONDIM_L*transpose(ufs)
   deallocate(ufs)
-
 endif
+
 
 ! Infinite boundary conditions
 if(infbc)then
@@ -316,6 +321,49 @@ errcode=0
 
 return
 end subroutine apply_bc
+!===============================================================================
+!WE - applies non-zero boundary conditions originally in specfem3d.f90
+subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload)
+  use global 
+  use set_precision
+  use math_constants
+  implicit none 
+
+  ! IO 
+  integer,allocatable :: num(:),  egdof(:)
+  real(kind=kreal), allocatable :: kmat(:,:),storekmat(:,:,:), & 
+                                   bcnodalv(:,:), ubcload(:)
+  ! Local 
+  integer :: i_elmt, i, j, ielmt, iedof
+
+! Modify RHS vector for prescribed displacements
+  ! i.e. if boundary dispalcements are not equal to zero
+  ! WARNING: need to check for nedofu
+  do i_elmt=1,nelmt
+    ielmt=i_elmt ! all elements
+    num=g_num(:,ielmt)
+    egdof=gdof_elmt(:,ielmt)
+   
+    kmat=storekmat(:,:,ielmt)
+    iedof=0
+    do j=1,nenode
+      do i=1,nndof !nndofu
+        iedof=iedof+1
+        if(bcnodalv(i,num(j))/=ZERO)then
+          ubcload(egdof)=ubcload(egdof)-kmat(:,iedof)*bcnodalv(i,num(j))
+        endif
+      enddo
+    enddo
+  enddo ! i_elmt
+
+
+
+end subroutine apply_nonzero_bc
+
+
+
+
+
 !===============================================================================
 
 end module bc

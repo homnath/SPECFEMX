@@ -150,8 +150,17 @@ endif
 
 
 ! store orginal connectivity which helps to identify ghost interfaces
+
+
 allocate(g_num0(ngnode,nelmt))
 g_num0=g_num
+
+write(logunit,*) 'nenode: ', nenode
+write(logunit,*) 'ngnode: ', ngnode
+write(logunit,*) 'nelmt: ', nelmt
+
+write(logunit,*) 'GNUM: '
+write(logunit,*) g_num
 
 
 ! precompute gll 1D
@@ -162,6 +171,10 @@ call precompute_gll1d()
 call create_spec_elem(tot_nelmt,max_nelmt,min_nelmt, &
                       tot_nnode,max_nnode,min_nnode, &
                       errcode,errtag)
+
+
+write(*,*)'G_NUM: ', g_num
+write(*,*)'g_coord: ', g_coord
 
 
 ! number of elemental nodes (nodes per element = ngllx*nglly*ngllz
@@ -183,9 +196,11 @@ call set_element_dof()
 ! Write model details to log file for user 
 call print_model_details()
 
+
 ! prepare hexes
 call prepare_hex(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
+
 
 ! prepare hex faces
 call prepare_hexface(errcode,errtag)
@@ -277,6 +292,7 @@ integer :: i_elmt,mdomain,num(8)
 real(kind=kreal),dimension(ndim) :: x1,x2,x3,x4,x5,x6,x7,x8
 real(kind=kreal) :: d1,d2,d3,d4
 real(kind=kreal) :: maxsize,maxdiag
+
 ! find largest size of the element
 maxsize=zero
 do i_elmt=1,nelmt
@@ -288,6 +304,8 @@ do i_elmt=1,nelmt
      mdomain==VISCOELASTIC_INFDOMAIN)cycle
 
   num=g_num(hex8_gnode,i_elmt)
+  write(*,*)'num: ', num
+
   x1=g_coord(:,num(1))
   x2=g_coord(:,num(2))
   x3=g_coord(:,num(3))
@@ -296,10 +314,16 @@ do i_elmt=1,nelmt
   x6=g_coord(:,num(6))
   x7=g_coord(:,num(7))
   x8=g_coord(:,num(8))
+
   d1=distance(x1,x7,3)
+
   d2=distance(x2,x8,3)
+
   d3=distance(x3,x5,3)
+
   d4=distance(x4,x6,3)
+
+
   maxdiag=max(d1,d2,d3,d4)
   if(maxdiag.gt.maxsize)maxsize=maxdiag
 enddo

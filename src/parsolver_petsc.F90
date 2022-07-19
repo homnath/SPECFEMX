@@ -1009,6 +1009,47 @@ call VecDestroy(vdiag,ierr)
 end subroutine petsc_set_stiffness_matrix_freq
 !===============================================================================
 
+
+subroutine set_petsc_stiffness(isscale_ang_freq, storekmat, storemmat, &
+   ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)
+
+! USES 
+use global
+use set_precision
+use output_to_user 
+
+  implicit none 
+
+  real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:)
+  real(kind=kreal) :: ang_freq, scale_ang_freq2
+
+  logical reuse_pc_bool, freq_bool, isscale_ang_freq
+
+  
+
+! CODE: 
+    if (freq_bool)then 
+        call petsc_set_stiffness_matrix_freq(storekmat,storemmat,        &
+                                             ang_freq, scale_ang_freq2,  & 
+                                             isscale_ang_freq)
+        log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;  
+        call write_ifproc0()
+        call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
+    else 
+        call petsc_set_stiffness_matrix(storekmat)
+        log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   
+        call write_ifproc0()
+        call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
+        call petsc_set_solver()
+
+    endif 
+
+
+end subroutine set_petsc_stiffness
+
+
+
+!===============================================================================
 subroutine petsc_set_vector(rload)
 use ieee_arithmetic
 implicit none

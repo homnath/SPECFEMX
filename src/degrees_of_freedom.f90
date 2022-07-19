@@ -42,9 +42,13 @@ if(ISDISP_DOF)then
   enddo
   allocate(edofu(nedofu))
 endif
+
 ! gravity
 idof=idofu(nndofu)
+write(*,*)'ISPOT_DOF is : ', ISPOT_DOF 
+
 if(ISPOT_DOF)then
+  write(*,*)'ISPOT_DOF is : ', ISPOT_DOF 
   nndof=nndof+nndofphi
   nedofphi=NNDOFPHI*nenode
   nedof=nedof+nedofphi
@@ -54,6 +58,10 @@ if(ISPOT_DOF)then
   enddo
   allocate(edofphi(nedofphi))
 endif
+
+
+
+
 end subroutine initialize_dof
 !===============================================================================
 
@@ -81,13 +89,18 @@ do i=1,NGLL
     iu(1)=iu0+1
     nu=nu+1
     edofu(nu)=iu(1)
+
+
     do j=2,NNDOFU
       nu=nu+1
+
       iu(j)=iu(j-1)+1
       edofu(nu)=iu(j)
     enddo
+
     iu0=iu(NNDOFU) ! this will be overwritten if POT_DOF is present
     iphi0=iu(NNDOFU)
+
   endif
   if(ISPOT_DOF)then
     iphi=iphi0+1
@@ -97,8 +110,12 @@ do i=1,NGLL
     iphi0=iphi
   endif
 enddo
-!print*,edofu
-!print*,edofphi; stop
+
+write(*,*)'***** EDOFU: ', edofu
+
+
+
+
 return
 end subroutine set_element_dof
 !===============================================================================
@@ -223,6 +240,7 @@ errtag="ERROR: unknown!"
 errcode=-1
 ! Compute modified gdof
 neq=0
+
 do j=1,ubound(gdof,2)
   do i=1,ubound(gdof,1)
     if(gdof(i,j)/=0)then
@@ -231,6 +249,10 @@ do j=1,ubound(gdof,2)
     endif
   enddo
 enddo
+
+
+
+
 
 ofname='tmp/'//trim(file_head)//'_gdof'//trim(adjustl(proc_str))
 open(unit=22,file=trim(ofname),access='stream',form='unformatted', &

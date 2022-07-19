@@ -159,6 +159,9 @@ do i_elmt=1,nelmt
   enddo
 enddo
 
+
+
+
 write(logunit,*)' Finished looping through all elements'
 
 deallocate(g_coord,g_num) ! no longer need these
@@ -167,9 +170,39 @@ allocate(iglob(npoint))
 ! gets ibool indexing from local (gll points) to global points
 call get_global(ndim,xstore,ystore,zstore,iglob,nnode,npoint,xmin,xmax)
 
+write(*,*)'nnode:  ', nnode
+
+write(*,*)'XSTORE: '
+do i =1, npoint 
+  write(*,*) xstore(i)
+enddo 
+
+write(*,*)'YSTORE: '
+do i =1, npoint 
+  write(*,*) ystore(i)
+enddo 
+
+write(*,*)'ZSTORE: '
+do i =1, npoint 
+  write(*,*) zstore(i)
+enddo 
+
+write(*,*)'IGLOB: '
+do i =1, npoint 
+  write(*,*) iglob(i)
+enddo 
+
+
+write(*,*)'Now using indirect addressing'
 ! now we got the new number of nodes (nnode)
 !- we can create a new indirect addressing to reduce cache misses
 call get_global_indirect_addressing(nnode,npoint,iglob)
+
+write(*,*)'IGLOB is now : '
+do i =1, npoint 
+  write(*,*) iglob(i)
+enddo 
+
 
 allocate(g_coord(3,nnode),g_num(ngll,nelmt)) ! alocate with new number of nodes
 ipoint=0
@@ -203,7 +236,6 @@ end subroutine hex2spec
 !============================================
 
 subroutine get_global(ndim,xold,yold,zold,iglob,nnode,npoint,xmin,xmax)
-
 ! this routine must be in double precision to avoid sensitivity
 ! to roundoff errors in the coordinates of the points
 
@@ -240,6 +272,10 @@ zp=zold
 
 ! define geometrical tolerance based upon typical size of the model
 smalltol = 1.e-10_kreal * abs(xmax - xmin)
+!write(*,*)'SMALL TOLERANCE IS:', smalltol
+
+
+!write(*,*)'Entered get_global(): '
 
 ! dynamically allocate arrays
   allocate(ind(npoint), &
@@ -250,6 +286,8 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
     write(*,*)'ERROR: error allocating arrays!'
     stop
   endif
+
+
 
 ! establish initial pointers
   do i=1,npoint
@@ -262,21 +300,53 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
   ifseg(1)=.true.
   ninseg(1)=npoint
 
+  !write(*,*)'Sorting: '
+
+
+
   do j=1,ndim
+    write(*,*)'j: ',j
+
+
 
 ! sort within each segment
     ioff=1
+    !write(*,*), 'nseg:', nseg
+
     do iseg=1,nseg
+
+      !write(*,*)'  iseg = ',iseg
+
       if(j == 1) then
-        call rank(xp(ioff),ind,ninseg(iseg))
+        call rank(xp(ioff), ind, ninseg(iseg))
       else if(j == 2) then
+        !write(*,*)'   yp(ioff): ', yp(ioff)
+        !write(*,*)'   ind: ', ind 
+        !write(*,*)'   ninseg(iseg): ', ninseg(iseg) 
+        !write(*,*)'   RUN RANK YP: '
+
         call rank(yp(ioff),ind,ninseg(iseg))
       else
+
         call rank(zp(ioff),ind,ninseg(iseg))
       endif
+
       call swap_all(iloc(ioff),xp(ioff),yp(ioff),zp(ioff),iwork,work,ind,ninseg(iseg))
+      !write(*,*)' AFTER SWAP THE VALUES ARE NOW: '
+      !write(*,*)'iloc: ', iloc
+      !!write(*,*)'xp: ', xp
+      !write(*,*)'yp: ', yp
+      !write(*,*)'zp: ', zp
+      !write(*,*)'i_work: ', iwork
+      !!write(*,*)'ind: ', ind
+      !write(*,*)'ninseg: ', ninseg
+      
       ioff=ioff+ninseg(iseg)
+      !write(*,*)'new ioff value is : ', ioff 
     enddo
+
+
+
 
 ! check for jumps in current coordinate
 ! compare the coordinates of the points within a small tolerance
@@ -294,8 +364,10 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
       enddo
     endif
 
+
 ! count up number of different segments
     nseg=0
+    
     do i=1,npoint
       if(ifseg(i)) then
         nseg=nseg+1
@@ -304,7 +376,12 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
         ninseg(nseg)=ninseg(nseg)+1
       endif
     enddo
+
+
+
   enddo ! j=1,ndim
+
+
 
 ! assign global node numbers (now sorted lexicographically)
   ig=0
@@ -315,6 +392,8 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
 
   nnode=ig
 
+  !write(*,*)'IGLOB: ', iglob
+
 ! deallocate arrays
   deallocate(ind)
   deallocate(ninseg)
@@ -324,8 +403,10 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
   end subroutine get_global
 !===========================================
 
-! sorting routines put in same file to allow for inlining
 
+
+
+! sorting routines put in same file to allow for inlining
   subroutine rank(a,ind,n)
 !
 ! use heap sort (numerical recipes)
@@ -339,46 +420,110 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
   integer :: i,j,l,ir,indx
   real(kind=kreal) :: q !double precision
 
+
+  !write(*,*)'inside rank: '
+  !write(*,*)'a = ', a
+  !write(*,*)'n = ', n
+  !write(*,*)'ind = ', ind
+
+
+
   do j=1,n
    ind(j)=j
   enddo
+  !write(*,*)'ind array is now: ', ind 
+
 
   if (n == 1) return
 
   l=n/2+1
   ir=n
+
+  !write(*,*)'l = ', l
+  !write(*,*)'ir = ', ir
+
+
   100 continue
+
+   !write(*,*) 'l=  ', l
    if (l>1) then
+       !write(*,*)'l is larger than 1 so subtract 1'
       l=l-1
       indx=ind(l)
+      !write(*,*)'indx = ind(l) = ', indx
       q=a(indx)
+      !write(*,*)'q = a(indx) = ', q
+
    else
+    !write(*,*)'l is NOT larger than 1'
+
       indx=ind(ir)
+      !write(*,*)'indx = ind(ir) = ', indx 
+
       q=a(indx)
+      !write(*,*)'q = a(indx) = ', q 
+
       ind(ir)=ind(1)
+      !write(*,*)'ind(ir) = ind(1)', ind(ir) 
+
       ir=ir-1
+      !write(*,*)'ir -= 1 so ir =', ir 
+
       if (ir == 1) then
+        !write(*,*)'ir now == 1 so'
+
          ind(1)=indx
+         !write(*,*)'ind(1) = indx and RETURN'
          return
       endif
    endif
+
+  
    i=l
+   !write(*,*)'i = l =', i 
    j=l+l
+   !write(*,*)'j = l+l =', j 
+
+   !write(*,*)'____ AT 200 pt'
   200    continue
    if (j <= ir) then
+    !write(*,*)'j <= ir so enter'
+
       if (j<ir) then
-         if ( a(ind(j))<a(ind(j+1)) ) j=j+1
+        !write(*,*)'j < ir so enter'
+
+         if ( a(ind(j))<a(ind(j+1)) ) then 
+          !write(*,*)'a(ind(j))<a(ind(j+1)) so enter'
+          j=j+1
+          !write(*,*) 'j is now += 1   = ', j
+         endif 
       endif
+
       if (q<a(ind(j))) then
+        !write(*,*)'q<a(ind(j)) so enter'
          ind(i)=ind(j)
+         !write(*,*)'ind(i) = ind(j) = ', ind(i)
          i=j
          j=j+j
+         !write(*,*)'i = j = ', i
+         !write(*,*)'j = j+j = ', j
       else
+        !write(*,*)'NOT TRUE q<a(ind(j)) so enters else'
+
          j=ir+1
+         !write(*,*)'j =ir+1 =  ', j
       endif
+      !write(*,*)'Go to 200'
    goto 200
    endif
    ind(i)=indx
+   !write(*,*)'ind(i) = indx =', ind(i)
+   !write(*,*)''
+   !write(*,*)''
+   !write(*,*)'Go to 100'
+   !write(*,*)''
+   !write(*,*)''
+
   goto 100
 
 end subroutine rank
@@ -397,6 +542,9 @@ subroutine swap_all(ia,a,b,c,iw,w,ind,n)
   real(kind=kreal) :: a(n),b(n),c(n),w(n) !double precision
 
   integer :: i
+
+
+  write(*,*) " INSIDE SWAPPING SUBROUTINR"
 
   iw(:) = ia(:)
   w(:) = a(:)
@@ -439,15 +587,27 @@ integer:: i_point
 mask_ibool = -1
 copy_ibool_ori = ibool
 ! reduces misses
+
 inumber = 0
 do i_point=1,npoint
+  write(*,*)'i_point = ', i_point
+  write(*,*)'      copy_ibool_ori(i_point) = ', copy_ibool_ori(i_point) 
+  write(*,*)'mask_ibool(copy_ibool_ori(i_point)) = ', mask_ibool(copy_ibool_ori(i_point))
+
   if(mask_ibool(copy_ibool_ori(i_point)) == -1) then
+    write(*,*)'mask_ibool is -1 so enter if...'
     inumber = inumber + 1
+    write(*,*)'inumber becomes = ', inumber 
     ibool(i_point) = inumber
     mask_ibool(copy_ibool_ori(i_point)) = inumber
+    write(*,*)'make  = mask_ibool(copy_ibool_ori(i_point)) = ', inumber 
+
   else
+    write(*,*)'mask_ibool is NOT -1 so else...'
     ! use an existing point created previously
     ibool(i_point) = mask_ibool(copy_ibool_ori(i_point))
+    write(*,*)'ibool(i_point) becomes ', ibool(i_point)
+
   endif
 enddo
 return

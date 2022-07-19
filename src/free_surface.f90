@@ -57,6 +57,10 @@ if (ios /= 0)then
 endif
 
 read(11,*,iostat=ios)nelmt_fs
+
+write(*,*)' FREE SURFACE'
+write(*,*)'   nelmt_fs = ', nelmt_fs
+
 if(ios/=0.or.nelmt_fs.eq.0)then
   nnode_fs=0
   ! No need to plot free surface files
@@ -64,20 +68,27 @@ if(ios/=0.or.nelmt_fs.eq.0)then
   savedata%fsplot_plane=.false.
   return
 endif
+
 allocate(iface_fs(nelmt_fs))
 allocate(gnum4_fs(4,nelmt_fs),gnum_fs(maxngll2d,nelmt_fs))
 nsnode_all=nelmt_fs*maxngll2d
 allocate(nodelist(nsnode_all),inode_order(nsnode_all))
+
 n1=1; n2=maxngll2d
 do i_face=1,nelmt_fs
+
   read(11,*)ielmt,iface
+
   iface_fs(i_face)=iface
   num=g_num(:,ielmt)
   gnum4_fs(:,i_face)=num(hexface(iface)%gnode)
   gnum_fs(:,i_face)=num(hexface(iface)%node)
   
+
   nodelist(n1:n2)=num(hexface(iface)%node)
   n1=n2+1; n2=n1+maxngll2d-1
+
+
 enddo
 
 close(11)
@@ -85,28 +96,51 @@ close(11)
 ! Renumber connectivity for the surface elements
 call i_uniinv(nodelist,inode_order)
 
+
+
+
 nnode_fs=maxval(inode_order)
+write(*,*)'nnode_fs = ', nnode_fs
+
 allocate(isnode(nnode_fs))
 isnode=.false.
 
 ! Store global node IDs for free surface nodes
 allocate(gnode_fs(nnode_fs))
 gnode_fs(inode_order(1))=nodelist(1)
+
+
+
 isnode(inode_order(1))=.true.
+
+
 do i=2,nsnode_all
+  
   if(.not.isnode(inode_order(i)))then
      isnode(inode_order(i))=.true.
+
      gnode_fs(inode_order(i))=nodelist(i)
+  
   endif
 enddo
 deallocate(isnode,nodelist)
+
+
 ! Store the renumbered connectivity for the free surface elements.
+
 n1=1; n2=maxngll2d
 allocate(rgnum_fs(maxngll2d,nelmt_fs))
 do i_face=1,nelmt_fs
+  
  rgnum_fs(:,i_face)=inode_order(n1:n2)
+
+
  n1=n2+1; n2=n1+maxngll2d-1
+
 enddo
+
+
+
 
 deallocate(inode_order)
 

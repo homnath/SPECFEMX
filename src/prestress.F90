@@ -67,8 +67,9 @@ if(savedata%strain)then
 endif
 
 if(isstress0)then
-    if(s0_type==0)then
+    write(logunit,*)'PRESTRESS PRESENT'
 
+    if(s0_type==0)then
         ! compute initial stress using SEM itself
         allocate(extload(0:neq),du(0:neq),dprecon(0:neq), &
         storekmat(nedof,nedof,nelmt),stat=istat)

@@ -1202,28 +1202,75 @@ storemmat=zero
 ! Elastic elements
 ! Following loops through nelmt
 do i_elmt=1,nelmt
+
+  write(*,*)'i_elmt:  ', i_elmt
+
   ielmt=i_elmt
   num=g_num(:,ielmt)
+  ! write(*,*)'   num = g_num(:,ielmt) =  ', num
+
+  !write(*,*)'                hex8_gnode  =  ', hex8_gnode
+  !write(*,*)'  g_coord(:,num(hex8_gnode))=  ', g_coord(:,num(hex8_gnode))
+
+
   coord=transpose(g_coord(:,num(hex8_gnode)))
+  write(*,*)'  coord =  ', coord
+
+
   nip=ngll
   
+  write(*,*)'  Now loop for each gll point:  '
+
   mass=ZERO
   do i=1,nip
       ignode=num(i)
+      write(*,*)'____________________________________________'
+      write(*,*)i_elmt, i
       ! standard element
       interpf=lagrange_gll(i,:)
-    
+
       jac=matmul(dshape_hex8(:,:,i),coord)
+
+      write(*,*)'jac 1 1', jac(1,1)
+      write(*,*)'jac 2 1', jac(2,1)
+      write(*,*)'jac 3 1', jac(3,1)
+      write(*,*)'jac 1 2', jac(1,2)
+      write(*,*)'jac 2 2', jac(2,2)
+      write(*,*)'jac 3 2', jac(3,2)
+      write(*,*)'jac 1 3', jac(1,3)
+      write(*,*)'jac 2 3', jac(2,3)
+      write(*,*)'jac 3 3', jac(3,3)
+
+
+
       detjac=determinant(jac)
       call invert(jac)
+
+
       deriv=matmul(jac,dlagrange_gll(:,i,:))
-      
+
       jacw=detjac*gll_weights(i)
      
+      write(*,*)gll_weights(i) 
+      write(*,*)jacw 
+      write(*,*)massdens_elmt(i,ielmt)
+
       mass=mass+massdens_elmt(i,ielmt)*jacw
+      write(*,*)mass
+
   enddo
   storemmat(:,i_elmt)=mass
+
+
+
+
+  write(*,*)'____________________________________________________________  '
+
 enddo ! i_elmt
+
+write(*,*)'MASS MATRIX: '
+write(*,*)storemmat
+
 
 end subroutine compute_mass_elastic
 !===============================================================================

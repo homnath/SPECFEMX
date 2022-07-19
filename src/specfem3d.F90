@@ -62,6 +62,8 @@ use postprocess
 use cleanup
 use save_variables 
 use nonlinearloop
+use bilinear_form
+
 
 !use relaxation_time
 implicit none
@@ -239,19 +241,17 @@ call split_elas_visco_eids(nelmt_elas, &
 nelmt_viscoelas, eid_elas, eid_viscoelas )
 
 
+
 ! Create new elastic/viscoelastic arrays
 allocate(elas_e0(nst,ngll,nelmt_viscoelas), &
 visco_q0(nst,nmaxwell,ngll,nelmt_viscoelas),q0(nst,nmaxwell))
-
 
 ! prepare ghost partitions for the communication
 if(nproc.gt.1)then
   call prepare_ghost()
 endif
-! Old connectivity no longer necessary
-deallocate(g_num0)
+deallocate(g_num0) ! Old connectivity no longer necessary
 call sync_process
-
 
 
 ! prepare fault - UNECESSARY FOR SEA LEVEL 
@@ -262,7 +262,6 @@ if( iseqsource .and. (eqsource_type.eq.3 .or. eqsource_type.eq.4) )then
   call control_error(errcode,errtag,stdout,myrank)
   log_msg = 'Complete!...' ;  call write_ifproc0() 
 endif
-
 
 
 ! Apply displacement boundary conditions
@@ -280,11 +279,7 @@ endif
 allocate(infinite_iface(6,nelmt),infinite_face_idir(6,nelmt))
 infinite_iface=.false.
 infinite_face_idir=-9999
-! activate degrees of freedom
-!gdof=0
-!gdof(idofu,:)=1
-!
-!gdof=1
+
 call activate_dof(errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
@@ -297,9 +292,9 @@ call control_error(errcode,errtag,stdout,myrank)
 call assemble_ghosts_gdof(nndof,gdof,gdof)
 where(gdof>0)gdof=1
 call sync_process
-
 ! At this point, all gdof IDs are consistent across the parallel interfaces
 ! having the values either 0 or 1.
+
 
 ! Apply Dirichlet boundary conditions
 call apply_bc(bcnodalv,errcode,errtag)
@@ -320,7 +315,6 @@ call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
         eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB )
 
 
-
 ! store elemental global degrees of freedoms from nodal gdof
 ! this removes the repeated use of reshape later but it has larger size than
 ! gdof!!!
@@ -338,7 +332,10 @@ enddo
 ! this process is necessary for petsc implementation and is done in a single
 ! processor
 call sync_process
-if(ismpi .and. nproc.gt.1 .and. myrank.eq.0)call gindex()
+if(ismpi .and. nproc.gt.1 .and. myrank.eq.0)then 
+  call gindex()
+  write(logunit,*)'CALLED GINDEX'
+endif 
 call sync_process
 !----------------------------------------------
 
@@ -355,24 +352,22 @@ log_msg = 'preprocessing...' ; call write_ifproc0()
 
 
 
+
 ! Calculate any prestress 
 call calculate_prestress(strain_elmt, strain_nodal, &
                                 stress_elmt, stress_nodal, & 
                                 extload, du, dprecon, storekmat, &
                                 isgravity, ispseudoeq, &
                                 errcode, errtag, ksp_iter, istat)
-       
-
-
-
-
+   
 allocate(slipload(0:neq),extload(0:neq),rhoload(0:neq),ubcload(0:neq))
 
 extload=ZERO
 rhoload=ZERO
 
-allocate(node_valency(nnode))
 
+
+allocate(node_valency(nnode))
 ! compute node valency only once - needed for averaging value across interfaces
 ! e.g a point may be shared by 4 nodes if on the corner of 4 elements (valence 4)
 ! and so the stress is given as the average of these 4 
@@ -382,6 +377,7 @@ do i_elmt=1,nelmt
   num=g_num(:,ielmt)
   node_valency(num)=node_valency(num)+1
 enddo
+
 ! assemble all node_valceny across the processors
 call assemble_ghosts_nodal_iscalar(node_valency,node_valency)
 
@@ -442,9 +438,8 @@ if(solver_type.eq.petsc_solver)then
   ! Prepare sparsity of the stiffness matrix (working out size etc)
   call prepare_sparse() 
   ! petsc solver
-      call petsc_initialize() 
-      log_msg = 'petsc_initialize: SUCCESS!' ; call write_ifproc0()
-  
+  call petsc_initialize() 
+  log_msg = 'petsc_initialize: SUCCESS!' ; call write_ifproc0()
   
   ! Create sparse vector, matrix, and preallocate                                                         
   ! TODO: following call is not necessary for RECYCLE                            
@@ -489,6 +484,7 @@ if(ISDISP_DOF)then
 endif
 
 
+
 ! prepare background gravity data
 ! I think this only works for a global model where it does radial integration
 ! It can use a global model for g0 with local mesh but wont calc gravity
@@ -502,12 +498,16 @@ allocate(storederiv(ndim,ngll,ngll,nelmt),storejw(ngll,nelmt))
 if(solver_type.eq.builtin_solver .or. solver_diagscale)then
   allocate(dprecon(0:neq))
 endif
+
 if(solver_diagscale)then
   allocate(ndscale(0:neq))
 endif
+
+
 if(trim(devel_example).eq.'axial_rod')then
   open(77,file=trim(file_head)//"_strain.dat",action="write",status="replace")
 endif
+
 
 
 ! Note that the stepping starts from 
@@ -529,7 +529,9 @@ endif
 
 
 ! Compute ELASTIC mass matrix once and for all 
+! THIS SHOULD BE COMPUTE_mass_elastic_GLOBAL!!!! 
 call compute_mass_elastic(storemmat,errcode,errtag)
+
 
 if(isplastic)then
   ! Compute minimum pseudo-time step for viscoplasticity
@@ -579,8 +581,8 @@ loop_step: do i_step=istep0,nstep
     scale_ang_freq2=ONE/(ang_freq*ang_freq)
   endif
   ! ________________________________________________________________________
-
-
+  
+  
   ! Set initial values to 0 
   nodalu=ZERO
   if(ISPOT_DOF)then
@@ -591,35 +593,32 @@ loop_step: do i_step=istep0,nstep
   rhoload=ZERO
   
 
-  ! CALCULATING ELASTIC/ LIENAR VISCOELASIC STIFFNESS MATRIX  
+
+  ! ____________________________________________________________________
+  !!!!  CALCULATING ELASTIC/ LIENAR VISCOELASIC STIFFNESS MATRIX  
   if(steptype.eq.FREQSTEP)then
-    ! compute elastic stiffness matrix for time = 0
-    if(i_step==0)then
-      call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
-    endif
-
-    if(solver_type.eq.petsc_solver)then
-      call petsc_set_stiffness_matrix_freq(storekmat,storemmat,ang_freq, &
-      scale_ang_freq2,isscale_ang_freq)
-      log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   call write_ifproc0()
+      ! compute elastic stiffness matrix for time = 0
+      if(i_step==0)then
+        call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+      endif
       
-      call petsc_set_ksp_operator(reuse_pc=.false.)
-    endif
+      ! Set Petsc stiffness matrix
+      if(solver_type.eq.petsc_solver)then
+        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+                                 ang_freq, scale_ang_freq2, &
+                                 reuse_pc_bool=.false.,freq_bool=.true.)            
+      endif
 
 
-  else ! TIMESTEPPING not freq
+  else ! TIMESTEPPING not freqstepping 
     if(i_step==1)then 
       ! compute elastic stiffness matrix for time = 0
       call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
     
-
-      ! The following is repeated below in the next elseif except for 
-      ! the reuse_pc flag being true - make into a function 
       if(solver_type.eq.petsc_solver)then
-        call petsc_set_stiffness_matrix(storekmat)
-        log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   call write_ifproc0()
-        call petsc_set_ksp_operator(reuse_pc=.false.)
-        call petsc_set_solver()
+        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+                                 ang_freq, scale_ang_freq2,            &
+                                reuse_pc_bool=.false.,freq_bool=.false.) 
       endif
 
     elseif(i_step==2)then
@@ -627,25 +626,21 @@ loop_step: do i_step=istep0,nstep
       ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
       ! it has to be called for every time steps or every changing time step.
       ! This will simply overwrite the storekmat for viscoelastic elements.
-      call compute_stiffness_viscoelastic(nelmt_viscoelas,eid_viscoelas,         &
-           dt,relaxtime,storekmat,errcode,errtag)
-
+      call compute_stiffness_viscoelastic(nelmt_viscoelas,             &   
+                                          eid_viscoelas, dt, relaxtime,&
+                                          storekmat, errcode, errtag)
+ 
       if(solver_type.eq.petsc_solver)then
-        call petsc_set_stiffness_matrix(storekmat)
-        log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   call write_ifproc0()
-        call petsc_set_ksp_operator(reuse_pc=.true.)
-        call petsc_set_solver()
+        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+                                 ang_freq, scale_ang_freq2, &
+                                 reuse_pc_bool=.true.,freq_bool=.false.) 
       endif
     endif
-
   endif ! if(steptype.eq.FREQSTEP)
+  ! ____________________________________________________________________
 
-
-
-
-
-
-  ! NOW WE ARE AT A POINT WHERE ANY STIFFNESS MATRICES HAVE BEEN CALCULATED 
+  ! NOW WE ARE AT A POINT WHERE ANY STIFFNESS MATRICES HAVE BEEN 
+  ! CALCULATED 
 
   ! apply traction boundary conditions
   ! WARNING: i_step==1 is ONLY for rod example
@@ -667,7 +662,7 @@ loop_step: do i_step=istep0,nstep
 
 
   ! Calculate relevant force terms: 
-     if(ismtraction)then
+  if(ismtraction)then
     call compute_magnetic_traction(errcode, errtag, extload)
   endif 
 
@@ -701,31 +696,15 @@ loop_step: do i_step=istep0,nstep
   ! ____________________________________________________________________________
 
 
-  ! Modify RHS vector for prescribed displacements
-  ! i.e. if boundary dispalcements are not equal to zero
-  ! WARNING: need to check for nedofu
-  do i_elmt=1,nelmt
-    ielmt=i_elmt ! all elements
-    num=g_num(:,ielmt)
-    egdof=gdof_elmt(:,ielmt)
-   
-    kmat=storekmat(:,:,ielmt)
-    iedof=0
-    do j=1,nenode
-      do i=1,nndof !nndofu
-        iedof=iedof+1
-        if(bcnodalv(i,num(j))/=ZERO)then
-          ubcload(egdof)=ubcload(egdof)-kmat(:,iedof)*bcnodalv(i,num(j))
-        endif
-      enddo
-    enddo
-  enddo ! i_elmt
+  ! Apply non-zero boundary conditions
+  call apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload)
 
 
   ! PREPARE BUILT IN SOLVER
   call prep_inbuilt_solver(dprecon, egdof, storekmat, ndscale,     &
                            nzero_dprecon, nelmt_elas, eid_elas,    &
                            nelmt_viscoelas, eid_viscoelas)
+
 
 
   ! ALSO TO DO WITH NON ZERO BOUNDARY CONDITIONS? 
@@ -749,6 +728,7 @@ loop_step: do i_step=istep0,nstep
       enddo
     enddo
   endif
+
 
   ! Reset/initialise the count of ksp and non linear iterations 
   ksp_tot=0; nl_iter=0
@@ -827,7 +807,6 @@ loop_step: do i_step=istep0,nstep
     
     call check_convergence(uerr, maxu, maxdu, u, & 
                            olddu, resload, nl_isconv, i_nliter)
-
     call sync_process()
 
 
@@ -874,6 +853,9 @@ loop_step: do i_step=istep0,nstep
                               eid_viscoelas, dt, num, q0)
       bodyload(0)=ZERO
     endif !(ISDISP_DOF)
+
+
+
 
 
 
@@ -1049,31 +1031,7 @@ loop_step: do i_step=istep0,nstep
   ! =========================END NON LINEAR ITERATIONS LOOP =============================
 
 
-
-
-
-  !!compute nodal strain--------------------------------------------------
-  !if(ISDISP_DOF)then
-  !  ! strain 
-  !  if(savedata%strain)then
-  !    if(myrank==0)then
-  !      write(logunit,*)'computing nodal strain'
-  !      flush(logunit)
-  !    endif
-  !    call compute_nodal_tensor(strain_elmt,strain_nodal)  
-  !    if(nproc.gt.1)then
-  !      call assemble_ghosts_nodal_vectorn(NST,strain_nodal,strain_nodal)
-  !    endif
-  !    ! compute average on the sharing nodes
-  !    do i_comp=1,NST
-  !      strain_nodal(i_comp,:)=strain_nodal(i_comp,:)/real(node_valency,kreal)
-  !    enddo
-  !    write(77,*)dt*real(i_step),strain_nodal(1,2099)                               
-  !    flush(77)
-  !  endif
-  !endif
-  !-----------------------------------------------------------------------------
-
+  ! Warning if there is not convergence 
   if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
     if(myrank==0)then
       write(logunit,*)'WARNING: nonconvergence in nonlinear iterations!'
@@ -1104,6 +1062,9 @@ loop_step: do i_step=istep0,nstep
   endif
   
 enddo loop_step ! i_step time/frequency stepping loop
+
+
+
 
 
 ! cleanup solver

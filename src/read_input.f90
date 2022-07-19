@@ -1175,24 +1175,52 @@ phi_blk=-inftol
 psi_blk=-inftol
 allocate(ismat(nmatblk))
 ismat=.false.
+
+write(*,*)'READING THE INPUT FILE'
 do i=1,nmatblk
   ! This will read a line and proceed to next line
   ! if the input line is long enough only the part of the lineword will be
   ! filled
+  write(*,*)'  i = ', i
+
   lineword=""
   read(11,'(a)',iostat=ios)line
   read(line,*,iostat=ios)lineword
+
+  write(*,*)'  line = ', line
+  write(*,*)'  lineword = ', lineword
+
   imat=str2int(lineword(1))
+  write(*,*)'  imat = ', imat
+
   mat_domain(imat)=str2int(lineword(2))
+
+  write(*,*)'  mat_domain(imat) = ', str2int(lineword(2))
+
   type_blk(imat)=str2int(lineword(3))
+
+  write(*,*)'  type_blk(imat) = ', str2int(lineword(3))
+
+
   if(type_blk(imat).eq.0)then
     ! block material properties
+    write(*,*)'  type_blk(imat) =  0 so '
+
     if(isdensity)then
+      write(*,*)'ISDENSITY IS TRUE'
       rho_blk(imat)=str2real(lineword(4))
+      write(*,*)'  rho_blk(imat) = ', str2real(lineword(4))
+
       gam_blk(imat)=agrav*rho_blk(imat)
+      write(*,*)'  agrav = ', agrav
+      write(*,*)'  gam_blk(imat) = ', agrav*rho_blk(imat)
     else
+      write(*,*)'ISDENSITY IS FALSE'
       gam_blk(imat)=str2real(lineword(4))
+      write(*,*)'  gam_blk(imat) = ', str2real(lineword(4))
       rho_blk(imat)=gam_blk(imat)/agrav
+      write(*,*)'   rho_blk(imat) = ', gam_blk(imat)/agrav
+
     endif
 
     ym_blk(imat)=str2real(lineword(5))

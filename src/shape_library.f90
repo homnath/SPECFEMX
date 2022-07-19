@@ -238,7 +238,7 @@ do i=1,ngll
       endif
 enddo
 
-!write(logunit, *)'    Resulting derivatives stored in dshape_hex8: '
+!write(logunit, *)'esulting derivatives stored in dshape_hex8: '
 !write(logunit, *)'      dshape_hex8(3, 8, ngll)'
 !write(logunit, *)'      3 for 3D, 8 for 8 nodes in hexahedra '
 !write(logunit, *)'      e.g.: dshape_hex8(1, 3, :)'

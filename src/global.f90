@@ -135,6 +135,12 @@ implicit none
 
 integer(kind=8) :: GPU_pointer
 
+! WE edits: 
+real(kind=kreal), allocatable:: weJAC(:,:,:,:)    ! NDIM x NDIM jacobian for NGLL for N ELEMENTS 
+real(kind=kreal), allocatable:: weJACINV(:,:,:,:) ! NDIM x NDIM inverse jac for NGLL at N ELEMENTS 
+real(kind=kreal), allocatable:: weDETJAC(:,:)     ! Determinant of jacobian at GLL for each element 
+
+
 ! UTM projection zone (Optional input)
 integer :: UTM_ZONE
 character(len=20) :: proc_str,ptail,ptail_inp
