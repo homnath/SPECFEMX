@@ -334,7 +334,7 @@ subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload)
   real(kind=kreal), allocatable :: kmat(:,:),storekmat(:,:,:), & 
                                    bcnodalv(:,:), ubcload(:)
   ! Local 
-  integer :: i_elmt, i, j, ielmt, iedof
+  integer :: i_elmt, i,  ielmt, iedof, j_node, i_dof
 
 ! Modify RHS vector for prescribed displacements
   ! i.e. if boundary dispalcements are not equal to zero
@@ -346,11 +346,11 @@ subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload)
    
     kmat=storekmat(:,:,ielmt)
     iedof=0
-    do j=1,nenode
-      do i=1,nndof !nndofu
+    do j_node=1,nenode
+      do i_dof=1,nndof !nndofu
         iedof=iedof+1
-        if(bcnodalv(i,num(j))/=ZERO)then
-          ubcload(egdof)=ubcload(egdof)-kmat(:,iedof)*bcnodalv(i,num(j))
+        if(bcnodalv(i_dof,num(j_node))/=ZERO)then
+          ubcload(egdof)=ubcload(egdof)-kmat(:,iedof)*bcnodalv(i_dof,num(j_node))
         endif
       enddo
     enddo

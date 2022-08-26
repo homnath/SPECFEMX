@@ -232,6 +232,11 @@ else
   geo_file=trim(file_head)//'_step'//wild_char(1:twidth)//trim(ptail)//'.geo'
 endif
 
+! Add 1 time step to plot elastic and plastic results together
+if(isplastic.and.nstep.le.1)then
+  ns=ns+1
+  dstep=one
+endif
 add_tag=''
 call write_ensight_casefile_long(case_file,geo_file,add_tag,isgeo_change, &
 ts,ns,fs,fi,twidth,errcode,errtag)

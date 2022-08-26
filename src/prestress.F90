@@ -56,6 +56,14 @@ integer :: errcode
 integer :: istat
 
 
+! allocate variables to store elemental derivative and intergration factors.
+allocate(element_is_infinite(nelmt))
+allocate(storederiv(ndim,ngll,ngll,nelmt),storejw(ngll,nelmt))
+allocate(storeinterpf_infinite(ngll,ngll,nelmt_infinite))
+
+! computes and stores elemental derivative and integration information
+call precompute_derivative_integration(errcode,errtag)
+
 if(savedata%stress.or.isplastic)then
     allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
     stress_elmt=ZERO
@@ -79,9 +87,9 @@ if(isstress0)then
             stop
         endif
 
-        extload=ZERO; isgravity=.true.; ispseudoeq=.false.
+        extload=ZERO
         call stiffness_bodyload(nelmt,neq,hex8_gnode,g_num,gdof_elmt,mat_id,gam_blk, &
-        storekmat,dprecon,extload,isgravity,ispseudoeq)
+        storekmat,dprecon,extload,.true.,.false.)
 
         log_msg = 'complete...' ; call write_ifproc0()
         log_msg = '--------------------------------------------' ; call write_ifproc0()

@@ -565,7 +565,8 @@ case(6)
   sigm=(s1+s2+s3)/three
   d2=((s1-s2)**2+(s2-s3)**2+(s3-s1)**2)/six+s4*s4+s5*s5+s6*s6
 
-  if(d2<small)d2=small ! special case of hydrostatic pressure or just at the tip
+  !! WARNING: Need to check this
+  !if(d2<small)d2=small ! special case of hydrostatic pressure or just at the tip
 
   ds1=s1-sigm
   ds2=s2-sigm

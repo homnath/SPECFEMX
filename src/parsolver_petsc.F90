@@ -898,7 +898,7 @@ use ieee_arithmetic
 implicit none
 
 real(kind=kreal),intent(in) :: storekmat(:,:,:),storemmat(:,:)
-integer :: i,i_elmt,ielmt,j,n,ndzero                                             
+integer :: i,i_elmt,ielmt,i_gll,i1,i1,j,n,ndzero                                             
 integer :: ggdof_elmt(NEDOF)                                   
 
 PetscReal         freq,scale_freq2 ! angular frequency                           
@@ -926,8 +926,15 @@ do i_elmt=1,nelmt
   ielmt=i_elmt                           
 
   kmat=storekmat(:,:,ielmt)                                                      
-  if(steptype.eq.FREQSTEP)then                                                   
-    mdiag=storemmat(:,i_elmt)                                                    
+  if(steptype.eq.FREQSTEP)then 
+    ! populate mdiag for all displacement DOFs
+    i2=0
+    do i_gll=1,ngll 
+    i1=i2+1
+    i2=i2+NNDOFU
+    mdiag(i1:i2) = storemmat(i_gll,ielmt)
+    enddo    
+    !mdiag=storemmat(:,i_elmt)
     if(isscale_freq2)then                                                        
       kmat=scale_freq2*kmat                                                      
     else                                                                         

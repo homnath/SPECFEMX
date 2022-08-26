@@ -26,7 +26,7 @@ use serial_library
     integer :: nzero_dprecon, nelmt_elas, nelmt_viscoelas
 
     ! Local 
-    integer :: i_elmt, ielmt, j, i
+    integer :: i_elmt, ielmt, j_dof, i_eq, i_dof
   
     ! CODE: 
     if(solver_type.eq.builtin_solver)then
@@ -35,8 +35,8 @@ use serial_library
       do i_elmt=1,nelmt
         ielmt=i_elmt ! all elements
         egdof=gdof_elmt(:,ielmt)
-        do j=1,nedof
-          dprecon(egdof(j))=dprecon(egdof(j))+storekmat(j,j,ielmt)
+        do j_dof=1,nedof
+          dprecon(egdof(j_dof))=dprecon(egdof(j_dof))+storekmat(j_dof,j_dof,ielmt)
         enddo
       enddo ! i_elmt
       dprecon(0)=ZERO
@@ -57,18 +57,18 @@ use serial_library
       if(solver_diagscale)then
         ! regularize linear equations,
         ndscale=ONE
-        do i=1,neq
-          ndscale(i)=one/sqrt(abs(dprecon(i)))
+        do i_eq=1,neq
+          ndscale(i_eq)=one/sqrt(abs(dprecon(i_eq)))
         enddo
         ! nondimensionalize stiffness matrix
         ! elastic region
         do i_elmt=1,nelmt_elas
           ielmt=eid_elas(i_elmt)
           egdof=gdof_elmt(:,ielmt)
-          do i=1,nedof
-            do j=1,nedof
-              storekmat(i,j,ielmt)=ndscale(egdof(i))*storekmat(i,j,ielmt)*       &
-              ndscale(egdof(j))
+          do i_dof=1,nedof
+            do j_dof=1,nedof
+              storekmat(i_dof,j_dof,ielmt)=ndscale(egdof(i_dof))*storekmat(i_dof,j_dof,ielmt)*       &
+              ndscale(egdof(j_dof))
             enddo
           enddo
         enddo
@@ -76,10 +76,10 @@ use serial_library
         do i_elmt=1,nelmt_viscoelas
           ielmt=eid_viscoelas(i_elmt)
           egdof=gdof_elmt(:,ielmt)
-          do i=1,nedof
-            do j=1,nedof
-              storekmat(i,j,ielmt)=ndscale(egdof(i))*storekmat(i,j,ielmt)*       &
-              ndscale(egdof(j))
+          do i_dof=1,nedof
+            do j_dof=1,nedof
+              storekmat(i_dof,j_dof,ielmt)=ndscale(egdof(i_dof))*storekmat(i_dof,j_dof,ielmt)*       &
+              ndscale(egdof(j_dof))
             enddo
           enddo
         enddo

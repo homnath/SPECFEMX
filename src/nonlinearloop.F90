@@ -149,7 +149,7 @@ use math_library_serial
     endif 
     
     if(myrank==0)then
-     write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',maxdu/maxu,'maxu:',maxu
+     write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',uerr,'maxu:',maxu
      flush(logunit)
     endif
 
@@ -166,7 +166,7 @@ subroutine update_nodal_u_vector(nodalu, u, nodalphi)
   ! IO 
   real(kind=kreal),allocatable :: nodalu(:,:), u(:), nodalphi(:)
   ! local: 
-  integer :: i, i_node, idof
+  integer :: i_dof, i_node, idof
 
 
   ! Code: 
@@ -176,19 +176,19 @@ subroutine update_nodal_u_vector(nodalu, u, nodalphi)
     ! u contains both diaplacement and/or gravity
     ! displacement
   if(ISDISP_DOF)then
-    do i=1,nndofu
-      idof=idofu(i)
+    do i_dof=1,nndofu
+      idof=idofu(i_dof)
       do i_node=1,nnode
         if(gdof(idof,i_node)/=0)then
-          nodalu(i,i_node)=u(gdof(idof,i_node))
+          nodalu(i_dof,i_node)=u(gdof(idof,i_node))
         endif
       enddo
     enddo
   endif
   ! gravity
   if(ISPOT_DOF)then
-    do i=1,nndofphi
-      idof=idofphi(i)
+    do i_dof=1,nndofphi
+      idof=idofphi(i_dof)
       do i_node=1,nnode
         if(gdof(idof,i_node)/=0)then
           ! \phi is a scalar
@@ -240,13 +240,15 @@ subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
                                   stress_elmt(:,:,:), evpt(:,:,:)
 
   ! Local 
-  integer :: i_elmt, ielmt, imat, i
+  integer :: i_elmt, ielmt, imat, i_gll
   
   
   ! CODE: 
   ! Elastic elements
   ! This part is repeated for the first step. We should change this for
   ! efficiency.
+
+  if(.not.isplastic)bodyload=ZERO
   do i_elmt=1,nelmt_elas
     ielmt=eid_elas(i_elmt)
     imat=mat_id(ielmt)
@@ -254,25 +256,25 @@ subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
     egdofu=gdof_elmt(edofu,ielmt)
     eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
     bload=ZERO
-    do i=1,ngll ! Integration loop
-      call compute_cmat_elastic(bulkmod_elmt(i,ielmt), &
-      shearmod_elmt(i,ielmt),cmat)
+    do i_gll=1,ngll ! Integration loop
+      call compute_cmat_elastic(bulkmod_elmt(i_gll,ielmt), &
+      shearmod_elmt(i_gll,ielmt),cmat)
       
-      deriv=storederiv(:,:,i,ielmt)
-      jacw=storejw(i,ielmt)
+      deriv=storederiv(:,:,i_gll,ielmt)
+      jacw=storejw(i_gll,ielmt)
     
       call compute_bmat_stress(deriv,bmat)
       estrain=matmul(bmat,eld)
       if(isplastic)then
-        estrain=estrain-evpt(:,i,ielmt)
+        estrain=estrain-evpt(:,i_gll,ielmt)
       endif
       sigma=matmul(cmat,estrain)
 
-      if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
-      if(savedata%stress .and. .not.isplastic)stress_elmt(:,i,ielmt)=sigma
+      if(savedata%strain)strain_elmt(:,i_gll,ielmt)=estrain
+      if(savedata%stress .and. .not.isplastic)stress_elmt(:,i_gll,ielmt)=sigma
 
-      if(isplastic)then
-        effsigma=sigma+stress_elmt(:,i,ielmt)
+      if(isplastic.and.isplastic_blk(imat))then
+        effsigma=sigma+stress_elmt(:,i_gll,ielmt)
         call stress_invariant(effsigma,sigm,dsbar,lode_theta)
         ! check whether yield is violated
         call mohcouf(phi_blk(imat),coh_blk(imat),sigm,dsbar,lode_theta,f)
@@ -285,7 +287,7 @@ subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
 
           erate=matmul(flow,effsigma)
           evp=erate*dt_vp
-          evpt(:,i,ielmt)=evpt(:,i,ielmt)+evp
+          evpt(:,i_gll,ielmt)=evpt(:,i_gll,ielmt)+evp
           devp=matmul(cmat,evp)
           
           ! if not converged we need body load for next iteration
@@ -296,7 +298,7 @@ subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
         endif!(f>=zero)
         if(nl_isconv.or.nl_iter==nl_maxiter)then
           devp=sigma
-          stress_elmt(:,i,ielmt)=effsigma
+          stress_elmt(:,i_gll,ielmt)=effsigma
         endif
 
       else ! if(isplastic)then
@@ -351,7 +353,7 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
   logical :: nl_isconv
 
   ! Local: 
-  integer :: i, i_maxwell, ielmt, imat,  i_elmt
+  integer :: i_gll, i_maxwell, ielmt, imat,  i_elmt
 
   ! Code: 
   do i_elmt=1,nelmt_viscoelas
@@ -365,19 +367,19 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
     egdofu=gdof_elmt(edofu,ielmt)
     eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
     bload=ZERO; vload=ZERO
-    do i=1,ngll ! integration loop
-      K=bulkmod_elmt(i,ielmt) 
-      G=shearmod_elmt(i,ielmt)
+    do i_gll=1,ngll ! integration loop
+      K=bulkmod_elmt(i_gll,ielmt) 
+      G=shearmod_elmt(i_gll,ielmt)
  
-      deriv=storederiv(:,:,i,ielmt)
-      jacw=storejw(i,ielmt)
+      deriv=storederiv(:,:,i_gll,ielmt)
+      jacw=storejw(i_gll,ielmt)
     
       call compute_bmat_stress(deriv,bmat)
       estrain=matmul(bmat,eld) ! strain at current time step
 
       ! store elastic strain
       if(savedata%strain.and.i_step==1.and.i_nliter==1)then
-        strain_elmt(:,i,ielmt)=estrain
+        strain_elmt(:,i_gll,ielmt)=estrain
       endif
 
       trace_strain=estrain(1)+estrain(2)+estrain(3)
@@ -388,12 +390,12 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
       if(savedata%stress.and.i_step==1.and.i_nliter==1)then
         esigma=TWO*G*dev_strain
         esigma(1:3)=esigma(1:3)+K*trace_strain
-        stress_elmt(:,i,ielmt)=esigma
+        stress_elmt(:,i_gll,ielmt)=esigma
       endif
 
       !----------------------------ZIENCKIEWICZ-------------------------
-      e0=elas_e0(:,i,i_elmt)
-      q0=visco_q0(:,:,i,i_elmt)
+      e0=elas_e0(:,i_gll,i_elmt)
+      q0=visco_q0(:,:,i_gll,i_elmt)
       if(i_step==1)then !.and.i_nliter==1)then
         ! initialize
         e0=dev_strain
@@ -411,10 +413,10 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
       bload=bload+eload*jacw
       ! update
       if(nl_isconv.or.nl_iter==NL_MAXITER)then
-        elas_e0(:,i,i_elmt)=e0
-        visco_q0(:,:,i,i_elmt)=q0
-        if(savedata%strain)strain_elmt(:,i,ielmt)=estrain
-        if(savedata%stress)stress_elmt(:,i,ielmt)=vesigma
+        elas_e0(:,i_gll,i_elmt)=e0
+        visco_q0(:,:,i_gll,i_elmt)=q0
+        if(savedata%strain)strain_elmt(:,i_gll,ielmt)=estrain
+        if(savedata%stress)stress_elmt(:,i_gll,ielmt)=vesigma
       endif
       !----------------------------ZIENCKIEWICZ-------------------------
     enddo ! i

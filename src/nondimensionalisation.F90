@@ -137,10 +137,14 @@ subroutine calc_nondimensionalisation_vals
     NONDIM_L=ONE/DIM_L
   
     NONDIM_T=sqrt(PI*GRAV_CONS*maxdensity)
-  
+    DIM_T=ONE/NONDIM_T
+
     DIM_VEL=DIM_L*NONDIM_T
+    NONDIM_VEL=ONE/DIM_VEL
+
     DIM_ACCEL=DIM_VEL*NONDIM_T
-    NONDIM_ACCEL=ONE/DIM_VEL
+    NONDIM_ACCEL=ONE/DIM_ACCEL
+
     DIM_M=maxdensity*DIM_L*DIM_L*DIM_L
   
     DIM_MOD = DIM_M*NONDIM_L*NONDIM_T*NONDIM_T
@@ -174,6 +178,11 @@ subroutine calc_nondimensionalisation_vals
       massdens_elmt=massdens_elmt*NONDIM_DENSITY
       bulkmod_elmt=bulkmod_elmt*NONDIM_MOD
       shearmod_elmt=shearmod_elmt*NONDIM_MOD
+
+      ym_blk=ym_blk*NONDIM_MOD
+      coh_blk=coh_blk*NONDIM_MOD
+      rho_blk=rho_blk*NONDIM_DENSITY
+      gam_blk=gam_blk*(NONDIM_DENSITY*NONDIM_ACCEL)
     endif
 
     pole_coord0=pole_coord0*NONDIM_L

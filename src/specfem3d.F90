@@ -20,6 +20,7 @@ use fault
 use weakform
 use gravity
 use preprocess
+use matrix_vector
 use elastic
 use traction
 use mtraction
@@ -71,13 +72,12 @@ implicit none
 character(len=250) :: myfname=' => specfem3d.f90'
 character(len=500) :: errsrc
 
-! i,j are dummy vars for interation
-integer :: i,j
+
 ! istat: status indicator for allocation (can be used in other contexts)
 integer :: istat
 
 ! do-loop indices
-integer :: i_elmt,i_nliter,i_node,i_comp
+integer :: i_dof,ielmt,i_eq,i_gll,i_mat,i_nliter,i_node,i_comp,j_dof,j_node
 integer :: ielmt,imat,idof,iedof!element ID for gdof, node, etc.
 
 real(kind=kreal),dimension(nst),parameter :: unit_voigt=(/one,one,one,ZERO,    &
@@ -99,7 +99,7 @@ logical :: nl_isconv ! logical variable to check convergence of
 real(kind=kreal) :: G,K
 real(kind=kreal) :: cmat(nst,nst),estrain(nst),dev_strain(nst),  &
 esigma(nst),sigma(nst),effsigma(nst),vsigma(nst)
-real(kind=kreal) :: devp(nst),eps(nst),erate(nst),evp(nst),      &
+real(kind=kreal) :: devp(nst),erate(nst),evp(nst),      &
 flow(nst,nst),m1(nst,nst),m2(nst,nst),m3(nst,nst)
 real(kind=kreal) :: dq1,dq2,dq3,dsbar,f,fmax,lode_theta,sigm
 
@@ -143,7 +143,7 @@ vload(:),rhoload(:),resload(:)
 !extload: external load
 !ubcload: load contributed by displacement BC
 !load: like resload. Not currently used
-real(kind=kreal),allocatable :: slipload(:),extload(:),bodyload(:), &
+real(kind=kreal),allocatable :: slipload(:),extload(:),bodyload(:),selfload(:), &
 viscoload(:),ubcload(:),load(:)
 
 !strain_elmt: strain for all elements
@@ -159,6 +159,7 @@ real(kind=kreal),allocatable :: nodalphi(:),nodalg(:,:)
 real(kind=kreal),allocatable :: nodalB(:,:)
 !,psigma(:,:),psigma0(:,:),taumax(:),nsigma(:)
 !bodyload: load computed on all nodes of the element
+!selfload: self load computed  on all nodes of the element 
 !viscoload: load contributed (on all nodes) by visco elements
 !bmat: strain displacement matrix (per node). bmat*displacement vector = strain
 !bload: load computed on each dof on a particular element
@@ -176,8 +177,6 @@ integer,allocatable :: egdof(:),egdofu(:)
 ! Frequency
 logical :: isscale_ang_freq=.true.
 real(kind=kreal) :: freq,ang_freq,scale_ang_freq2
-
-logical :: isgravity,ispseudoeq ! gravity load and pseudostatic load
 
 ! Viscoelastic parameters
 integer :: mdomain
@@ -378,7 +377,7 @@ do i_elmt=1,nelmt
   node_valency(num)=node_valency(num)+1
 enddo
 
-! assemble all node_valceny across the processors
+! assemble all node_valency across the processors
 call assemble_ghosts_nodal_iscalar(node_valency,node_valency)
 
 
@@ -395,9 +394,13 @@ endif
 
 
 
-allocate(load(0:neq),bodyload(0:neq),viscoload(0:neq),             &
+allocate(load(0:neq),bodyload(0:neq),selfload(0:neq,)viscoload(0:neq),             &
 resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),            &
-storekmat(nedof,nedof,nelmt),storemmat(nedof,nelmt),stat=istat)
+storekmat(nedof,nedof,nelmt), &
+! The mass matrix element for X, Y, and Z degrees of freedom ata GLL point is the same. 
+! Therefore, we store only the one value per GLL point. 
+storemmat(nedof,nelmt), & 
+stat=istat)
 if(istat/=0)then
   write(logunit,*)'ERROR: cannot allocate memory!'
   flush(logunit)
@@ -422,6 +425,7 @@ visco_q0=ZERO
 
 nodalu=ZERO
 bodyload=ZERO
+selfload=ZERO
 viscoload=ZERO
 slipload=ZERO ! slip load
 extload=ZERO ! incremental external load
@@ -461,8 +465,8 @@ if(ISDISP_DOF)then
   allocate(iseq(neq))
   iseq=.false.
   do i_node=1,nnode
-    do i=1,nndofu
-      geq=gdof(idofu(i),i_node)
+    do i_dof=1,nndofu
+      geq=gdof(idofu(i_dof),i_node)
       if(geq.gt.0)iseq(geq)=.true.
     enddo
   enddo
@@ -470,10 +474,10 @@ if(ISDISP_DOF)then
   allocate(gdofu(nequ))
   gdofu=-9999
   inum=0
-  do i=1,neq
-    if(iseq(i))then
+  do i_eq=1,neq
+    if(iseq(i_eq))then
       inum=inum+1
-      gdofu(inum)=i
+      gdofu(inum)=i_eq
     endif
   enddo
   if(nequ.ne.inum)then
@@ -494,7 +498,6 @@ call prepare_gravity()
 
 
 ! Built-in preconditioner stuff? 
-allocate(storederiv(ndim,ngll,ngll,nelmt),storejw(ngll,nelmt))
 if(solver_type.eq.builtin_solver .or. solver_diagscale)then
   allocate(dprecon(0:neq))
 endif
@@ -540,7 +543,11 @@ if(isplastic)then
   dt_vp=minscal(dt_vp)
 endif
 
-
+! Compute body loads
+if(isbodyload)then
+  call compute_bodyload(selfload,selfweight=isselfweight)
+endif 
+!----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
 
 ! This needs to be in its own file! 
@@ -711,20 +718,20 @@ loop_step: do i_step=istep0,nstep
   extload(0)=ZERO
   ! set BC nodal displacements to nodalu array
   if(ISDISP_DOF)then
-    do i=1,nndofu
-      idof=idofu(i)
-      do j=1,nnode
-        if(bcnodalv(idof,j)/=ZERO)nodalu(i,j)=bcnodalv(idof,j)
+    do i_dof=1,nndofu
+      idof=idofu(i_dof)
+      do j_dof=1,nnode
+        if(bcnodalv(idof,j_dof)/=ZERO)nodalu(i_dof,j_dof)=bcnodalv(idof,j_dof)
       enddo
     enddo
   endif
 
   ! set BC nodal potential to nodalphi array
   if(ISPOT_DOF)then
-    do i=1,nndofphi
-      idof=idofphi(i)
-      do j=1,nnode
-        if(bcnodalv(idof,j)/=ZERO)nodalphi(j)=bcnodalv(idof,j)
+    do i_dof=1,nndofphi
+      idof=idofphi(i_dof)
+      do j_dof=1,nnode
+        if(bcnodalv(idof,j_dof)/=ZERO)nodalphi(j_dof)=bcnodalv(idof,j_dof)
       enddo
     enddo
   endif
@@ -734,7 +741,7 @@ loop_step: do i_step=istep0,nstep
   ksp_tot=0; nl_iter=0
 
   ! only for fault
-  load=extload+ubcload+rhoload
+  load=selfload+ubcload+rhoload
 
   du=ZERO; u=ZERO
   
@@ -746,6 +753,7 @@ loop_step: do i_step=istep0,nstep
     bodyload=ZERO
   endif
 
+  bodyload(0)=ZERO
 
 
   ! ===================== RUN NON LINEAR ITERATIONS =====================
@@ -812,7 +820,10 @@ loop_step: do i_step=istep0,nstep
 
     call update_nodal_u_vector(nodalu, u, nodalphi)
     
-    bodyload=ZERO; !viscoload=ZERO
+
+    ! Reset bodyload to ZERO for viscoelastic iteration
+    ! We need to reconcile plastic and viscoelastic iterations. 
+    if(.not.isplastic)bodyload=ZERO; !viscoload=ZERO
 
 
     if(ISDISP_DOF)then
@@ -829,6 +840,7 @@ loop_step: do i_step=istep0,nstep
                              stress_elmt, dq1, dq2, dq3, dsbar, f,     &
                              fmax,lode_theta,sigm)
 
+      bodyload(0)=ZERO
 
       fmax=maxscal(fmax)                                                           
       if(myrank==0)then                                                            

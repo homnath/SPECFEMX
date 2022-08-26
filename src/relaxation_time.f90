@@ -23,7 +23,7 @@ subroutine calc_relaxation_time(relaxtime, tunitfac, muratio, tratio, min_relaxt
   ! In/Out variables: 
 
   ! Local variables: 
-  integer          :: iviscoelas, imat, i
+  integer          :: iviscoelas, imat, i_mat
   real(kind=kreal),  allocatable :: relaxtime(:,:),muratio(:),tratio(:)
   real(kind=kreal)             :: tunitfac
   real(kind=kreal) :: min_relaxtime,max_relaxtime
@@ -63,12 +63,12 @@ subroutine calc_relaxation_time(relaxtime, tunitfac, muratio, tratio, min_relaxt
 
   ! compute relax time
   iviscoelas=0
-  do i=1,nmatblk_viscoelas
-  !  if(mat_domain(i)==VISCOELASTIC_DOMAIN .or. &
-  !    mat_domain(i)==VISCOELASTIC_TRINFDOMAIN .or. &
-  !    mat_domain(i)==VISCOELASTIC_INFDOMAIN)then
+  do i_mat=1,nmatblk_viscoelas
+  !  if(mat_domain(i_mat)==VISCOELASTIC_DOMAIN .or. &
+  !    mat_domain(i_mat)==VISCOELASTIC_TRINFDOMAIN .or. &
+  !    mat_domain(i_mat)==VISCOELASTIC_INFDOMAIN)then
   !    iviscoelas=iviscoelas+1
-      imat=imatve_to_imat(i)
+      imat=imatve_to_imat(i_mat)
       ! Variables viscosity_blk and shearmod_blk are NOT nondimensionalized.
       ! Therefore the relaxtime will be in seconds.
       ! If nondimensionalized it may be better to dimensionalize again to compute
@@ -80,10 +80,10 @@ subroutine calc_relaxation_time(relaxtime, tunitfac, muratio, tratio, min_relaxt
 
 
       if(trim(devel_example).eq.'axial_rod')then
-      relaxtime(:,i)=tunitfac*viscosity_blk(:,i)/ym_blk(imat)
+      relaxtime(:,i_mat)=tunitfac*viscosity_blk(:,i_mat)/ym_blk(imat)
       else  
-      !relaxtime(:,i)=tunitfac*TWO*viscosity_blk(:,i)/shearmod_blk(imat)
-      relaxtime(:,i)=devel_rtfac*tunitfac*viscosity_blk(:,i)/shearmod_blk(imat)
+      !relaxtime(:,i_mat)=tunitfac*TWO*viscosity_blk(:,i_mat)/shearmod_blk(imat)
+      relaxtime(:,i_mat)=devel_rtfac*tunitfac*viscosity_blk(:,i_mat)/shearmod_blk(imat)
       endif
   !  endif
   enddo

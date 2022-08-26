@@ -18,7 +18,7 @@ use math_library_mpi
 implicit none
 
 ! Local variables: 
-integer :: i_elmt                             ! Loop index for elements    
+integer :: i_elmt, i_mat                           ! Loop index for elements    
 integer, intent(out)  :: nelmt_elas           ! Count of elastic elements
 integer, intent(out)  :: nelmt_viscoelas      ! Count of viscoelastic elements
 integer, intent(out)  :: mdomain              ! 

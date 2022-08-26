@@ -29,7 +29,7 @@ real(kind=kreal),parameter :: SMALL_VAL_ANGLE = 1.d-10
 ! Gravitational constant: G ( m^3 kg^{-1} s^{-2} )
 ! source: 2014 CODATA recommended values
 ! http://www.physics.nist.gov/cgi-bin/cuu/Value?bg
-real(kind=kreal),parameter :: GRAV_CONS=6.67408e-11_kreal
+real(kind=kreal),parameter :: GRAV_CONS=6.67430e-11_kreal
 ! vacuum permeability, permeability of free space, permeability of vacuum,
 ! or magnetic constant
 real(kind=kreal),parameter :: MAG_CONS=FOUR*PI*1.0e-7_kreal
@@ -93,6 +93,7 @@ real(kind=kreal) :: DIM_L
 real(kind=kreal) :: NONDIM_L
 ! velocity
 real(kind=kreal) :: DIM_VEL
+real(kind=kreal) :: NONDIM_VEL
 ! acceleration
 real(kind=kreal) :: DIM_ACCEL
 real(kind=kreal) :: NONDIM_ACCEL
@@ -218,7 +219,7 @@ integer :: nedofu
 integer :: nedofphi
 
 ! acceleration due to gravity
-real(kind=kreal),parameter :: agrav=9.82_kreal
+real(kind=kreal),parameter :: agrav=9.80665_kreal
 real(kind=kreal),allocatable :: g_coord(:,:) ! global coordinates
 ! coordinate extents of partitioned model of the finite region
 real(kind=kreal) :: pmodel_minx,pmodel_maxx,pmodel_miny,pmodel_maxy, &
@@ -289,10 +290,12 @@ real(kind=kreal) :: cmodel_zref
 ! alpha parameter, density anomaly on the top
 real(kind=kreal) :: cmodel_alpha,cmodel_drho0
 
+logical,allocatable :: element_is_infinite(:)
 real(kind=kreal),allocatable :: storederiv(:,:,:,:)
 real(kind=kreal),allocatable :: storejw(:,:)
+real(kind=kreal),allocatable :: storeinterpf_infinite(:,:,:)
 
-logical :: allelastic,iseqload,iseqsource,iswater,phinu
+logical :: allelastic,isselfweight,isbodyload,ispseudoeq,iseqsource,iswater,phinu
 ! pseudostatic coefficients for earthquake loading eqkh=ah/g, eqkv=av/g
 real(kind=kreal) :: eqkx,eqky,eqkz
 ! where ah and av are horizontal and vertical pseudostatic accelerations
@@ -460,7 +463,7 @@ logical,parameter ::  solver_diagscale=.false.
 integer,parameter :: smart_solver=0  ! select appropriate solver automatically
 integer,parameter :: builtin_solver=1! select builtin conjugate gradient solver
 integer,parameter :: petsc_solver=2  ! select PETSC solver
-integer :: solver_type=smart_solver !builtin_solver !petsc_solver !smart_solver 
+integer :: solver_type=1! smart_solver !builtin_solver !petsc_solver !smart_solver 
 ! By default solver is symmetric but it may be changed later depending on the
 ! conditions.
 logical :: symmetric_solver=.true.
