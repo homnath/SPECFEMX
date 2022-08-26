@@ -147,11 +147,7 @@ if(ismesh_only)then
 endif
 
 ! ___________________________________________________________________
-
-
 ! store orginal connectivity which helps to identify ghost interfaces
-
-
 allocate(g_num0(ngnode,nelmt))
 g_num0=g_num
 
@@ -161,6 +157,7 @@ write(logunit,*) 'nelmt: ', nelmt
 
 write(logunit,*) 'GNUM: '
 write(logunit,*) g_num
+
 
 
 ! precompute gll 1D
@@ -200,7 +197,6 @@ call print_model_details()
 ! prepare hexes
 call prepare_hex(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
-
 
 ! prepare hex faces
 call prepare_hexface(errcode,errtag)

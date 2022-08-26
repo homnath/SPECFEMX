@@ -144,7 +144,7 @@ use math_library_serial
 
 
     nl_isconv=uerr.le.NL_TOL
-    if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROtol)then 
+    if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROTOL)then 
       nl_isconv=.true.
     endif 
     
@@ -299,7 +299,7 @@ subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
           stress_elmt(:,i,ielmt)=effsigma
         endif
 
-      else
+      else ! if(isplastic)then
         eload=matmul(sigma,bmat)
         bload=bload+eload*jacw
       endif
