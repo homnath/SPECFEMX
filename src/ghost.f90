@@ -16,7 +16,7 @@ module ghost
 
         real(kind=kreal) , allocatable :: coord(:,:), deriv(:,:), jac(:,:), bmat(:,:), &
                                           eld(:), eload(:),bload(:), vload(:), nodalu(:,:), &
-                                          nodalphi(:), nodalg(:,:), nodalB(:,:)
+                                          nodalphi(:),  nodalsl(:),  nodalg(:,:), nodalB(:,:)
 
         ! Local variables
         integer :: istat 
@@ -27,6 +27,8 @@ module ghost
         if(nproc.gt.1)then
             call prepare_ghost_gdof()
         endif
+
+
         allocate(num(nenode),coord(ngnode,ndim),jac(ndim,ndim),deriv(ndim,nenode),     &
         bmat(nst,nedofu),eld(nedofu),bload(nedofu),vload(nedofu),eload(nedofu),        &
         nodalu(nndofu,nnode),egdof(nedof),egdofu(nedofu),stat=istat)
@@ -35,6 +37,7 @@ module ghost
             flush(logunit)
             stop
         endif
+        
         if(ISPOT_DOF)then
             allocate(nodalphi(nnode),nodalg(ndim,nnode),nodalB(ndim,nnode),stat=istat)
             if(istat/=0)then
@@ -45,6 +48,15 @@ module ghost
         endif
         !--------------------------------
         
+        if(ISSL_DOF)then 
+            allocate(nodalsl(nnode),stat=istat)
+            if(istat/=0)then
+            write(logunit,*)'ERROR: cannot allocate memory of nodalSL!'
+            flush(logunit)
+            stop
+            endif
+        endif 
+
         return 
         
     end subroutine modify_ghost_gdof

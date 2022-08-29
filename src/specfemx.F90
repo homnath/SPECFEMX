@@ -155,10 +155,6 @@ endif
 allocate(g_num0(ngnode,nelmt))
 g_num0=g_num
 
-
-
-
-
 ! precompute gll 1D
 call precompute_gll1d()
 
@@ -221,6 +217,7 @@ call calc_nondimensionalisation_vals
 call prepare_free_surface(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
+
 case_file=trim(out_path)//trim(file_head)//trim(ptail)//'.case'
 if(nexcav==0)then
   geo_file=trim(file_head)//trim(ptail)//'.geo'
@@ -228,6 +225,7 @@ else
   isgeo_change=.true.
   geo_file=trim(file_head)//'_step'//wild_char(1:twidth)//trim(ptail)//'.geo'
 endif
+
 
 ! Add 1 time step to plot elastic and plastic results together
 if(isplastic.and.nstep.le.1)then

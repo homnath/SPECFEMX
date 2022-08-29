@@ -123,7 +123,7 @@ POT_STRING='gravity'
 ISGRAV0=.false.
 
 ! WE Until incorporated into the input files will always set this to true
-!ISSL_DOF = .true.
+ISSL_DOF = .true.
 
 
 

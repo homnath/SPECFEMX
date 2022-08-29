@@ -34,50 +34,55 @@ idofu   = 0
 idofphi = 0
 idofsl  = 0
 
-write(SLlogunit,*)'  DISPLACEMENT   : '
-
 
 ! displacement
 if(ISDISP_DOF)then
-  nndof=nndof+nndofu ! now 3 
-  write(SLlogunit,*)'  nndof   : ', nndof
-
-  nedofu=NNDOFU*nenode ! 3 x ngll 
-  write(SLlogunit,*)'  nenode   : ', nenode
-  write(SLlogunit,*)'  NNDOFU   : ', NNDOFU
-  write(SLlogunit,*)'  nedofu   : ', nedofu
-
+  nndof=nndof+nndofu 
+  nedofu=NNDOFU*nenode 
   nedof=nedof+nedofu
 
-  write(SLlogunit,*)'  nedof   : ', nedof
-
-  write(SLlogunit,*)' Now loopin through nndofu' 
+  write(SLlogunit,*)'Displacement: '
   do i_dof=1,nndofu
+    
     idof=idof+1
+    write(SLlogunit,*)'   idof   :', idof
+
     idofu(i_dof)=idof
+    write(SLlogunit,*)'   idofu   :', idofu
+
   enddo
+
   allocate(edofu(nedofu))
 endif
 
+
+ISPOT_DOF = .true.
+
 ! gravity
+write(SLlogunit,*)' Updating the idof for gravity :'
+
 idof=idofu(nndofu)
-write(*,*)'ISPOT_DOF is : ', ISPOT_DOF 
+write(SLlogunit,*)'   idof   :', idof
+
 
 if(ISPOT_DOF)then
-  write(*,*)'ISPOT_DOF is : ', ISPOT_DOF 
   nndof=nndof+nndofphi
   nedofphi=NNDOFPHI*nenode
   nedof=nedof+nedofphi
+  write(SLlogunit,*)'Gravity: '
+
   do i_dof=1,nndofphi
     idof=idof+1
+    write(SLlogunit,*)'   idof   :', idof
+
     idofphi(i_dof)=idof
+    write(SLlogunit,*)'   idofphi   :', idofphi
+
   enddo
   allocate(edofphi(nedofphi))
 endif
 
 
-
-ISSL_DOF = .true.
 ! Sea level (theta): 
 if(ISSL_DOF)then
   write(*,*)'ISSL_DOF is : ', ISSL_DOF 
@@ -93,7 +98,7 @@ if(ISSL_DOF)then
   enddo
 
   allocate(edofsl(nedofsl))
-  write(*,SLlogunit)'Currently adding SL DOF to every node - in future implementation should only be for surface nodes to save memory'
+  write(SLlogunit,*)'Currently adding SL DOF to every node - in future implementation should only be for surface nodes to save memory'
 
 endif
 
@@ -104,20 +109,23 @@ end subroutine initialize_dof
 ! This subroutine sets IDs for the elemental degrees of freedom for
 ! u and \phi which may be used to map the elemental matrices
 subroutine set_element_dof()
-use global,only:ISDISP_DOF,ISPOT_DOF,nedofu,nedofphi,ngll,nndofu, &
-                edofu,edofphi
+use global,only:ISDISP_DOF,ISPOT_DOF,ISSL_DOF, nedofu,nedofphi,ngll,nndofu, &
+                edofu,edofphi,edofsl
 implicit none
-integer :: i,iu(NNDOFU),iphi,j,nu
-integer :: iu0,iphi0
+integer :: i,iu(NNDOFU),iphi,j,nu, isl
+integer :: iu0, iphi0, isl0
 
 ! order ux,uy,uz,\phi
 edofu=-9999
 if(ISPOT_DOF)edofphi=-9999
+if(ISSL_DOF)edofsl=-9999
 
 iu0=0
 iphi0=0
+isl0=0
 
 iphi=0
+isl=0
 nu=0
 iu=0
 do i=1,NGLL
@@ -144,6 +152,14 @@ do i=1,NGLL
 
     iu0=iphi ! this will be overwritten if DISP_DOF is present
     iphi0=iphi
+  endif
+
+  if(ISSL_DOF)then
+    isl=isl0+1
+    edofsl(i)=isl
+
+    iu0=isl    ! Not sure when this will be overwritetn!
+    isl0=isl
   endif
 enddo
 
@@ -199,14 +215,16 @@ end subroutine set_face_scaldof
 ! This subroutine activates degrees of freedoms.
 subroutine activate_dof(errcode,errtag)
 use global
+use free_surface
 use math_constants,only:ZERO
 implicit none
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 
-integer :: ios
-integer :: i_elmt,imat,mdomain
+integer :: ios, ctr 
+integer :: i_elmt,imat,mdomain, i_face
 integer :: inodes(ngll)
+integer :: numf(maxngll2d)
 
 errtag="ERROR: unknown!"
 errcode=-1
@@ -254,6 +272,17 @@ endif
 if(ISPOT_DOF)then
   ! gravity exists everywhere
   gdof(idofphi,:)=1
+endif
+
+! Sea Level
+if(ISSL_DOF)then
+  ! only for nodes on the free surface
+  do i_face=1, nelmt_fs  
+    ! Get g_num values of this face 
+    numf  = gnum_fs(:,i_face)
+    ! Set these nodes for the index idofsl to 1 (activate them) 
+    gdof(idofsl, numf)=1
+  enddo 
 endif
 
 errcode=0

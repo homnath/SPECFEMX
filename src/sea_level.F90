@@ -98,7 +98,7 @@ use serial_library
     dlagrange_gll(2,maxngll2d,maxngll2d))
 
 
-        ! Calculating R matrices as defined in BF latex doc 
+    ! Calculating R matrices as defined in BF latex doc 
 
     
     ! Need to loop through each element face combination for the solid
@@ -141,7 +141,7 @@ use serial_library
             phi_tf = 1.0_kreal 
             u_tf = 1.0 
 
-            !! J sum as part of G_cal calculation 
+            ! J sum as part of G_cal calculation 
             !Gj_sum = 0.0 
             !do j =1,3
             !    Gj_sum = Gj_sum + u_tf(j)*g0_local(3*(gid-1) + j) 
@@ -160,4 +160,27 @@ use serial_library
 
     enddo 
     end subroutine calc_SL_LHS
+
+
+
+
+
+
+    subroutine update_ocean_function()
+    ! Routine checks each GLL point on the surface to see if its theta
+    ! Value is 0 or not - if it is 0 then the ocean function becomes 0 
+    ! if SL is larger than 0 then ocean function is 1.
+
+
+
+
+
+
+    end subroutine update_ocean_function
+
+
+
+
+
+
 end module

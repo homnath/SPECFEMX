@@ -155,6 +155,12 @@ stress_elmt(:,:,:),stress_nodal(:,:),evpt(:,:,:)
 !nodalu: nodal displacement for all nodes (not just BC)
 real(kind=kreal),allocatable :: bcnodalv(:,:),nodalu(:,:)
 real(kind=kreal),allocatable :: nodalphi(:),nodalg(:,:)
+
+! Sea level edit - WE 
+real(kind=kreal),allocatable :: nodalsl(:)
+
+
+
 ! magnetization
 real(kind=kreal),allocatable :: nodalB(:,:)
 !,psigma(:,:),psigma0(:,:),taumax(:),nsigma(:)
@@ -253,7 +259,7 @@ deallocate(g_num0) ! Old connectivity no longer necessary
 call sync_process
 
 
-! prepare fault - UNECESSARY FOR SEA LEVEL 
+! prepare fault - Only for Fault-based simulations 
 if( iseqsource .and. (eqsource_type.eq.3 .or. eqsource_type.eq.4) )then
   log_msg = trim('preparing split fault...') ;   call write_ifproc0()
   call prepare_fault(errcode,errtag)
@@ -305,6 +311,7 @@ call control_error(errcode,errtag,stdout,myrank)
 !call sync_process
 !call undo_unmatching_displacementBC(bcnodalv)
 !call sync_process
+! Finalise the GDOF after BCs have been applied 
 call finalize_gdof(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 log_msg = 'complete!' ; call write_ifproc0()
@@ -598,6 +605,11 @@ loop_step: do i_step=istep0,nstep
   if(ISPOT_DOF)then
     nodalphi=ZERO
   endif
+
+  if(ISSL_DOF)then
+    nodalsl = ZERO ! Will still then need to allocate nodal SL values?
+  endif
+
   ubcload=ZERO
   !extload=ZERO
   rhoload=ZERO
@@ -740,6 +752,13 @@ loop_step: do i_step=istep0,nstep
   endif
 
 
+  ! ____________________________________________________________
+  ! NEED TO ADD IN INITIAL SL SETUP AND ADD TO NODALSL HERE
+
+
+  ! ____________________________________________________________
+
+
   ! Reset/initialise the count of ksp and non linear iterations 
   ksp_tot=0; nl_iter=0
 
@@ -821,7 +840,7 @@ loop_step: do i_step=istep0,nstep
     call sync_process()
 
 
-    call update_nodal_u_vector(nodalu, u, nodalphi)
+    call update_nodal_u_vector(u, nodalu, nodalphi, nodalsl)
     
 
     ! Reset bodyload to ZERO for viscoelastic iteration
