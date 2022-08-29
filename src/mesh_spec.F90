@@ -100,19 +100,12 @@ xmin=minval(g_coord(1,:))
 xmax=maxval(g_coord(1,:))
 npoint=nelmt*(ngllx*nglly*ngllz)
 
-write(logunit,*)'   ngllx:', ngllx
-write(logunit,*)'   nglly:', nglly
-write(logunit,*)'   ngllz:', ngllz
-write(logunit,*)'   ngll (ngllx * nglly * ngllz):', ngll
-write(logunit,*)'   npoint (ngll * npoint): ', npoint
 
 
 allocate(xstore(npoint),ystore(npoint),zstore(npoint),stat=istat)
 if(istat/=0)then
   write(errtag,'(a)')'ERROR: cannot allocate memory!'
   return
-else
-  write(logunit,*)'   Created xstore, ystore, zstore each of length :', npoint
 endif
 
 
@@ -121,7 +114,6 @@ endif
 call shape_function_hex8(ngnod,ngllx,nglly,ngllz,gllpx,gllpy,gllpz,shape_hex8)
 
 
-write(logunit,*)' Filling in xstore, ystore, zstore with coordinates of local gll points:'
 ! compute coordinates all local gll points
 xstore=zero
 ystore=zero
@@ -162,7 +154,6 @@ enddo
 
 
 
-write(logunit,*)' Finished looping through all elements'
 
 deallocate(g_coord,g_num) ! no longer need these
 allocate(iglob(npoint))
@@ -170,38 +161,14 @@ allocate(iglob(npoint))
 ! gets ibool indexing from local (gll points) to global points
 call get_global(ndim,xstore,ystore,zstore,iglob,nnode,npoint,xmin,xmax)
 
-write(*,*)'nnode:  ', nnode
-
-write(*,*)'XSTORE: '
-do i =1, npoint 
-  write(*,*) xstore(i)
-enddo 
-
-write(*,*)'YSTORE: '
-do i =1, npoint 
-  write(*,*) ystore(i)
-enddo 
-
-write(*,*)'ZSTORE: '
-do i =1, npoint 
-  write(*,*) zstore(i)
-enddo 
-
-write(*,*)'IGLOB: '
-do i =1, npoint 
-  write(*,*) iglob(i)
-enddo 
 
 
-write(*,*)'Now using indirect addressing'
+
 ! now we got the new number of nodes (nnode)
 !- we can create a new indirect addressing to reduce cache misses
 call get_global_indirect_addressing(nnode,npoint,iglob)
 
-write(*,*)'IGLOB is now : '
-do i =1, npoint 
-  write(*,*) iglob(i)
-enddo 
+
 
 
 allocate(g_coord(3,nnode),g_num(ngll,nelmt)) ! alocate with new number of nodes
@@ -305,25 +272,19 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
 
 
   do j=1,ndim
-    write(*,*)'j: ',j
 
 
 
 ! sort within each segment
     ioff=1
-    !write(*,*), 'nseg:', nseg
 
     do iseg=1,nseg
 
-      !write(*,*)'  iseg = ',iseg
 
       if(j == 1) then
         call rank(xp(ioff), ind, ninseg(iseg))
       else if(j == 2) then
-        !write(*,*)'   yp(ioff): ', yp(ioff)
-        !write(*,*)'   ind: ', ind 
-        !write(*,*)'   ninseg(iseg): ', ninseg(iseg) 
-        !write(*,*)'   RUN RANK YP: '
+ 
 
         call rank(yp(ioff),ind,ninseg(iseg))
       else
@@ -332,17 +293,9 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
       endif
 
       call swap_all(iloc(ioff),xp(ioff),yp(ioff),zp(ioff),iwork,work,ind,ninseg(iseg))
-      !write(*,*)' AFTER SWAP THE VALUES ARE NOW: '
-      !write(*,*)'iloc: ', iloc
-      !!write(*,*)'xp: ', xp
-      !write(*,*)'yp: ', yp
-      !write(*,*)'zp: ', zp
-      !write(*,*)'i_work: ', iwork
-      !!write(*,*)'ind: ', ind
-      !write(*,*)'ninseg: ', ninseg
+
       
       ioff=ioff+ninseg(iseg)
-      !write(*,*)'new ioff value is : ', ioff 
     enddo
 
 
@@ -544,7 +497,6 @@ subroutine swap_all(ia,a,b,c,iw,w,ind,n)
   integer :: i
 
 
-  write(*,*) " INSIDE SWAPPING SUBROUTINR"
 
   iw(:) = ia(:)
   w(:) = a(:)
@@ -590,23 +542,15 @@ copy_ibool_ori = ibool
 
 inumber = 0
 do i_point=1,npoint
-  write(*,*)'i_point = ', i_point
-  write(*,*)'      copy_ibool_ori(i_point) = ', copy_ibool_ori(i_point) 
-  write(*,*)'mask_ibool(copy_ibool_ori(i_point)) = ', mask_ibool(copy_ibool_ori(i_point))
-
+  
   if(mask_ibool(copy_ibool_ori(i_point)) == -1) then
-    write(*,*)'mask_ibool is -1 so enter if...'
     inumber = inumber + 1
-    write(*,*)'inumber becomes = ', inumber 
     ibool(i_point) = inumber
     mask_ibool(copy_ibool_ori(i_point)) = inumber
-    write(*,*)'make  = mask_ibool(copy_ibool_ori(i_point)) = ', inumber 
 
   else
-    write(*,*)'mask_ibool is NOT -1 so else...'
     ! use an existing point created previously
     ibool(i_point) = mask_ibool(copy_ibool_ori(i_point))
-    write(*,*)'ibool(i_point) becomes ', ibool(i_point)
 
   endif
 enddo

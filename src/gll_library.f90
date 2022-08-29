@@ -115,7 +115,6 @@ write(logunit,*) gll_points(:,:)
 write(logunit,*)'   Weights of GLL points: (1 x n)'
 write(logunit,*) gll_weights(:)
 
-write(*,*)' _______Computing lagrange 1D: _______'
 
 do ii=1,ngll ! ngllx*nglly*ngllz
   xi=gll_points(1,ii)
@@ -123,23 +122,15 @@ do ii=1,ngll ! ngllx*nglly*ngllz
   zeta=gll_points(3,ii)
 
 
-  write(*,*)'ii = ', ii
-  write(*,*)'   xi = ', xi
-  write(*,*)'   eta = ', eta
-  write(*,*)'   zeta = ', zeta
+  
 
   ! compute 1d lagrange polynomials
   call lagrange1d(ngllx,xi,lagrange_x,lagrange_dx)
-  write(*,*)'     lagrange_x is now = '
-  write(*,*)'      ',lagrange_x
+  
 
   call lagrange1d(nglly,eta,lagrange_y,lagrange_dy)
-  write(*,*)'     lagrange_y is now = '
-  write(*,*)'      ',lagrange_y
+  
   call lagrange1d(ngllz,zeta,lagrange_z,lagrange_dz)
-  write(*,*)'     lagrange_z is now = '
-  write(*,*)'      ',lagrange_z
-
 
 
 

@@ -17,25 +17,41 @@ contains
 ! This subroutine sets number of degrees of freedom and IDs of nodal dof  
 subroutine initialize_dof()
 use global,only:edofu,edofphi,idofu,nenode,idofphi,nndofu,nndofphi,nndof,      &
-                nedofu,nedofphi,nedof,ISDISP_DOF,ISPOT_DOF
+                nedofu,nedofphi,nedof,ISDISP_DOF,ISPOT_DOF, nedofsl, ISSL_DOF, & 
+                nndofsl, idofsl, edofsl, SLlogunit
 implicit none
 integer :: i_dof,idof
 ! total number of degrees of freedom per node
-nndof=0
-nedofu=0
-nedofphi=0
-nedof=0
+nndof    = 0
+nedofu   = 0  
+nedofphi = 0
+nedofsl  = 0 
+nedof    = 0
 
-! dof IDs
-idof=0
-idofu=0
-idofphi=0
+! initialise dof IDs
+idof    = 0
+idofu   = 0
+idofphi = 0
+idofsl  = 0
+
+write(SLlogunit,*)'  DISPLACEMENT   : '
+
 
 ! displacement
 if(ISDISP_DOF)then
-  nndof=nndof+nndofu
-  nedofu=NNDOFU*nenode
+  nndof=nndof+nndofu ! now 3 
+  write(SLlogunit,*)'  nndof   : ', nndof
+
+  nedofu=NNDOFU*nenode ! 3 x ngll 
+  write(SLlogunit,*)'  nenode   : ', nenode
+  write(SLlogunit,*)'  NNDOFU   : ', NNDOFU
+  write(SLlogunit,*)'  nedofu   : ', nedofu
+
   nedof=nedof+nedofu
+
+  write(SLlogunit,*)'  nedof   : ', nedof
+
+  write(SLlogunit,*)' Now loopin through nndofu' 
   do i_dof=1,nndofu
     idof=idof+1
     idofu(i_dof)=idof
@@ -60,6 +76,26 @@ if(ISPOT_DOF)then
 endif
 
 
+
+ISSL_DOF = .true.
+! Sea level (theta): 
+if(ISSL_DOF)then
+  write(*,*)'ISSL_DOF is : ', ISSL_DOF 
+  write(SLlogunit,*)'ISSL_DOF is : ', ISSL_DOF, ' -- Activating SL degrees of freedom' 
+  
+  
+  nndof   = nndof + nndofsl   ! Add 1 to nodal degrees of freedom
+  nedofsl = NNDOFSL*nenode    ! SL dof on each gll pt (1) x num of GLL pts
+  nedof   = nedof + nedofsl   ! Add this to total DOF for each element
+  do i_dof=1, nndofsl
+    idof=idof+1
+    idofsl(i_dof)=idof        ! Assign ID of sea level in order of DOFs
+  enddo
+
+  allocate(edofsl(nedofsl))
+  write(*,SLlogunit)'Currently adding SL DOF to every node - in future implementation should only be for surface nodes to save memory'
+
+endif
 
 
 end subroutine initialize_dof
@@ -111,7 +147,6 @@ do i=1,NGLL
   endif
 enddo
 
-write(*,*)'***** EDOFU: ', edofu
 
 
 

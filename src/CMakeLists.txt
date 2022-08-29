@@ -109,7 +109,7 @@ SET(srcboth
    determine_solver.F90
    save_variables.F90
    nonlinearloop.F90
-   bilinear_form.F90
+   sea_level.F90
    )
 
 

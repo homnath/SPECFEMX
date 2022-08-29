@@ -58,9 +58,6 @@ endif
 
 read(11,*,iostat=ios)nelmt_fs
 
-write(*,*)' FREE SURFACE'
-write(*,*)'   nelmt_fs = ', nelmt_fs
-
 if(ios/=0.or.nelmt_fs.eq.0)then
   nnode_fs=0
   ! No need to plot free surface files
@@ -100,7 +97,7 @@ call i_uniinv(nodelist,inode_order)
 
 
 nnode_fs=maxval(inode_order)
-write(*,*)'nnode_fs = ', nnode_fs
+write(*,*)' ', nnode_fs
 
 allocate(isnode(nnode_fs))
 isnode=.false.

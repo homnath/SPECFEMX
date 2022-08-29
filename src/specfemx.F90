@@ -22,6 +22,7 @@ use integration
 use model
 use gll_library,only:precompute_gll1d,cleanup_gll1d
 use free_surface
+use sea_level
 #if (USE_MPI)
 use mpi_library
 use math_library_mpi
@@ -106,6 +107,9 @@ call process_user_input(cmd, tdate, ttime, tzone, ios, path, &
                         cpu_tstart)
 
 
+! Create SL log file  
+call start_SL_log(errcode, errtag)
+
 ! Calculate model extents for individual processors/whole model
 call calc_model_coord_extents(tot_nelmt,max_nelmt,min_nelmt, &
                               tot_nnode,max_nnode,min_nnode, &
@@ -151,12 +155,7 @@ endif
 allocate(g_num0(ngnode,nelmt))
 g_num0=g_num
 
-write(logunit,*) 'nenode: ', nenode
-write(logunit,*) 'ngnode: ', ngnode
-write(logunit,*) 'nelmt: ', nelmt
 
-write(logunit,*) 'GNUM: '
-write(logunit,*) g_num
 
 
 
@@ -170,8 +169,6 @@ call create_spec_elem(tot_nelmt,max_nelmt,min_nelmt, &
                       errcode,errtag)
 
 
-write(*,*)'G_NUM: ', g_num
-write(*,*)'g_coord: ', g_coord
 
 
 ! number of elemental nodes (nodes per element = ngllx*nglly*ngllz
@@ -305,7 +302,6 @@ do i_elmt=1,nelmt
      mdomain==VISCOELASTIC_INFDOMAIN)cycle
 
   num=g_num(hex8_gnode,i_elmt)
-  write(*,*)'num: ', num
 
   x1=g_coord(:,num(1))
   x2=g_coord(:,num(2))

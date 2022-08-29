@@ -898,7 +898,7 @@ use ieee_arithmetic
 implicit none
 
 real(kind=kreal),intent(in) :: storekmat(:,:,:),storemmat(:,:)
-integer :: i,i_elmt,ielmt,i_gll,i1,i1,j,n,ndzero                                             
+integer :: i,i_elmt,ielmt,i_gll,i1,i2,j,n,ndzero                                             
 integer :: ggdof_elmt(NEDOF)                                   
 
 PetscReal         freq,scale_freq2 ! angular frequency                           

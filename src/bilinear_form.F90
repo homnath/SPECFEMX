@@ -670,7 +670,6 @@ module bilinear_form
     
             ! Get the IDs for the element 
             num = g_num(:,i_elem)
-            !write(*,*)'Num:', num
     
             do abg = 1, ngll
                 do lam = 1, 3

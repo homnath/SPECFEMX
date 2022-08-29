@@ -82,7 +82,6 @@ hex8_gnode(7)=ngll;
 hex8_gnode(8)=hex8_gnode(7)-ngllx+1
 
 
-write(*,*)'hex8_gnode:  ', hex8_gnode
 errcode=0
 return
 
@@ -269,9 +268,7 @@ ny=ngllz
 
 ! edge 1 => [1,2]
 iedge=1
-write(*,*)' looping from 1 to 1: '
 do j=1,1
-  write(*,*)'  j = ', j 
   jm1=j-1
 
   do i=1,nx
@@ -288,7 +285,6 @@ hexface_edge(iface,iedge)%node=hexface(iface)%node(indx)
 
 ! edge 2 => [2,6]
 iedge=2
-write(*,*)' looping from 1 to  ', ny 
 
 do j=1,ny
 

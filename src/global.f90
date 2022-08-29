@@ -182,6 +182,7 @@ integer :: ngllx,nglly,ngllz,ngll
 integer :: ngllxy,ngllyz,ngllzx,maxngll2d
 integer,parameter :: ng=8 ! number of gauss points for FEM
 
+
 logical :: ismpi !.true. : MPI, .false. : serial
 integer :: myrank,nproc !myrank is indexed from 0
 integer :: ngdof !Number of nodal degrees of freedom per processor = nndof*nnode
@@ -244,7 +245,7 @@ logical :: isdensity
 logical :: isplastic
 ! Flag to check if the domain is empty
 logical,allocatable :: isempty_blk(:)
-integer,allocatable :: mat_domain(:),type_blk(:)
+integer,allocatable :: mat_domain(:),type_blk(:), isplastic_blk(:)
 real(kind=kreal),allocatable :: gam_blk(:),rho_blk(:),ym_blk(:),nu_blk(:),     &
 coh_blk(:),phi_blk(:),psi_blk(:)
 character(len=60),allocatable :: mfile_blk(:)
@@ -463,7 +464,7 @@ logical,parameter ::  solver_diagscale=.false.
 integer,parameter :: smart_solver=0  ! select appropriate solver automatically
 integer,parameter :: builtin_solver=1! select builtin conjugate gradient solver
 integer,parameter :: petsc_solver=2  ! select PETSC solver
-integer :: solver_type=1! smart_solver !builtin_solver !petsc_solver !smart_solver 
+integer :: solver_type=smart_solver !builtin_solver !petsc_solver !smart_solver 
 ! By default solver is symmetric but it may be changed later depending on the
 ! conditions.
 logical :: symmetric_solver=.true.
@@ -488,12 +489,31 @@ character(len=1),parameter :: CR=achar(13) ! carriage return to overwrite
 ! format string for time step
 character(len=20) :: tstep_sformat
 ! Log file all information
-character(len=250) :: log_file
+character(len=250) :: log_file, SL_log_file
 ! file unit ID for log file
-integer :: logunit=7
+integer :: logunit=7, SLlogunit=57
 integer :: stdout=6
 
 character(len=250) :: log_msg
+
+
+
+! Sea Level variables
+real(kind=kreal), allocatable     :: oceanf(:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
+
+
+! Sea level degrees of freedom 
+logical :: ISSL_DOF   ! Activates SL or not
+integer,parameter :: nndofsl=1  ! number of sea level degrees of freedom per node - \theta
+integer, dimension(nndofsl) :: idofsl    ! should be an array of size 1 (only 1 dof per node) and the ID will be 5 if phi and u are present
+integer :: nedofsl    ! number of elemental degrees of freedom for sea level
+integer,allocatable :: edofsl(:) !IDs for SL degrees of freedom per element
+
+
+
+
+
+
 
 
 ! developement variables

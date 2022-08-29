@@ -63,8 +63,8 @@ use postprocess
 use cleanup
 use save_variables 
 use nonlinearloop
-use bilinear_form
-
+!use bilinear_form
+use sea_level
 
 !use relaxation_time
 implicit none
@@ -77,7 +77,7 @@ character(len=500) :: errsrc
 integer :: istat
 
 ! do-loop indices
-integer :: i_dof,ielmt,i_eq,i_gll,i_mat,i_nliter,i_node,i_comp,j_dof,j_node
+integer :: i_dof,i_elmt,i_eq,i_gll,i_mat,i_nliter,i_node,i_comp,j_dof,j_node
 integer :: ielmt,imat,idof,iedof!element ID for gdof, node, etc.
 
 real(kind=kreal),dimension(nst),parameter :: unit_voigt=(/one,one,one,ZERO,    &
@@ -356,7 +356,6 @@ log_msg = 'preprocessing...' ; call write_ifproc0()
 call calculate_prestress(strain_elmt, strain_nodal, &
                                 stress_elmt, stress_nodal, & 
                                 extload, du, dprecon, storekmat, &
-                                isgravity, ispseudoeq, &
                                 errcode, errtag, ksp_iter, istat)
    
 allocate(slipload(0:neq),extload(0:neq),rhoload(0:neq),ubcload(0:neq))
@@ -393,14 +392,11 @@ if(myrank==0)then
 endif
 
 
-
-allocate(load(0:neq),bodyload(0:neq),selfload(0:neq,)viscoload(0:neq),             &
+! HERE IS ALLOCATION OF U VECTOR 
+allocate(load(0:neq),bodyload(0:neq),selfload(0:neq),viscoload(0:neq), &
 resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),            &
-storekmat(nedof,nedof,nelmt), &
-! The mass matrix element for X, Y, and Z degrees of freedom ata GLL point is the same. 
-! Therefore, we store only the one value per GLL point. 
-storemmat(nedof,nelmt), & 
-stat=istat)
+storekmat(nedof,nedof,nelmt), storemmat(nedof,nelmt), stat=istat)
+
 if(istat/=0)then
   write(logunit,*)'ERROR: cannot allocate memory!'
   flush(logunit)
@@ -547,6 +543,13 @@ endif
 if(isbodyload)then
   call compute_bodyload(selfload,selfweight=isselfweight)
 endif 
+
+
+! Initialise Sea Level 
+call prepare_sea_level()
+call calc_SL_LHS(errcode, errtag)
+
+
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
 

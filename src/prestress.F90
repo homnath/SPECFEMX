@@ -9,7 +9,6 @@ contains
 subroutine calculate_prestress(strain_elmt, strain_nodal, &
                                 stress_elmt, stress_nodal, & 
                                 extload, du, dprecon, storekmat, &
-                                isgravity, ispseudoeq, &
                                 errcode, errtag, ksp_iter, istat)
 ! USES 
 use global
@@ -17,6 +16,7 @@ use preprocess
 use math_constants
 use output_to_user
 use element
+use matrix_vector
 use postprocess
 #if (USE_MPI)
 use mpi_library
@@ -46,7 +46,6 @@ real(kind=kreal), allocatable :: strain_elmt(:,:,:), &
                                     stress_nodal(:,:), & 
                                     extload(:), & 
                                     du(:), dprecon(:) , storekmat(:,:,:)
-logical :: isgravity, ispseudoeq
 integer :: ksp_iter
 
 character(len=250) :: errtag ! error message
