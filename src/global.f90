@@ -499,7 +499,7 @@ character(len=250) :: log_msg
 
 
 ! Sea Level variables
-real(kind=kreal), allocatable     :: oceanf(:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
+real(kind=kreal), allocatable     :: oceanf(:,:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
 
 
 ! Sea level degrees of freedom 

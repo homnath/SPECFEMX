@@ -34,6 +34,7 @@ idofu   = 0
 idofphi = 0
 idofsl  = 0
 
+write(*,*)'MADE IT TO 1'
 
 ! displacement
 if(ISDISP_DOF)then
@@ -41,47 +42,37 @@ if(ISDISP_DOF)then
   nedofu=NNDOFU*nenode 
   nedof=nedof+nedofu
 
-  write(SLlogunit,*)'Displacement: '
   do i_dof=1,nndofu
     
     idof=idof+1
-    write(SLlogunit,*)'   idof   :', idof
-
     idofu(i_dof)=idof
-    write(SLlogunit,*)'   idofu   :', idofu
 
   enddo
 
   allocate(edofu(nedofu))
 endif
+write(*,*)'MADE IT TO 2'
 
-
-ISPOT_DOF = .true.
 
 ! gravity
-write(SLlogunit,*)' Updating the idof for gravity :'
 
 idof=idofu(nndofu)
-write(SLlogunit,*)'   idof   :', idof
-
 
 if(ISPOT_DOF)then
   nndof=nndof+nndofphi
   nedofphi=NNDOFPHI*nenode
   nedof=nedof+nedofphi
-  write(SLlogunit,*)'Gravity: '
 
   do i_dof=1,nndofphi
     idof=idof+1
-    write(SLlogunit,*)'   idof   :', idof
 
     idofphi(i_dof)=idof
-    write(SLlogunit,*)'   idofphi   :', idofphi
 
   enddo
   allocate(edofphi(nedofphi))
 endif
 
+write(*,*)'MADE IT TO 3'
 
 ! Sea level (theta): 
 if(ISSL_DOF)then
@@ -101,6 +92,8 @@ if(ISSL_DOF)then
   write(SLlogunit,*)'Currently adding SL DOF to every node - in future implementation should only be for surface nodes to save memory'
 
 endif
+
+write(*,*)'MADE IT TO 4'
 
 
 end subroutine initialize_dof

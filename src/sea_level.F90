@@ -6,6 +6,8 @@ module sea_level
 
 
 
+
+
 subroutine start_SL_log(errcode, errtag)
 
 use global
@@ -32,6 +34,7 @@ use serial_library
 
     ! Write example 
     write(SLlogunit, *)' ****** CREATED SL LOG FILE ******'
+    write(*, *)' Created SL log file'
 
 end subroutine start_SL_log
         
@@ -47,9 +50,7 @@ subroutine prepare_sea_level()
 
     write(SLlogunit, *)'Preparing sea level variables...'
 
-    allocate(oceanf(nnode_fs)) ! Allocate ocean function 
-
-
+    allocate(oceanf(nelmt_fs, maxngll2d)) ! Allocate ocean function 
     
 
 
@@ -166,15 +167,50 @@ use serial_library
 
 
 
-    subroutine update_ocean_function()
+    subroutine update_ocean_function(u, errcode, errtag)
     ! Routine checks each GLL point on the surface to see if its theta
     ! Value is 0 or not - if it is 0 then the ocean function becomes 0 
     ! if SL is larger than 0 then ocean function is 1.
+    use global 
+    use free_surface
+    implicit none 
 
+    ! IO variables
+    character(len=250) :: errtag
+    integer :: ios, errcode
+    real(kind=kreal), allocatable :: u(:)
 
+    ! Local variables 
+    integer          :: i_face, iface, numf(maxngll2d), i_numf
+    real(kind=kreal) :: sl
 
+    
 
+    ! Loop through the free surface faces: 
+    do i_face=1, nelmt_fs  
 
+        ! Get the global ID of the nodes on this face 
+        numf  = gnum_fs(:,i_face)
+
+        ! Loop through nodes on this face
+        do i_numf = 1, maxngll2d
+
+            if (u(gdof(idofsl(1), numf(i_numf))).gt.0.0 ) then 
+                ! Sea level is not zero - ocean func is 1 
+                oceanf(i_face, i_numf) = 1.0_kreal
+
+            elseif(u(gdof(idofsl(1), numf(i_numf)))==0.0 ) then 
+                ! Sea level is zero - ocean func is 0 
+                oceanf(i_face, i_numf) = 0.0_kreal
+
+            else 
+                write(errtag,'(a)')'SEA LEVEL VALUE IS NEGATIVE!! '
+                return
+            endif 
+        enddo 
+
+        
+    enddo
 
     end subroutine update_ocean_function
 
