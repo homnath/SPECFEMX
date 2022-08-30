@@ -258,7 +258,6 @@ endif
 deallocate(g_num0) ! Old connectivity no longer necessary
 call sync_process
 
-write(*,*)'MADE IT TO 5'
 
 
 
@@ -283,7 +282,6 @@ if (istat/=0)then
   stop
 endif
 
-write(*,*)'MADE IT TO 6'
 
 
 allocate(infinite_iface(6,nelmt),infinite_face_idir(6,nelmt))
@@ -294,7 +292,6 @@ call activate_dof(errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
 
-write(*,*)'MADE IT TO 7'
 
 
 ! This will ensure that the gdof IDs are same in the finite/infinite interface
@@ -307,7 +304,6 @@ call sync_process
 ! At this point, all gdof IDs are consistent across the parallel interfaces
 ! having the values either 0 or 1.
 
-write(*,*)'MADE IT TO 8'
 
 
 ! Apply Dirichlet boundary conditions
@@ -315,7 +311,6 @@ call apply_bc(bcnodalv,errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
 
-write(*,*)'MADE IT TO 9'
 
 
 !! Undo the unmatching dipalcement BCs. This may occur in fault implementation
@@ -327,7 +322,7 @@ call finalize_gdof(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 log_msg = 'complete!' ; call write_ifproc0()
 
-write(*,*)'MADE IT TO 10'
+
 
 
 call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
@@ -427,13 +422,11 @@ endif
 
 
 ! Initialise Sea Level 
-call prepare_sea_level()
-call update_ocean_function(u, errcode, errtag)
-
-call calc_SL_LHS(errcode, errtag)
-
-
-write(*,*) ' MADE IT TO THE END OF SEA LEVEL '
+if(ISSL_DOF)then 
+  call prepare_sea_level()
+  call update_ocean_function(u, errcode, errtag)
+  call calc_SL_LHS(errcode, errtag)
+endif 
 
 
 ! Timestepping only needed for plastic/viscoelastic situations
@@ -778,6 +771,7 @@ loop_step: do i_step=istep0,nstep
   endif
 
 
+
   ! ____________________________________________________________
   ! NEED TO ADD IN INITIAL SL SETUP AND ADD TO NODALSL HERE
 
@@ -836,6 +830,7 @@ loop_step: do i_step=istep0,nstep
                     scale_ang_freq2, ksp_iter, errcode, ksp_convreason, &
                     errtag, isscale_ang_freq)
     
+                    
     ! Output time details
     call write_cpu_timer(format_str,cpu_tstart,cpu_tend,telap)
 

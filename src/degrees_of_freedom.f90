@@ -34,7 +34,6 @@ idofu   = 0
 idofphi = 0
 idofsl  = 0
 
-write(*,*)'MADE IT TO 1'
 
 ! displacement
 if(ISDISP_DOF)then
@@ -51,7 +50,6 @@ if(ISDISP_DOF)then
 
   allocate(edofu(nedofu))
 endif
-write(*,*)'MADE IT TO 2'
 
 
 ! gravity
@@ -72,7 +70,7 @@ if(ISPOT_DOF)then
   allocate(edofphi(nedofphi))
 endif
 
-write(*,*)'MADE IT TO 3'
+
 
 ! Sea level (theta): 
 if(ISSL_DOF)then
@@ -93,7 +91,6 @@ if(ISSL_DOF)then
 
 endif
 
-write(*,*)'MADE IT TO 4'
 
 
 end subroutine initialize_dof

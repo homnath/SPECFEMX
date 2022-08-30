@@ -252,7 +252,7 @@ character(len=60),allocatable :: mfile_blk(:)
 real(kind=kreal),allocatable :: bulkmod_blk(:),shearmod_blk(:)
 real(kind=kreal),allocatable :: massdens_elmt(:,:),bulkmod_elmt(:,:),          &
 shearmod_elmt(:,:)
-real(kind=kreal),allocatable :: grav0_nodal(:,:),dgrav0_elmt(:,:,:)
+real(kind=kreal),allocatable :: grav0_nodal(:,:),dgrav0_elmt(:,:,:), g0_nodal(:)
 ! magnetization
 real(kind=kreal),allocatable :: magnetization_elmt(:,:,:)
 integer :: nwmat
@@ -496,6 +496,11 @@ integer :: stdout=6
 
 character(len=250) :: log_msg
 
+
+
+
+! Flag for cartesian or global simulation 
+logical :: IS_CART_SIM, IS_GLOB_SIM  
 
 
 ! Sea Level variables

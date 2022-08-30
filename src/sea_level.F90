@@ -52,8 +52,6 @@ subroutine prepare_sea_level()
 
     allocate(oceanf(nelmt_fs, maxngll2d)) ! Allocate ocean function 
     
-
-
 end subroutine prepare_sea_level
 
 
@@ -131,7 +129,7 @@ use serial_library
 
 
         ! Loop through GLL on the surface: 
-        do i_gll = 1,nfgll
+        do i_gll = 1, nfgll
             
             ! global ID for this GLL point 
             gid = numf(i_gll) 

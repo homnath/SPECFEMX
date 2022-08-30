@@ -120,7 +120,6 @@ call calc_model_coord_extents(tot_nelmt,max_nelmt,min_nelmt, &
 call initialize_model(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
-write(*,*)'got to here '
 
 ! STILL NOT SURE WHAT THIS IS FOR! 
 isgeo_change=.false.
