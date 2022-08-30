@@ -108,7 +108,11 @@ call process_user_input(cmd, tdate, ttime, tzone, ios, path, &
 
 
 ! Create SL log file  
-call start_SL_log(errcode, errtag)
+if(is_SL)then 
+  write(*,*)' Creating SL log file ... '
+  call start_SL_log(errcode, errtag)
+  flush(SLlogunit)
+endif 
 
 ! Calculate model extents for individual processors/whole model
 call calc_model_coord_extents(tot_nelmt,max_nelmt,min_nelmt, &

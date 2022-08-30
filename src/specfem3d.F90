@@ -421,12 +421,7 @@ endif
 
 
 
-! Initialise Sea Level 
-if(ISSL_DOF)then 
-  call prepare_sea_level()
-  call update_ocean_function(u, errcode, errtag)
-  call calc_SL_LHS(errcode, errtag)
-endif 
+
 
 
 ! Timestepping only needed for plastic/viscoelastic situations
@@ -574,6 +569,14 @@ endif
 
 
 
+
+! Initialise Sea Level 
+if(ISSL_DOF)then 
+  call prepare_sea_level()
+  call set_original_sea_level()
+  call update_ocean_function(u, errcode, errtag)
+  call calc_SL_LHS(errcode, errtag)
+endif 
 
 
 !----------------------------------------------------------------------

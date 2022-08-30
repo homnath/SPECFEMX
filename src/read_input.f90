@@ -43,7 +43,7 @@ character(len=*),intent(in) :: inp_fname
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 logical,optional,intent(in) :: ispartmesh
-
+integer :: read_stat
 logical :: isfrom_partmesh
 character(len=250) :: line
 character(len=60) :: lineword(9)
@@ -55,7 +55,7 @@ integer :: id,ind,ios,narg,slen
 
 integer :: bc_stat,preinfo_stat,mesh_stat,material_stat,step_stat,control_stat,&
 bodyload_stat,stress0_stat,traction_stat,mtraction_stat,water_stat, &
-save_stat,eqsource_stat,benchmark_stat,station_stat,devel_stat,mag_stat
+save_stat,eqsource_stat,benchmark_stat,station_stat,devel_stat,mag_stat, sl_stat
 integer :: mat_count
 integer :: ielmt,i_node,inode,imat,tmp_nelmt,tmp_nnode !,mat_domain
 
@@ -70,6 +70,11 @@ real(kind=kreal) :: rval
 real(kind=kreal),allocatable :: rvect(:)
 
 logical,allocatable :: ismat(:)
+
+
+! Sea level variables: 
+integer :: sl_read_ctr
+
 
 ! Magnetization
 ! Inclination (0) or latitude (1). If latitude, the inclination is obtained
@@ -122,9 +127,6 @@ POT_TYPE=PGRAVITY
 POT_STRING='gravity'
 ISGRAV0=.false.
 
-! WE Until incorporated into the input files will always set this to true
-ISSL_DOF    = .false.
-IS_CART_SIM = .true.
 
 
 iselastic=0
@@ -149,6 +151,14 @@ pole_axis=-9999
 benchmark_okada=.false.
 benchmark_error=.false.
 isstation=.false.
+
+
+! Sea level defaults
+sl_stat     = 0 
+ISSL_DOF    = .false.
+IS_CART_SIM = .false.
+IS_GLOB_SIM = .false.
+is_SL       = .false.
 
 ! Default savedata options
 savedata%model=.false.
@@ -953,6 +963,29 @@ do
     cycle
   endif
 
+
+
+
+! read sea level part
+  if (trim(token)=='sealevel:')then
+    write(*,*)'Detected sea level flag'
+    if(sl_stat==1)then
+      write(errtag,*)'ERROR: copy of line type sealevel: not permitted!'
+      return
+    endif
+
+    call split_string(tag,',',args,narg)
+    slfile=get_string('slfile',args,narg)
+    sl_stat=1
+    is_SL=.true.
+    cycle
+  endif
+  
+
+
+
+
+
   ! read development vaiables if any
   if (trim(token)=='devel:')then
     if(devel_stat==1)then
@@ -1121,6 +1154,79 @@ if(iseqsource.and.eqsource_type.eq.3)then
     call recreate_faultslip_file(faultslipfile_minus)
   endif
 endif
+
+
+
+
+! Read Sea Level file: 
+sl_read_ctr = 0 
+if(is_SL)then 
+
+  fname= trim(data_path)//trim(slfile)//trim(ptail_inp)
+  open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
+  if( ios /= 0 ) then
+    write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
+    return
+  endif
+
+  do 
+    read(11,*,IOSTAT=read_stat) line 
+
+    if (read_stat==0)then 
+      ! Line read and needs processing 
+      if (isblank(line) .or. iscomment(line,'#'))then
+        cycle 
+      else 
+        ! Not a comment - we want this value: 
+        sl_read_ctr = sl_read_ctr + 1 
+        
+        SELECT CASE (sl_read_ctr)
+        CASE (1)
+          ! First line says global or cartesian 
+          if (str2int(trim(line)) .eq. 1)then
+            IS_CART_SIM = .true.
+          elseif(str2int(trim(line)) .eq. 2)then 
+            IS_GLOB_SIM = .true.
+          else
+            write(*,*)'Wrong specification for glob/cart sim'
+          endif 
+
+        CASE (2)
+          if (str2int(trim(line)).eq.0)then 
+            ! constant z value: 
+            SL0_is_constant = .true. 
+            read(11,*) line 
+            SL0_constant    = str2real(trim(line)) 
+            sl_read_ctr     = sl_read_ctr + 1 
+          else
+            write(*,*)'ONLY CONSTANT CARTESIAN SL CURRENTLY IMPLEMENTED'
+            stop
+          endif             
+        CASE DEFAULT
+          write(*,*)'Read in the following line but it isnt being used:'
+          write(*,*)trim(line)
+
+        END SELECT
+
+
+
+
+      endif 
+
+    elseif(read_stat==-1)then 
+      ! End of File: 
+      exit 
+    else
+      ! Error reading line  
+      write(*,*)'ERROR READING LINE OF SEA LEVEL FILE '    
+    endif 
+
+  enddo 
+
+endif 
+
+
+
 
 ! Read material id
 fname=trim(data_path)//trim(idfile)//trim(ptail_inp)
@@ -1425,6 +1531,10 @@ do i=1,nmatblk
     !if(myrank==0)print*,'bulkmod & shearmod: ',bulkmod_blk(i),shearmod_blk(i)
   endif
 enddo
+
+
+
+
 
 errcode=0
 if(myrank==0)then

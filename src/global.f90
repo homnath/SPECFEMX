@@ -500,11 +500,13 @@ character(len=250) :: log_msg
 
 
 ! Flag for cartesian or global simulation 
-logical :: IS_CART_SIM, IS_GLOB_SIM  
-
+logical :: IS_CART_SIM, IS_GLOB_SIM , is_SL, SL0_is_constant
+character(len=250) :: slfile                ! Input file name 
 
 ! Sea Level variables
 real(kind=kreal), allocatable     :: oceanf(:,:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
+real(kind=kreal)                  :: SL0_constant  ! Constant initial SL value 
+real(kind=kreal), allocatable     :: icnodalSL(:,:)  ! Initial condition for SL (gll pt on face, element on Free Surf.)
 
 
 ! Sea level degrees of freedom 
