@@ -16,7 +16,7 @@ module ghost
 
         real(kind=kreal) , allocatable :: coord(:,:), deriv(:,:), jac(:,:), bmat(:,:), &
                                           eld(:), eload(:),bload(:), vload(:), nodalu(:,:), &
-                                          nodalphi(:),  nodalsl(:),  nodalg(:,:), nodalB(:,:)
+                                          nodalphi(:),  nodalg(:,:), nodalB(:,:)
 
         ! Local variables
         integer :: istat 
@@ -48,14 +48,7 @@ module ghost
         endif
         !--------------------------------
         
-        if(ISSL_DOF)then 
-            allocate(nodalsl(nnode),stat=istat)
-            if(istat/=0)then
-            write(logunit,*)'ERROR: cannot allocate memory of nodalSL!'
-            flush(logunit)
-            stop
-            endif
-        endif 
+        
 
         return 
         

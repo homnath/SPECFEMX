@@ -96,11 +96,39 @@ end subroutine start_SL_log
 subroutine prepare_sea_level()
     use global 
     use free_surface
+    use set_precision
+    use math_constants
 
     implicit none 
 
+    real(kind=kreal), allocatable ::  nodalsl(:)
+    integer :: istat
+
     write(SLlogunit, *)'Preparing sea level variables...'
-    allocate(oceanf(nelmt_fs, maxngll2d)) ! Allocate ocean function 
+    
+    ! Create store for initial SL 
+    if(savedata%sl0)then 
+        allocate(nodalsl0(nnode))
+        nodalsl0 = ZERO
+        write(SLlogunit, *)'   - Created initial SL (nodal)'
+    endif
+
+    if(ISSL_DOF)then 
+        allocate(oceanf(nelmt_fs, maxngll2d)) ! Allocate ocean function 
+        oceanf=ZERO 
+        write(SLlogunit, *)'   - Created ocean function'
+
+        allocate(nodalsl(nnode),stat=istat)
+        nodalsl = ZERO
+        if(istat/=0)then
+        write(logunit,*)'ERROR: cannot allocate memory of nodalSL!'
+        flush(logunit)
+        stop
+        else 
+            write(SLlogunit, *)'   - Created SL (nodal)'
+        endif
+    endif 
+
 end subroutine prepare_sea_level
 
 
@@ -154,24 +182,35 @@ subroutine set_original_sea_level()
                 ! Now with integration weights, ngll etc for face: 
                 call get_fs_details(i_face, iface, nfgll, gll_weight, ds_quad4)
 
+                ! For each GLL point calculate and store SL0
                 do i_gll = 1, nfgll 
                     ! Get Z coordinates for the face and global IDs 
-                    z_coord = g_coord(3,  gnum_fs(i_gll,i_face))/NONDIM_L
-                    theta = SL0_constant/NONDIM_L - z_coord 
+                    z_coord = g_coord(3,  gnum_fs(i_gll,i_face))
+                    theta = SL0_constant - z_coord 
+                    
 
                     if(theta.gt.0.0_kreal)then
                         icnodalSL(i_gll, i_face) = theta
+                        !! SET INITIAL OCEAN FUNCTION HERE! 
                     endif 
-                    write(*,*)'z      = ',  z_coord
-                    write(*,*)'sl val = ', SL0_constant/NONDIM_L
-                    write(*,*)'theta  = ', icnodalSL(i_gll, i_face)
-                    write(*,*)''
                 enddo 
-                
 
             enddo 
         endif
     endif 
+
+
+
+    if (savedata%sl0)then 
+        ! Saving the initial nodal values:
+        do i_face=1, nelmt_fs  
+            call get_fs_details(i_face, iface, nfgll, gll_weight, ds_quad4)
+            do i_gll = 1, nfgll 
+                nodalsl0(gnum_fs(i_gll,i_face)) = icnodalSL(i_gll, i_face)
+            enddo 
+        enddo 
+    endif 
+
 
 
 end subroutine set_original_sea_level

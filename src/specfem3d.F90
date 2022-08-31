@@ -574,9 +574,33 @@ endif
 if(is_SL)then 
   call prepare_sea_level()
   call set_original_sea_level()
-  call update_ocean_function(u, errcode, errtag)
+  
+
+
+! Save initial sea level if flagged: 
+  write(SLlogunit,*)'Value of SL0 Save:', savedata%sl0
+  if(savedata%sl0)then 
+    write(SLlogunit,*)'Saving the original SL values'
+    call write_scalar_to_file(nnode,DIM_L*nodalsl0,ext='sl0',istep=0) 
+    ! On the free surface
+    if(savedata%fsplot)then
+      call write_scalar_to_file_freesurf(nnode_fs,DIM_L*nodalsl0(gnode_fs), &
+      ext='sl0',istep=0) 
+    endif
+    if(savedata%fsplot_plane)then
+      call write_scalar_to_file_freesurf(nnode_fs,DIM_L*nodalsl0(gnode_fs), &
+      ext='sl0', istep=0,plane=.true.) 
+    endif
+  endif 
+
+
+
+
+
+  !call update_ocean_function(u, errcode, errtag)
   !call calc_SL_LHS(errcode, errtag)
 endif 
+
 
 
 !----------------------------------------------------------------------
@@ -1172,6 +1196,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
     !  call compute_save_density_perturbation(nodalu,errcode,errtag)
     !endif
   endif
+
   if(ISPOT_DOF)then
     ! plot gravity potential
     if(savedata%gpot)then
@@ -1257,6 +1282,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
     flush(logunit)
   endif
 enddo loop_step ! i_step time/frequency stepping loop
+
 if(savedata%strain)then
   close(77)
   deallocate(strain_elmt,strain_nodal)

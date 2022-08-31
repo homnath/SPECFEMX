@@ -476,6 +476,7 @@ type savedata_options
   logical :: gpot,agrav
   logical :: mpot,magb
   logical :: infinite
+  logical :: sl0 ! initial sea level
   ! Free surface plot. If this option is .TRUE., and the free surface file is
   ! given, the result will be plotted on the free surface.
   logical :: fsplot,fsplot_plane 
@@ -507,6 +508,8 @@ character(len=250) :: slfile                ! Input file name
 real(kind=kreal), allocatable     :: oceanf(:,:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
 real(kind=kreal)                  :: SL0_constant  ! Constant initial SL value 
 real(kind=kreal), allocatable     :: icnodalSL(:,:)  ! Initial condition for SL (gll pt on face, element on Free Surf.)
+real(kind=kreal), allocatable     :: nodalsl0(:)   ! Store of nodal initial SL 
+
 
 
 ! Sea level degrees of freedom 

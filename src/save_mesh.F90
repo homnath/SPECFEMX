@@ -166,6 +166,7 @@ integer :: errcode
 ! Local variables
 integer :: iounit,iounit_inf,iounit_fs,i,j,k, i_elmt
 
+
 ! Code: 
 if(savedata%infinite)then
 infcase_file=trim(out_path)//trim(file_head)//'_inf'//trim(ptail)//'.case'

@@ -33,6 +33,7 @@ Only the following line types are permitted.
 \item[control:]   control of the simulation
 \item[step:]      frequency/time step information
 \item[save:]      options to save data
+\item[sealevel:]  information for sea level simulation
 \item[devel:]     development parameters for experimental features [optional]
 \end{adescription}
 
@@ -204,6 +205,16 @@ Only the following arguments under the specified line types are permitted.\\
   \item[agrav]: gradient of potential, e.g., acceleration due to gravity [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
   \\
 \end{adescription}
+
+
+\texttt{\underline{sealevel:}}
+\begin{adescription}{solvesl}
+  \item[slfile]: sea level file name  [string].
+  \item[savesl0]: saves initial sea level [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[solvesl]: solve for sea level? [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \\
+\end{adescription}
+
 
 \texttt{\underline{devel:}}
 \begin{adescription}{example}
@@ -631,3 +642,18 @@ Following data specify the two water surfaces: a horizontal surface and an incli
 1\\
 1 0.0 42.7 12.2 6.1}\\
 
+\subsection{Sea Level file: \texttt{slfile}}
+
+This file contains details required for running a sea level simulation.
+In this file any lines beginning with '#' as the first character are considered
+to be comment lines and are ignored. The information format for this file (ignoring) any comment lines) is: 
+
+line 1: \emph{cartesian or global}: integer value 1 = Cartesian, 2 = Global 
+line 2: \emph{type of initial SL}: integer value 0 = defined by constant Z value - only for cartesian SL simulation 
+line 3: \emph{initial sea level} See full description below
+
+
+\underline{initial sea level (line 3):}
+Different formats are used based on the input: 
+
+if line2 = 0: Sea level is defined by constant Z value. In this case line 3 is the Z value.

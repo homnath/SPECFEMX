@@ -154,11 +154,12 @@ isstation=.false.
 
 
 ! Sea level defaults
-sl_stat     = 0 
-ISSL_DOF    = .false.
-IS_CART_SIM = .false.
-IS_GLOB_SIM = .false.
-is_SL       = .false.
+sl_stat      = 0 
+ISSL_DOF     = .false.
+IS_CART_SIM  = .false.
+IS_GLOB_SIM  = .false.
+is_SL        = .false.
+savedata%sl0 = .false. 
 
 ! Default savedata options
 savedata%model=.false.
@@ -974,11 +975,31 @@ do
       return
     endif
 
+    ! Means SL is involved
     call split_string(tag,',',args,narg)
     slfile   = get_string('slfile',args,narg)
     sl_stat  = 1
     is_SL    = .true.
-    ISSL_DOF = .true.
+    write(*,*)'WILL FETCH INFO FROM SL FILE: ', slfile
+
+    ! Save sl0 
+    call seek_integer('savesl0',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%sl0=.true.
+      write(*,*)' SAVING INITIAL SEA LEVEL'
+    endif 
+
+    
+    ! In this case will actually solve for SL 
+    call seek_integer('solvesl',ival,args,narg,istat)
+    if(istat==0.and.ival.eq.1)then 
+      ISSL_DOF = .true.
+      write(*,*)' SOLVING SEA LEVEL'
+    else 
+      write(*,*)' WARNING: SL FILE PARSED BUT NOT SOLVING FOR SEA LEVEL'
+    endif 
+
+
     cycle
   endif
   
