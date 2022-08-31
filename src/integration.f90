@@ -96,7 +96,6 @@ gll_points_zx
 errtag="ERROR: unknown!"
 errcode=-1
 
-write(logunit,*)' Running integration 2D...'
 
 ! Derivatives of shape functions 
 allocate(dshape_quad4_xy(2,4,ngllxy),dshape_quad4_yz(2,4,ngllyz),              &
@@ -115,28 +114,20 @@ allocate(gll_weights_zx(ngllzx),gll_points_zx(2,ngllzx),                       &
 lagrange_gll_zx(ngllzx,ngllzx),dlagrange_gll_zx(2,ngllzx,ngllzx))
 
 
-write(logunit,*)'   Calculating deriv shape functions quad4: XY'
 call dshape_function_quad4(4,ngllx,nglly,gllpx,gllpy,dshape_quad4_xy)
-write(logunit,*)'   Calculating deriv shape functions quad4: YZ'
 call dshape_function_quad4(4,nglly,ngllz,gllpy,gllpz,dshape_quad4_yz)
-write(logunit,*)'   Calculating deriv shape functions quad4: ZX'
 call dshape_function_quad4(4,ngllz,ngllx,gllpz,gllpx,dshape_quad4_zx)
 
-write(logunit,*)'   Calculating 2D GLL quadrature: XY'
 call gll_quadrature2d(2,ngllx,nglly,ngllxy,gll_points_xy,gll_weights_xy,       &
 lagrange_gll_xy,dlagrange_gll_xy)
-write(logunit,*)'   Calculating 2D GLL quadrature: YZ'
 call gll_quadrature2d(2,nglly,ngllz,ngllyz,gll_points_yz,gll_weights_yz,       &
 lagrange_gll_yz,dlagrange_gll_yz)
-write(logunit,*)'   Calculating 2D GLL quadrature: ZX'
 call gll_quadrature2d(2,ngllz,ngllx,ngllzx,gll_points_zx,gll_weights_zx,       &
 lagrange_gll_zx,dlagrange_gll_zx)
 
 deallocate(gll_points_xy,gll_points_yz,gll_points_zx)
 
 
-write(logunit,*)' Completed integration 2D'
-write(logunit,*)'------------------------------------------------------'
 
 errcode=0
 return

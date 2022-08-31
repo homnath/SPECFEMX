@@ -93,7 +93,6 @@ integer, dimension(:), allocatable :: iglob
 errtag="ERROR: unknown!"
 errcode=-1
 
-write(logunit,*)'Running hex2spec...'
 
 ngll=ngllx*nglly*ngllz
 xmin=minval(g_coord(1,:))
@@ -118,27 +117,20 @@ call shape_function_hex8(ngnod,ngllx,nglly,ngllz,gllpx,gllpy,gllpz,shape_hex8)
 xstore=zero
 ystore=zero
 zstore=zero
-write(logunit,*)''
 ipoint=0
 do i_elmt=1,nelmt
-  write(logunit,*)' element = ', i_elmt
   do k=1,ngllz
     do j=1,nglly
       do i=1,ngllx
-        !write(logunit,*)'   i: ', i, 'j: ', j, 'k: ', k
 
         xgll = zero
         ygll = zero
         zgll = zero
-        !write(logunit,*)'   reset xgll, ygll, zgll to 0'
 
-       ! write(logunit,*)'looping from i_gnod = 1 to ngnod: ', ngnod
         do i_gnod=1,ngnod
           xgll = xgll + shape_hex8(i_gnod,i,j,k)*g_coord(1,g_num(i_gnod,i_elmt))
           ygll = ygll + shape_hex8(i_gnod,i,j,k)*g_coord(2,g_num(i_gnod,i_elmt))
           zgll = zgll + shape_hex8(i_gnod,i,j,k)*g_coord(3,g_num(i_gnod,i_elmt))
-
-          !write(logunit,*)'   xgll += ', shape_hex8(i_gnod,i,j,k), ' * ', g_coord(1,g_num(i_gnod,i_elmt))
         enddo
 
         ipoint=ipoint+1

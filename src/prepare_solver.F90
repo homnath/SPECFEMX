@@ -29,7 +29,6 @@ use serial_library
     integer :: i_elmt, ielmt, j_dof, i_eq, i_dof
   
     ! CODE: 
-    if(solver_type.eq.builtin_solver)then
       ! Compute diagonal precoditioner
       dprecon=ZERO
       do i_elmt=1,nelmt
@@ -86,7 +85,6 @@ use serial_library
       else
         dprecon(1:)=one/dprecon(1:)
       endif
-    endif !(solver_type.eq.builtin_solver)
   
   
   end subroutine prep_inbuilt_solver

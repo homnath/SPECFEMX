@@ -67,7 +67,6 @@ character(len=250),intent(out) :: errtag
 errtag="ERROR: unknown!"
 errcode=-1
 
-write(logunit,*)'Running prepare_hex: '
 ! geometrical nodes (corner nodes) in EXODUS/CUBIT order
 ! bottom nodes
 
@@ -106,19 +105,11 @@ integer,allocatable :: indx(:),indy(:),indz(:)
 errtag="ERROR: unknown!"
 errcode=-1
 
-write(logunit,*)'Allocate 6 hexfaces:'
-write(logunit,*)'   hexface(1) uses ZX'
-write(logunit,*)'   hexface(2) uses YZ'
-write(logunit,*)'   hexface(3) uses ZX'
-write(logunit,*)'   hexface(4) uses YZ'
-write(logunit,*)'   hexface(5) uses XY'
-write(logunit,*)'   hexface(6) uses XY'
 
 allocate(hexface(1)%node(ngllzx),hexface(3)%node(ngllzx))
 allocate(hexface(2)%node(ngllyz),hexface(4)%node(ngllyz))
 allocate(hexface(5)%node(ngllxy),hexface(6)%node(ngllxy))
 
-write(logunit,*)'Allocated hexfaces.'
 
 ! local node numbers for the faces (faces are numbered in exodus/CUBIT
 ! convention)
@@ -172,14 +163,8 @@ do k=1,ngllz
   enddo
 enddo
 
-write(logunit,*)'Resulting hex face node arrays:'
-do i=1,6
-  write(logunit,*)' Face ', i
-  write(logunit,' (I4.0)')hexface(i)%node(:)
-enddo 
 
 
-write(logunit,*)'Finding geometric corner nodes...'
 ! find geometric corners nodes
 do i_face=1,6 ! there are 6 faces in a hexahedron
   if(i_face==1 .or. i_face==3)then ! ZX plane
@@ -203,11 +188,6 @@ do i_face=1,6 ! there are 6 faces in a hexahedron
   endif
 enddo
 
-write(logunit,*)'Resulting hex corner nodes:'
-do i=1,4
-  write(logunit,*)'  hexface(i)%gnode(:), i = ', i
-  write(logunit,*)hexface(i)%gnode(:)
-enddo 
 
 
 
@@ -219,7 +199,6 @@ hexface_sign(3)=-one
 hexface_sign(4)=-one
 hexface_sign(5)=-one
 
-write(logunit,*)'...determine degress of freedoms on face'
 ! local degrees of freedoms on face
 allocate(hexface(1)%edof(nndof*ngllzx),hexface(3)%edof(nndof*ngllzx))
 allocate(hexface(2)%edof(nndof*ngllyz),hexface(4)%edof(nndof*ngllyz))
@@ -244,16 +223,10 @@ do i_face=1,6
   enddo
 enddo
 
-write(logunit,*)'   Resulting hex node degrees of freedom:'
-do i=1,6
-  write(logunit,*)'   hexface(i)%edof(:), i = ', i
-  write(logunit,*)hexface(i)%edof(:)
-enddo 
 
 
 
 
-write(logunit,*)'...face edge nodes...'
 ! face_edge_nodes
 allocate(indx(ngllx),indy(nglly),indz(ngllz))
 
@@ -588,20 +561,6 @@ enddo
 hexface_edge(iface,iedge)%fnode=indy
 hexface_edge(iface,iedge)%node=hexface(iface)%node(indy)
 !-------------------------------------------------------------------------------
-
-write(logunit,*)'Resulting hexface_edge: '
-
-do i=1,6
-  do j=1,4
-    write(logunit,*)'Face: ', i, '   Edge: ', j
-    write(logunit,*)'    NODE:  ', hexface_edge(i,j)%node
-    write(logunit,*)'    FNODE: ', hexface_edge(i,j)%fnode
-    
-  enddo  
-enddo
-
-
-
 
 
 deallocate(indx,indy,indz)

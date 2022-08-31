@@ -975,9 +975,10 @@ do
     endif
 
     call split_string(tag,',',args,narg)
-    slfile=get_string('slfile',args,narg)
-    sl_stat=1
-    is_SL=.true.
+    slfile   = get_string('slfile',args,narg)
+    sl_stat  = 1
+    is_SL    = .true.
+    ISSL_DOF = .true.
     cycle
   endif
   

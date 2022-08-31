@@ -185,6 +185,10 @@ subroutine calc_nondimensionalisation_vals
       gam_blk=gam_blk*(NONDIM_DENSITY*NONDIM_ACCEL)
     endif
 
+    if(IS_SL)then
+      SL0_constant = SL0_constant*NONDIM_L
+    endif 
+    
     pole_coord0=pole_coord0*NONDIM_L
     pole_coord1=pole_coord1*NONDIM_L
     axis_range=axis_range*NONDIM_L

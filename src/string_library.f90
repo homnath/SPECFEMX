@@ -79,8 +79,6 @@ character(len=*),intent(in) :: fname
 character(len=*),intent(out) :: path,head,ext
 integer :: i,ipath,iext,slen
 
-write(logunit,*)'Entered parse_file...'
-write(logunit,*)'  parsing fname:   '//trim(fname)
 
 
 slen=len(fname)
@@ -114,11 +112,6 @@ enddo
 head=fname(ipath+1:iext-1)
 path=fname(1:ipath)
 ext=fname(iext+1:slen)
-
-write(logunit,*)'  finished parsiing:'
-write(logunit,*)'  head:   '//trim(head)
-write(logunit,*)'  path:   '//trim(path)
-write(logunit,*)'  ext:   '//trim(ext)
 
 
 return

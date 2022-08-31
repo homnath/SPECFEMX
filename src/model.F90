@@ -30,7 +30,6 @@ character(len=250),intent(out) :: errtag
 errtag="ERROR: unknown!"
 errcode=-1
 
-write(logunit,*)'Initialising model...'
 
 isbulkmod=.false.
 isshearmod=.false.
@@ -42,7 +41,6 @@ if(ISDISP_DOF)then
   allocate(bulkmod_elmt(ngll,nelmt),shearmod_elmt(ngll,nelmt))
   bulkmod_elmt=ZERO
   shearmod_elmt=ZERO
-  write(logunit,*)'   ISDISP_DOF: T - allocating bulkmod_elmt and shearmod_elmt - both dim (ngll, nelmt)'
 endif
 
 ! Mass density
@@ -50,8 +48,6 @@ if(ISDISP_DOF .or. (ISPOT_DOF.and.POT_TYPE==PGRAVITY))then
   ismassdens=.true.
   allocate(massdens_elmt(ngll,nelmt))
   massdens_elmt=ZERO
-
-  write(logunit,*)'   ISDISP_DOF or ISPOT_DOF.and.POT_TYPE: T - allocating massdens_elmt (ngll, nelmt)'
 
 endif
 
@@ -263,10 +259,7 @@ allocate(num(ngll))
 ! classify material blocks
 ! count material blocks
 
-write(logunit,*)'------------------------------------------------------'
-write(logunit,*)'Setting model properties...'
 
-write(logunit,*)'   nmatblk = ', nmatblk
 allocate(block_nelmt(nmatblk))
 
 block_nelmt=0
@@ -274,20 +267,17 @@ do i_blk=1,nmatblk
   block_nelmt(i_blk)=count(mat_id==i_blk)
 enddo
 
-write(logunit,*)'   count number of blocks with each material ID: '
-write(logunit,*)'     block_nelmt array: ', block_nelmt
+
 
 
 allocate(block(nmatblk))
 do i_blk=1,nmatblk
-    write(logunit, *)'Allocate block(',i_blk,') for no. of elem:', block_nelmt(i_blk)
     allocate(block(i_blk)%elmt(block_nelmt(i_blk)))
 enddo
 
 
 allocate(ielmts(nmatblk))
 
-write(logunit, *)'mat_id: ', mat_id
 
 ielmts=0
 do i_elmt=1,nelmt
@@ -296,14 +286,6 @@ do i_elmt=1,nelmt
   block(iblk)%elmt(ielmts(iblk))=i_elmt
 
 enddo
-
-do i_blk=1,nmatblk 
-  write(logunit, *)'   block(',i_blk,')%elmt(:)  :' 
-  write(logunit, *)'      ', block(i_blk)%elmt(:)
-enddo 
-
-write(logunit, *)'     ielmts          :      '
-write(logunit, *)'      ', ielmts
 
 
 

@@ -26,9 +26,7 @@ real(kind=kreal),parameter :: jacobi_alpha=0.0_kreal,jacobi_beta=0.0_kreal
 ! get gll points
 ! for alpha=beta=0, jacobi polynomial is legendre polynomial
 ! for ngllx=nglly=ngllz=ngll, need to call only once
-write(logunit,*)'Precomputing 1D GLL locations and weights using'
-write(logunit,*)'   jacobi_alpha: ', jacobi_alpha
-write(logunit,*)'   jacobi_beta: ', jacobi_beta
+
 
 ! X
 allocate(gllpx(ngllx),gllwx(ngllx))
@@ -43,15 +41,6 @@ if(mod(nglly,2) /= 0)gllpy((nglly-1)/2+1) = zero
 allocate(gllpz(ngllz),gllwz(ngllz))
 call zwgljd(gllpz,gllwz,ngllz,jacobi_alpha,jacobi_beta)
 if(mod(ngllz,2) /= 0)gllpz((ngllz-1)/2+1) = zero
-
-write(logunit,*)'   gll points and weights now exist: '
-write(logunit,*)'     gllpx: ', gllpx
-write(logunit,*)'     gllwx: ', gllwx
-write(logunit,*)'     gllpy: ', gllpy
-write(logunit,*)'     gllwy: ', gllwy
-write(logunit,*)'     gllpz: ', gllpz
-write(logunit,*)'     gllwz: ', gllwz
-write(logunit,*)' Finished precomputing GLL 1D.'
 
 end subroutine precompute_gll1d
 !===============================================================================
@@ -90,8 +79,6 @@ real(kind=kreal),dimension(ngllz) :: lagrange_z,lagrange_dz
 
 ! compute everything in indexed order
 
-write(logunit,*)'Running gll_quadrature submodule'
-write(logunit,*)' computing GLL quadrature points and weights for 3D...'
 
 n=0
 do k=1,ngllz
@@ -109,11 +96,6 @@ do k=1,ngllz
   enddo
 enddo
 
-write(logunit,*)'   n =', n
-write(logunit,*)'   Coordinates of GLL points: [xi,eta,zeta] (3 x n)'
-write(logunit,*) gll_points(:,:)
-write(logunit,*)'   Weights of GLL points: (1 x n)'
-write(logunit,*) gll_weights(:)
 
 
 do ii=1,ngll ! ngllx*nglly*ngllz
@@ -158,11 +140,6 @@ enddo
 
 
 
-
-write(logunit,*)'    Lagrange GLL is stored in  (ngll, ngll) array:'
-write(logunit,*)lagrange_gll(:,:) 
-write(logunit,*)'    Derivative of Lagrange GLL is a (3, ngll, ngll) array' 
-write(logunit,*)'       This is mostly a sparse matrix.' 
 
 
 
@@ -252,7 +229,6 @@ real(kind=kreal),dimension(nglly) :: lagrange_y,lagrange_dy
 !call zwgljd(gllpx,gllwx,ngllx,jacobi_alpha,jacobi_beta)
 !call zwgljd(gllpy,gllwy,nglly,jacobi_alpha,jacobi_beta)
 
-write(logunit,*)'   Entered gll_quadrature2d...'
 
 
 n=0
@@ -269,11 +245,7 @@ do j=1,nglly
 enddo
 
 
-write(logunit,*)'   Store 2d gll pts and weights:  '
-write(logunit,*)'     point: '
-write(logunit,*)gll_points2d(:,:)
-write(logunit,*)'     weights: '
-write(logunit,*)gll_weights2d(:)
+
 
 
 do ii=1,ngll ! ngllx*nglly
@@ -296,12 +268,6 @@ do ii=1,ngll ! ngllx*nglly
 enddo
 
 
-write(logunit,*)'   Store 2d lagrange gll and derivatives '
-write(logunit,*)'     lagrange_gll2d has shape (ngll, ngll) i think!'
-write(logunit,*)'     dlagrange_gll2d has shape (2, ngll, ngll) for 2D'
-
-
-write(logunit,*)'  Finished gll_quadrature2d...'
 
 return
 end subroutine gll_quadrature2d

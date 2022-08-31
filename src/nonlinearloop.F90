@@ -5,6 +5,7 @@ module nonlinearloop
 
 contains
 
+
 !#######################################################################
 subroutine write_cpu_timer(format_str, cpu_tstart,cpu_tend,telap)
     ! Writes CPU time to log file for solver elapsed time
@@ -28,6 +29,8 @@ subroutine write_cpu_timer(format_str, cpu_tstart,cpu_tend,telap)
     endif
 
 end subroutine write_cpu_timer
+
+
 
 !#######################################################################
 subroutine run_solver(resload, dprecon, ndscale, storekmat, du, &

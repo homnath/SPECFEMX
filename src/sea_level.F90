@@ -111,32 +111,39 @@ subroutine set_original_sea_level()
     use set_precision
     use global 
     use integration
+    use dimensionless
     use free_surface
+    use math_constants
     implicit none 
 
     ! IO variables
 
     ! Local variables 
-    integer         :: i_face, iface, nfgll, ifacetest, nfglltest,i,j,k,l,m,n
-    real(kind=kreal),allocatable  :: GW(:), DSQ(:,:,:), LG(:,:)
+    integer          :: i_face, iface, nfgll, i_gll 
+    real(kind=kreal) :: theta, z_coord
+   
+    real(kind=kreal),dimension(:,:,:), allocatable :: ds_quad4
+    real(kind=kreal),dimension(:),     allocatable :: gll_weight
+    real(kind=kreal),dimension(:,:),   allocatable :: lag_gll
+    real(kind=kreal),dimension(:,:,:), allocatable :: dlag_gll
 
-    real(kind=kreal),dimension(:,:,:),allocatable ::  dsqtest
-    real(kind=kreal),dimension(:)    ,allocatable ::  gwtest
-    real(kind=kreal),dimension(:,:)  ,allocatable ::  lgtest
-    real(kind=kreal),dimension(:,:,:),allocatable ::  dlgtest
+
+    allocate(ds_quad4(2,4,maxngll2d))
+    allocate(gll_weight(maxngll2d),lag_gll(maxngll2d,maxngll2d),  &
+    dlag_gll(2,maxngll2d,maxngll2d))
+
 
 
     ! Code:
-    allocate(DSQ(2,4,maxngll2d), dsqtest(2,4,maxngll2d))
-    allocate(GW(maxngll2d),gwtest(maxngll2d),  LG(maxngll2d,maxngll2d),  lgtest(maxngll2d,maxngll2d),&
-    dlagrange_gll(2,maxngll2d,maxngll2d))
     ! icnodalSL holds the initial SL at each node
     allocate(icnodalSL(maxngll2d, nelmt_fs))
+    icnodalSL = ZERO
 
 
     ! For cartesian: 
     if(IS_CART_SIM)then
         if(SL0_is_constant)then
+
             ! SL0 is the z coordinate of the sea surface. We therefore
             ! need to calculate the theta value for each point based on the 
             ! the z coordinate of the face 
@@ -144,54 +151,23 @@ subroutine set_original_sea_level()
             ! Loop for each face on the surface: 
             do i_face=1, nelmt_fs  
 
-                ! Face number (ie between 1 and 6) and get related properties
-                iface = iface_fs(i_face)    
-                if(iface==1 .or. iface==3)then
-                    nfgll=ngllzx
-                    GW(1:nfgll)=gll_weights_zx
-                    DSQ(:,:,1:nfgll)=dshape_quad4_zx
-                  elseif(iface==2 .or. iface==4)then
-                    nfgll=ngllyz
-                    GW(1:nfgll)=gll_weights_yz
-                    DSQ(:,:,1:nfgll)=dshape_quad4_yz
-                  elseif(iface==5 .or. iface==6)then
-                    nfgll=ngllzx
-                    GW(1:nfgll)=gll_weights_xy
-                    DSQ(:,:,1:nfgll)=dshape_quad4_xy
-                  else
-                    !write(errtag,'(a)')'ERROR: wrong face ID for traction!'
-                    return
-                endif
+                ! Now with integration weights, ngll etc for face: 
+                call get_fs_details(i_face, iface, nfgll, gll_weight, ds_quad4)
 
-                ! Now with new version: 
-                call get_fs_details(i_face, ifacetest, nfglltest, gwtest, dsqtest)
+                do i_gll = 1, nfgll 
+                    ! Get Z coordinates for the face and global IDs 
+                    z_coord = g_coord(3,  gnum_fs(i_gll,i_face))/NONDIM_L
+                    theta = SL0_constant/NONDIM_L - z_coord 
 
-
-                ! Check if they are the same: 
-                write(*,*)' iface        :', iface
-                write(*,*)' ifacetest    :', nfgll
+                    if(theta.gt.0.0_kreal)then
+                        icnodalSL(i_gll, i_face) = theta
+                    endif 
+                    write(*,*)'z      = ',  z_coord
+                    write(*,*)'sl val = ', SL0_constant/NONDIM_L
+                    write(*,*)'theta  = ', icnodalSL(i_gll, i_face)
+                    write(*,*)''
+                enddo 
                 
-                write(*,*)' nfgll    :', nfgll
-                write(*,*)' nfglltest:', nfglltest
-
-                do i = 1,maxngll2d
-                    write(*,*)' equal     :', (gll_weights(i).eq.gwtest(i))
-                enddo 
-
-                do j=1,2
-                    do k=1,4
-                        do l=1,maxngll2d
-                            write(*,*)' dshapequad:', (DSQ(j,k,l).eq.dsqtest(j,k,l))
-                        enddo 
-                    enddo
-                enddo 
- 
-
-
-
-                ! Get coordinates for the face and global IDs 
-                !numf  = gnum_fs(:,i_face)
-                !coord = g_coord(:, numf)
 
             enddo 
         endif
@@ -249,23 +225,8 @@ use serial_library
     do i_face=1, nelmt_fs  
 
         ! Face number (ie between 1 and 6) and get related properties
-        iface = iface_fs(i_face)    
-        if(iface==1 .or. iface==3)then
-            nfgll=ngllzx
-            gll_weights(1:nfgll)=gll_weights_zx
-            dshape_quad4(:,:,1:nfgll)=dshape_quad4_zx
-          elseif(iface==2 .or. iface==4)then
-            nfgll=ngllyz
-            gll_weights(1:nfgll)=gll_weights_yz
-            dshape_quad4(:,:,1:nfgll)=dshape_quad4_yz
-          elseif(iface==5 .or. iface==6)then
-            nfgll=ngllzx
-            gll_weights(1:nfgll)=gll_weights_xy
-            dshape_quad4(:,:,1:nfgll)=dshape_quad4_xy
-          else
-            write(errtag,'(a)')'ERROR: wrong face ID for traction!'
-            return
-        endif
+        call get_fs_details(i_face, iface, nfgll, gll_weights, dlagrange_gll)
+
 
         ! Get coordinates for the face and global IDs 
         numf  = gnum_fs(:,i_face)
