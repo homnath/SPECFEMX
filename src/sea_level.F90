@@ -43,6 +43,30 @@ end subroutine get_fs_details
 
 
 
+subroutine get_fs_details_noweights(i_face, iface, nfgll)
+    use global 
+    use set_precision
+    use integration 
+    use free_surface
+    implicit none 
+
+    ! IO variables: 
+    integer           :: i_face, nfgll ,iface 
+
+    ! Face number (ie between 1 and 6) and get related properties
+    iface = iface_fs(i_face)    
+    if(iface==1 .or. iface==3)then
+        nfgll             = ngllzx
+      elseif(iface==2 .or. iface==4)then
+        nfgll             = ngllyz
+      elseif(iface==5 .or. iface==6)then
+        nfgll             = ngllzx
+      else
+        !write(errtag,'(a)')'ERROR: wrong face ID for traction!'
+        return
+    endif
+end subroutine get_fs_details_noweights
+
 
 
 
@@ -106,19 +130,23 @@ subroutine prepare_sea_level()
 
     write(SLlogunit, *)'Preparing sea level variables...'
     
+    ! If running SL then probably want ocean function: 
+    if(IS_SL)then 
+        allocate(oceanf(nelmt_fs, maxngll2d)) ! Allocate ocean function 
+        oceanf=ZERO 
+        write(SLlogunit, *)'   - Created ocean function'
+    endif 
+
+
     ! Create store for initial SL 
     if(savedata%sl0)then 
-        allocate(nodalsl0(nnode))
+        allocate(nodalsl0(nnode_fs))
         nodalsl0 = ZERO
         write(SLlogunit, *)'   - Created initial SL (nodal)'
     endif
 
     if(ISSL_DOF)then 
-        allocate(oceanf(nelmt_fs, maxngll2d)) ! Allocate ocean function 
-        oceanf=ZERO 
-        write(SLlogunit, *)'   - Created ocean function'
-
-        allocate(nodalsl(nnode),stat=istat)
+        allocate(nodalsl(nnode_fs),stat=istat)
         nodalsl = ZERO
         if(istat/=0)then
         write(logunit,*)'ERROR: cannot allocate memory of nodalSL!'
@@ -163,10 +191,7 @@ subroutine set_original_sea_level()
 
 
     ! Code:
-    ! icnodalSL holds the initial SL at each node
-    allocate(icnodalSL(maxngll2d, nelmt_fs))
-    icnodalSL = ZERO
-
+    nodalsl0 = 0.0_kreal
 
     ! For cartesian: 
     if(IS_CART_SIM)then
@@ -182,33 +207,22 @@ subroutine set_original_sea_level()
                 ! Now with integration weights, ngll etc for face: 
                 call get_fs_details(i_face, iface, nfgll, gll_weight, ds_quad4)
 
+
                 ! For each GLL point calculate and store SL0
                 do i_gll = 1, nfgll 
                     ! Get Z coordinates for the face and global IDs 
                     z_coord = g_coord(3,  gnum_fs(i_gll,i_face))
-                    theta = SL0_constant - z_coord 
+                    theta   = SL0_constant - z_coord 
                     
-
+                    
                     if(theta.gt.0.0_kreal)then
-                        icnodalSL(i_gll, i_face) = theta
-                        !! SET INITIAL OCEAN FUNCTION HERE! 
+                        nodalsl0(rgnum_fs(i_gll, i_face)) = theta
+                        write(SLlogunit,*)'  ', theta
                     endif 
                 enddo 
 
             enddo 
         endif
-    endif 
-
-
-
-    if (savedata%sl0)then 
-        ! Saving the initial nodal values:
-        do i_face=1, nelmt_fs  
-            call get_fs_details(i_face, iface, nfgll, gll_weight, ds_quad4)
-            do i_gll = 1, nfgll 
-                nodalsl0(gnum_fs(i_gll,i_face)) = icnodalSL(i_gll, i_face)
-            enddo 
-        enddo 
     endif 
 
 
@@ -245,8 +259,8 @@ use serial_library
 
     integer :: nfdof,nfgll !face nodal dof, face gll pts
     real(kind=kreal),dimension(:,:,:),allocatable :: dshape_quad4
-    real(kind=kreal),dimension(:),allocatable :: gll_weights
-    real(kind=kreal),dimension(:,:),allocatable :: lagrange_gll
+    real(kind=kreal),dimension(:),allocatable     :: gll_weights
+    real(kind=kreal),dimension(:,:),allocatable   :: lagrange_gll
     real(kind=kreal),dimension(:,:,:),allocatable :: dlagrange_gll
 
 
@@ -323,37 +337,47 @@ use serial_library
     real(kind=kreal), allocatable :: u(:)
 
     ! Local variables 
-    integer          :: i_face, iface, numf(maxngll2d), i_numf
-    real(kind=kreal) :: sl
+    integer          :: i_face, iface, numf(maxngll2d), i_numf, i_node, nfgll
+    integer          :: i_gll 
+    real(kind=kreal) :: theta
 
+
+    ! We may want the ocean function but not running simulation 
+    ! - in that case we need to use nodalsl0 rather than u 
+    if(ISSL_DOF)then 
+        write(*, *)'UPDATING OCEAN FUNCTION NOT DONE FOR CALCULATIONS'
+        stop
+    else
+        ! In this case we can calculate ocean function using nodalsl0: 
+        write(SLlogunit,*)' Calculating Ocean Function using nodalSL0'
+
+        do i_face=1, nelmt_fs  
+
+            ! Face number (ie between 1 and 6) and get related properties
+            call get_fs_details_noweights(i_face, iface, nfgll)
     
 
-    ! Loop through the free surface faces: 
-    do i_face=1, nelmt_fs  
+            ! Loop through GLL on the surface: 
+            do i_gll = 1, nfgll
+                theta = nodalsl0(rgnum_fs(i_gll, i_face))
 
-        ! Get the global ID of the nodes on this face 
-        numf  = gnum_fs(:,i_face)
+                if (theta.gt.0.0 ) then 
+                    ! Sea level is not zero - ocean func is 1 
+                    oceanf(i_face, i_gll) = 1.0_kreal
 
-        ! Loop through nodes on this face
-        do i_numf = 1, maxngll2d
+                elseif(theta==0.0 ) then 
+                    ! Sea level is zero - ocean func is 0 
+                    oceanf(i_face, i_gll) = 0.0_kreal
 
-            if (u(gdof(idofsl(1), numf(i_numf))).gt.0.0 ) then 
-                ! Sea level is not zero - ocean func is 1 
-                oceanf(i_face, i_numf) = 1.0_kreal
+                 else 
+                    write(errtag,'(a)')'SEA LEVEL VALUE IS NEGATIVE!! '
+                    return
+                endif 
 
-            elseif(u(gdof(idofsl(1), numf(i_numf)))==0.0 ) then 
-                ! Sea level is zero - ocean func is 0 
-                oceanf(i_face, i_numf) = 0.0_kreal
-
-            else 
-                write(errtag,'(a)')'SEA LEVEL VALUE IS NEGATIVE!! '
-                return
-            endif 
-        enddo 
-
-        
-    enddo
-
+                write(*,*)'Theta: ', theta, '  OF: ', oceanf(i_face, i_gll)
+            enddo 
+        enddo
+    endif 
     end subroutine update_ocean_function
 
 
@@ -373,5 +397,33 @@ use serial_library
 
     end subroutine summarise_SL_input_cart
 
+
+
+    subroutine write_SL0_to_ensight()
+        use global 
+        use postprocess
+        use free_surface
+        use dimensionless
+        implicit none 
+
+        write(SLlogunit,*)'Saving the original SL values'
+        write(SLlogunit,*)'  --> Min sea level: ', minval(nodalsl0)
+        write(SLlogunit,*)'  --> Max sea level: ', maxval(nodalsl0)
+        
+
+
+        ! On the free surface
+        if(savedata%fsplot)then
+          call write_scalar_to_file_freesurf(nnode_fs, DIM_L*nodalsl0, &
+          ext='sl0',istep=0) 
+        endif
+
+        
+        if(savedata%fsplot_plane)then
+          call write_scalar_to_file_freesurf(nnode_fs,DIM_L*nodalsl0(gnode_fs), &
+          ext='sl0', istep=0,plane=.true.) 
+        endif
+
+        end subroutine write_SL0_to_ensight
 
 end module

@@ -576,28 +576,13 @@ if(is_SL)then
   call set_original_sea_level()
   
 
-
-! Save initial sea level if flagged: 
-  write(SLlogunit,*)'Value of SL0 Save:', savedata%sl0
+  ! Save initial sea level if flagged: 
   if(savedata%sl0)then 
-    write(SLlogunit,*)'Saving the original SL values'
-    call write_scalar_to_file(nnode,DIM_L*nodalsl0,ext='sl0',istep=0) 
-    ! On the free surface
-    if(savedata%fsplot)then
-      call write_scalar_to_file_freesurf(nnode_fs,DIM_L*nodalsl0(gnode_fs), &
-      ext='sl0',istep=0) 
-    endif
-    if(savedata%fsplot_plane)then
-      call write_scalar_to_file_freesurf(nnode_fs,DIM_L*nodalsl0(gnode_fs), &
-      ext='sl0', istep=0,plane=.true.) 
-    endif
+    write(SLlogunit,*)
+    call write_SL0_to_ensight()
   endif 
 
-
-
-
-
-  !call update_ocean_function(u, errcode, errtag)
+  call update_ocean_function(u, errcode, errtag)
   !call calc_SL_LHS(errcode, errtag)
 endif 
 

@@ -124,13 +124,11 @@ deallocate(isnode,nodelist)
 
 
 ! Store the renumbered connectivity for the free surface elements.
-
 n1=1; n2=maxngll2d
 allocate(rgnum_fs(maxngll2d,nelmt_fs))
 do i_face=1,nelmt_fs
   
  rgnum_fs(:,i_face)=inode_order(n1:n2)
-
 
  n1=n2+1; n2=n1+maxngll2d-1
 

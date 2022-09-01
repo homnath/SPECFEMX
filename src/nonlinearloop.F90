@@ -163,6 +163,7 @@ end subroutine check_convergence
 subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
   ! USES
   use global
+  use free_surface
   implicit none 
 
 
@@ -207,7 +208,7 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
   if(ISSL_DOF)then
     do i_dof=1,nndofsl
       idof=idofsl(i_dof)
-      do i_node=1,nnode
+      do i_node=1,nnode_fs
         if(gdof(idof,i_node)/=0)then
           ! \theta is a scalar
           nodalsl(i_node)=u(gdof(idof,i_node))

@@ -985,11 +985,12 @@ do
     ! Save sl0 
     call seek_integer('savesl0',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
-      savedata%sl0=.true.
+      savedata%sl0    = .true.
+      savedata%fsplot = .true.
       write(*,*)' SAVING INITIAL SEA LEVEL'
     endif 
 
-    
+
     ! In this case will actually solve for SL 
     call seek_integer('solvesl',ival,args,narg,istat)
     if(istat==0.and.ival.eq.1)then 
