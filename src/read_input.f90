@@ -980,7 +980,7 @@ do
     slfile   = get_string('slfile',args,narg)
     sl_stat  = 1
     is_SL    = .true.
-    write(*,*)'WILL FETCH INFO FROM SL FILE: ', slfile
+    write(*,*)'WILL FETCH INFO FROM SL FILE: ', trim(slfile)
 
     ! Save sl0 
     call seek_integer('savesl0',issave,args,narg,istat)

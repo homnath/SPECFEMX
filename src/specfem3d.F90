@@ -574,15 +574,17 @@ endif
 if(is_SL)then 
   call prepare_sea_level()
   call set_original_sea_level()
-  
 
   ! Save initial sea level if flagged: 
   if(savedata%sl0)then 
-    write(SLlogunit,*)
     call write_SL0_to_ensight()
   endif 
 
-  call update_ocean_function(u, errcode, errtag)
+
+  call update_ocean_function(u, errcode, errtag)  ! Calc ocean func
+  call calculate_SL_A                             ! Calc SL area 
+  
+
   !call calc_SL_LHS(errcode, errtag)
 endif 
 

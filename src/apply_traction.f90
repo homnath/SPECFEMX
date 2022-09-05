@@ -16,7 +16,7 @@ use integration,only:dshape_quad4_xy,dshape_quad4_yz,dshape_quad4_zx,          &
                      gll_weights_xy,gll_weights_yz,gll_weights_zx,             &
                      lagrange_gll_xy,lagrange_gll_yz,lagrange_gll_zx
 use math_library,only : angle
-use free_surface,only:nelmt_fs,nnode_fs,gnode_fs,gnum_fs,rgnum_fs,iface_fs
+use free_surface,only:nelmt_fs,nnode_fs,gnode_fs,gnum_fs,rgnum_fs,iface_fs!, normal_fs, jac2d_fs
 implicit none
 real(kind=kreal),intent(inout) :: load(0:neq)
 integer,intent(out) :: errcode
@@ -69,6 +69,7 @@ allocate(fgdof(nndof*maxngll2d),ftracload(nndof*maxngll2d))
 allocate(dshape_quad4(2,4,maxngll2d))
 allocate(gll_weights(maxngll2d),lagrange_gll(maxngll2d,maxngll2d),             &
 dlagrange_gll(2,maxngll2d,maxngll2d))
+
 
 trac_stat=.true. ! Necessary for empty trfile
 if(istraction)then
@@ -141,6 +142,8 @@ if(istraction)then
           detjac=sqrt(dot_product(face_normal,face_normal))
           face_normal=hexface_sign(iface)*face_normal/detjac
 
+
+                  
           ! TODO:for constant q this can be computed only once!!
           ftracload(1:nfdof:3)=ftracload(1:nfdof:3)+ &
           q(1)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) ! *face_normal(1) !only in X direction

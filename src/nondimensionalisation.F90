@@ -111,6 +111,8 @@ subroutine calc_nondimensionalisation_vals
     DIM_VEL=ONE
     DIM_ACCEL=ONE
   
+    NONDIM_ACCEL=ONE
+
     DIM_M=ONE
   
     DIM_MOD = ONE
