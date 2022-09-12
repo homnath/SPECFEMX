@@ -246,7 +246,6 @@ call split_elas_visco_eids(nelmt_elas, &
 nelmt_viscoelas, eid_elas, eid_viscoelas )
 
 
-
 ! Create new elastic/viscoelastic arrays
 allocate(elas_e0(nst,ngll,nelmt_viscoelas), &
 visco_q0(nst,nmaxwell,ngll,nelmt_viscoelas),q0(nst,nmaxwell))
@@ -257,7 +256,6 @@ if(nproc.gt.1)then
 endif
 deallocate(g_num0) ! Old connectivity no longer necessary
 call sync_process
-
 
 
 
@@ -275,7 +273,16 @@ endif
 allocate(bcnodalv(nndof,nnode))
 bcnodalv=ZERO
 log_msg = 'applying bc...'; call write_ifproc0()
+
+
+!if (ISSL_DOF)then
+!  allocate(gdof(nndof+1,nnode),stat=istat)
+!else
+!  allocate(gdof(nndof,nnode),stat=istat)
+!endif 
 allocate(gdof(nndof,nnode),stat=istat)
+
+
 if (istat/=0)then
   write(logunit,*)'ERROR: cannot allocate memory!'
   flush(logunit)
@@ -298,7 +305,15 @@ call control_error(errcode,errtag,stdout,myrank)
 ! nodes if they lie across different processors.
 ! This can also be done if we explicitly define the gdof ON/OFF state on those
 ! inteface nodes across all the processors.
+
+!if (ISSL_DOF)then
+!  call assemble_ghosts_gdof(nndof+1, gdof, gdof)
+!else
+!  call assemble_ghosts_gdof(nndof,gdof,gdof)
+!endif 
 call assemble_ghosts_gdof(nndof,gdof,gdof)
+
+
 where(gdof>0)gdof=1
 call sync_process
 ! At this point, all gdof IDs are consistent across the parallel interfaces
@@ -324,20 +339,26 @@ log_msg = 'complete!' ; call write_ifproc0()
 
 
 
-
 call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
         eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB )
+
 
 
 ! store elemental global degrees of freedoms from nodal gdof
 ! this removes the repeated use of reshape later but it has larger size than
 ! gdof!!!
+!if (ISSL_DOF)then 
+!  allocate(gdof_elmt(nedof+ngll,nelmt)) ! Add ngll for the theta (even though only defined on surface)
+!else
+!  allocate(gdof_elmt(nedof,nelmt))
+!endif
 allocate(gdof_elmt(nedof,nelmt))
+
+
 gdof_elmt=0
 do i_elmt=1,nelmt
   gdof_elmt(:,i_elmt)=reshape(gdof(:,g_num(:,i_elmt)),(/nedof/))
 enddo
-
 
 
 
@@ -355,6 +376,7 @@ call sync_process
 
 
 
+
 ! Output details to user 
 tot_neq=sumscal(neq); max_neq=maxscal(neq); min_neq=minscal(neq)
 if(myrank==0)then
@@ -368,22 +390,23 @@ log_msg = 'preprocessing...' ; call write_ifproc0()
 
 
 ! Calculate any prestress 
-call calculate_prestress(strain_elmt, strain_nodal, &
-                                stress_elmt, stress_nodal, & 
-                                extload, du, dprecon, storekmat, &
-                                errcode, errtag, ksp_iter, istat)
+call calculate_prestress(strain_elmt, strain_nodal,       &
+                         stress_elmt, stress_nodal,       & 
+                         extload, du, dprecon, storekmat, &
+                         errcode, errtag, ksp_iter, istat)
    
-allocate(slipload(0:neq),extload(0:neq),rhoload(0:neq),ubcload(0:neq))
 
+! Initialise loads
+allocate(slipload(0:neq),extload(0:neq),rhoload(0:neq),ubcload(0:neq))
 extload=ZERO
 rhoload=ZERO
 
 
 
-allocate(node_valency(nnode))
 ! compute node valency only once - needed for averaging value across interfaces
 ! e.g a point may be shared by 4 nodes if on the corner of 4 elements (valence 4)
 ! and so the stress is given as the average of these 4 
+allocate(node_valency(nnode))
 node_valency=0
 do i_elmt=1,nelmt
   ielmt=i_elmt
@@ -410,7 +433,7 @@ endif
 
 ! HERE IS ALLOCATION OF U VECTOR 
 allocate(load(0:neq),bodyload(0:neq),selfload(0:neq),viscoload(0:neq), &
-resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),            &
+resload(0:neq),du(0:neq),u(0:neq),kmat(nedof,nedof),                   &
 storekmat(nedof,nedof,nelmt), storemmat(nedof,nelmt), stat=istat)
 
 if(istat/=0)then
@@ -418,10 +441,6 @@ if(istat/=0)then
   flush(logunit)
   stop
 endif
-
-
-
-
 
 
 ! Timestepping only needed for plastic/viscoelastic situations
@@ -436,19 +455,18 @@ allocate(ngpart_node(nnode))
 dt=dstep
 nl_tot=0
 
-elas_e0=ZERO
-visco_q0=ZERO
-
-nodalu=ZERO
-bodyload=ZERO
-selfload=ZERO
-viscoload=ZERO
-slipload=ZERO ! slip load
-extload=ZERO ! incremental external load
-ubcload=ZERO
-load=ZERO
-u=ZERO
-
+! Initialise more loads and u vector
+elas_e0   = ZERO
+visco_q0  = ZERO
+nodalu    = ZERO
+bodyload  = ZERO
+selfload  = ZERO
+viscoload = ZERO
+slipload  = ZERO ! slip load
+extload   = ZERO ! incremental external load
+ubcload   = ZERO
+load      = ZERO
+u         = ZERO
 
 
 
@@ -462,13 +480,15 @@ if(solver_type.eq.petsc_solver)then
   log_msg = 'petsc_initialize: SUCCESS!' ; call write_ifproc0()
   
   ! Create sparse vector, matrix, and preallocate                                                         
-  ! TODO: following call is not necessary for RECYCLE                            
-      call petsc_create_vector()                                                     
-      call petsc_matrix_preallocate_size()                                           
-      call petsc_create_matrix()                                                     
-      call petsc_create_solver()                                                     
-      log_msg = 'petsc_preallocate_matrix_size: SUCCESS!' ; call write_ifproc0()
+  ! TODO: following call is not necessary for RECYCLE         
+    call petsc_create_vector()                                                     
+    call petsc_matrix_preallocate_size()                                           
+    call petsc_create_matrix()                                                     
+    call petsc_create_solver()                           
+    log_msg = 'petsc_preallocate_matrix_size: SUCCESS!' ; call write_ifproc0()
 endif 
+
+
 
 
 
@@ -504,16 +524,8 @@ if(ISDISP_DOF)then
 endif
 
 
-
-
-
-
 ! prepare background gravity data
-! I think this only works for a global model where it does radial integration
-! It can use a global model for g0 with local mesh but wont calc gravity
-! just from the local mesh (always relies on some glboal model)
 call prepare_gravity()
-
 
 
 ! Built-in preconditioner stuff? 
@@ -551,7 +563,6 @@ endif
 
 
 ! Compute ELASTIC mass matrix once and for all 
-! THIS SHOULD BE COMPUTE_mass_elastic_GLOBAL!!!! 
 call compute_mass_elastic(storemmat,errcode,errtag)
 
 
@@ -569,7 +580,6 @@ endif
 
 
 
-
 ! Initialise Sea Level 
 if(is_SL)then 
   call prepare_sea_level()
@@ -581,12 +591,18 @@ if(is_SL)then
   endif 
 
 
-  call update_ocean_function(u, errcode, errtag)  ! Calc ocean func
-  call calculate_SL_A                             ! Calc SL area 
+  call update_ocean_function(u, errcode, errtag, use_s0=.true.)  ! Calc ocean func
+  call calculate_SL_A()                                          ! Calc SL area 
   
 
-  !call calc_SL_LHS(errcode, errtag)
+  write(*,*)'Ocean area: ', SLarea
+  
+  write(*,*)'MADE HERE.'
+
+  call calc_SL_LHS() 
 endif 
+
+write(*,*)'MADE OUT.'
 
 
 
@@ -639,8 +655,8 @@ loop_step: do i_step=istep0,nstep
     nodalphi=ZERO
   endif
 
-  if(IS_SL)then
-    nodalsl = ZERO ! Will still then need to allocate nodal SL values?
+  if(ISSL_DOF)then
+    nodalsl = ZERO 
   endif
 
   ubcload=ZERO
@@ -659,9 +675,14 @@ loop_step: do i_step=istep0,nstep
       
       ! Set Petsc stiffness matrix
       if(solver_type.eq.petsc_solver)then
-        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-                                 ang_freq, scale_ang_freq2, &
-                                 reuse_pc_bool=.false.,freq_bool=.true.)            
+        if (ISSL_DOF)then 
+          call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
+          storeRu, storeRphi, storemmat, ang_freq, scale_ang_freq2,    &
+          reuse_pc_bool=.false.,freq_bool=.true.)   
+        else 
+          call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+          ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.true.)   
+        endif 
       endif
 
 
@@ -671,9 +692,14 @@ loop_step: do i_step=istep0,nstep
       call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
     
       if(solver_type.eq.petsc_solver)then
-        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-                                 ang_freq, scale_ang_freq2,            &
-                                reuse_pc_bool=.false.,freq_bool=.false.) 
+        if (ISSL_DOF)then 
+          call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
+          storeRu, storeRphi, storemmat, ang_freq, scale_ang_freq2,    &
+          reuse_pc_bool=.false.,freq_bool=.false.)   
+        else 
+          call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+          ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
+        endif 
       endif
 
     elseif(i_step==2)then
@@ -686,13 +712,25 @@ loop_step: do i_step=istep0,nstep
                                           storekmat, errcode, errtag)
  
       if(solver_type.eq.petsc_solver)then
-        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-                                 ang_freq, scale_ang_freq2, &
-                                 reuse_pc_bool=.true.,freq_bool=.false.) 
+        if (ISSL_DOF)then 
+          call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
+          storeRu, storeRphi, storemmat, ang_freq, scale_ang_freq2,    &
+          reuse_pc_bool=.true.,freq_bool=.false.)   
+        else 
+          call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+          ang_freq, scale_ang_freq2, reuse_pc_bool=.true.,freq_bool=.false.)   
+        endif 
       endif
+
     endif
   endif ! if(steptype.eq.FREQSTEP)
   ! ____________________________________________________________________
+
+
+
+
+
+
 
   ! NOW WE ARE AT A POINT WHERE ANY STIFFNESS MATRICES HAVE BEEN 
   ! CALCULATED 
@@ -787,13 +825,6 @@ loop_step: do i_step=istep0,nstep
 
 
 
-  ! ____________________________________________________________
-  ! NEED TO ADD IN INITIAL SL SETUP AND ADD TO NODALSL HERE
-
-
-  ! ____________________________________________________________
-
-
   ! Reset/initialise the count of ksp and non linear iterations 
   ksp_tot=0; nl_iter=0
 
@@ -811,6 +842,8 @@ loop_step: do i_step=istep0,nstep
   endif
 
   bodyload(0)=ZERO
+
+
 
 
   ! ===================== RUN NON LINEAR ITERATIONS =====================
@@ -834,6 +867,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
       flush(logunit)
     endif
 
+    
     ! starting timer
     call cpu_time(cpu_tstart)
 

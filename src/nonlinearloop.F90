@@ -92,9 +92,7 @@ use solver_petsc
           call control_error(errcode,errtag,stdout,myrank)
         endif
       else
-        !petsc solver
-        !call petsc_set_stiffness_matrix(storekmat)
-        !if(myrank==0)print*,'petsc_set_stiffness_matrix: SUCCESS!'
+         ! petsc solver 
         if(steptype.eq.FREQSTEP.and.isscale_ang_freq)then
           resload=scale_ang_freq2*resload
         endif
@@ -102,7 +100,13 @@ use solver_petsc
         call petsc_set_vector(resload)
         log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0()
   
-        call petsc_solve(du(1:),ksp_iter,ksp_convreason)
+
+        write(*,*)'About to run solver...iteration:'
+        call petsc_print_vector()
+        call petsc_print_matrix()
+
+
+        call petsc_solve(du(1:), ksp_iter, ksp_convreason)
         log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0()
   
         continue
@@ -207,16 +211,14 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
   ! Sea level
   if(ISSL_DOF)then
     do i_dof=1,nndofsl
-      idof=idofsl(i_dof)
       do i_node=1,nnode_fs
-        if(gdof(idof,i_node)/=0)then
+        if(gdof(5,i_node)/=0)then
           ! \theta is a scalar
           nodalsl(i_node)=u(gdof(idof,i_node))
         endif
       enddo
     enddo
   endif
-
 
 
 end subroutine update_nodal_u_vector

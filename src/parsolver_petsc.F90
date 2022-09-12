@@ -130,9 +130,19 @@ allocate(nzeros(neq),stat=ierr)
 call check_allocate(ierr,errsrc)
 
 nzeros=0;
+
+write(SLlogunit,*)'SPARSE PREALLOCATE: '
+write(SLlogunit,*)' nsparse: ', nsparse
+
 do i=1,nsparse
   nzeros(krow_sparse(i))=nzeros(krow_sparse(i))+1
 enddo
+write(SLlogunit,*)' nzeros: ', nzeros
+
+
+
+
+
 nzeros_max=maxscal(maxval(nzeros))
 nzeros_min=minscal(minval(nzeros))
 nzerosoff_max=nzeros_max
@@ -142,6 +152,9 @@ if(myrank==0)then
   flush(logunit)
 endif
 deallocate(nzeros)
+
+
+
 
 ! precompute ownership range OR partion layout
 ng1=ngdof/nproc
@@ -814,7 +827,7 @@ real(kind=8) :: xval
 !  - Note that MatSetValues() uses 0-based row and column numbers
 !  in Fortran as well as in C (as set here in the array "col").
 
-call MatZeroEntries(Amat,ierr)
+call MatZeroEntries(Amat,ierr) ! set all vals to 0
 CHKERRA(ierr)
 call sync_process
 rval=1.0
@@ -843,6 +856,8 @@ do i_elmt=1,nelmt
     enddo                                                                        
   enddo                                                                          
 enddo    
+
+
 
 call MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
 CHKERRA(ierr)
@@ -1016,6 +1031,49 @@ call VecDestroy(vdiag,ierr)
 end subroutine petsc_set_stiffness_matrix_freq
 !===============================================================================
 
+subroutine petsc_print_vector()
+  use global
+  integer :: ierr
+  PetscInt dim
+  character(len=80) :: outputString
+
+
+  write(*,*)'BVEC: '
+  call VecView(bvec, PETSC_VIEWER_STDOUT_WORLD, ierr)
+
+  call VecGetSize(bvec, dim, ierr)
+
+  write(outputString,*) 'Vector dimension: ', dim,'\n'
+
+  call PetscPrintf(PETSC_COMM_WORLD, outputString, ierr) 
+
+end subroutine
+
+
+subroutine petsc_print_matrix()
+  use global
+  implicit none 
+  integer :: ierr
+  character(len=80) :: outputString
+
+  PetscInt m 
+  PetscInt n
+
+
+  call MatView(Amat, PETSC_VIEWER_STDOUT_WORLD, ierr)
+
+  !call MatGetSize(Amat, m, n )
+  !write(outputString,*) 'Matrix dimensions: ', m, '  ', n, '\n'
+
+  !call PetscPrintf(PETSC_COMM_WORLD, outputString, ierr) 
+
+
+end subroutine petsc_print_matrix
+
+
+
+
+
 
 subroutine set_petsc_stiffness(isscale_ang_freq, storekmat, storemmat, &
    ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)
@@ -1031,8 +1089,6 @@ use output_to_user
   real(kind=kreal) :: ang_freq, scale_ang_freq2
 
   logical reuse_pc_bool, freq_bool, isscale_ang_freq
-
-  
 
 ! CODE: 
     if (freq_bool)then 
@@ -1051,8 +1107,46 @@ use output_to_user
 
     endif 
 
-
 end subroutine set_petsc_stiffness
+
+
+
+
+subroutine set_petsc_stiffness_SL(isscale_ang_freq, storekmat,  QSL, storeRu, storeRphi, storemmat, &
+  ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)
+
+! USES 
+use set_precision
+use output_to_user 
+
+ implicit none 
+ real(kind=kreal), allocatable :: storeRu(:,:,:), QSL(:,:), storeRphi(:,:)
+ real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:)
+ real(kind=kreal) :: ang_freq, scale_ang_freq2
+
+ logical reuse_pc_bool, freq_bool, isscale_ang_freq
+
+! CODE: 
+   if (freq_bool)then 
+       call petsc_set_stiffness_matrix_freq(storekmat,storemmat,        &
+                                            ang_freq, scale_ang_freq2,  & 
+                                            isscale_ang_freq)
+       log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;  
+       call write_ifproc0()
+       call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
+   else 
+       call petsc_set_stiffness_matrix_SL(storekmat, QSL, storeRu, storeRphi)
+       log_msg = trim(' petsc_set_stiffness_matrix with SEA LEVEL: SUCCESS!') ;   
+       call write_ifproc0()
+       write(SLlogunit,*)'petsc_set_stiffness_matrix with SEA LEVEL: SUCCESS!'
+       call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
+       call petsc_set_solver()
+   endif 
+
+end subroutine set_petsc_stiffness_SL
+
+
+
 
 
 
@@ -1234,6 +1328,231 @@ call PetscFinalize(ierr)
 
 end subroutine petsc_finalize
 !===============================================================================
+
+
+
+!===============================================================================
+
+subroutine petsc_create_vector_SL()
+  use global 
+  use free_surface
+  implicit none
+  IS global_is,local_is
+  
+  errsrc=trim(myfname)//' => petsc_create_vector_SL'
+  
+  ! dimension of vector: 
+
+  ! create vector objects
+  call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,ngdof+nnode_fs,xvec,ierr)
+  CHKERRA(ierr)
+  call VecDuplicate(xvec,bvec,ierr)
+  CHKERRA(ierr)
+  
+  ! NOT SURE WHAT TO DO HERE - CHANGE neq? 
+  
+  ! local vector
+  call VecCreateSeq(PETSC_COMM_SELF,neq,local_vec,ierr)
+  CHKERRA(ierr)
+  
+  ! objects needed for global vector scattering to local vector
+  ! create local and global IS (index set) objects from the array of local and
+  ! global indices
+  call ISCreateGeneral(PETSC_COMM_WORLD,neq,l2gdof(1:),PETSC_COPY_VALUES,global_is,ierr)
+  CHKERRA(ierr)
+  call ISCreateStride(PETSC_COMM_SELF,neq,0,1,local_is,ierr);
+  CHKERRA(ierr)
+  ! create VecScatter object which is needed to scatter PETSc parallel vectors
+  call VecScatterCreate(bvec,global_is,local_vec,local_is,vscat,ierr)
+  CHKERRA(ierr)
+  call ISDestroy(global_is,ierr) ! no longer necessary
+  call ISDestroy(local_is,ierr)  ! no longer necessary
+  
+  end subroutine petsc_create_vector_SL
+  !===============================================================================
+
+
+
+
+
+  subroutine petsc_set_stiffness_matrix_SL(storekmat, QSL, storeRu, storeRphi)
+    use math_library_mpi,only:sumscal
+    use ieee_arithmetic
+    use free_surface
+    implicit none
+    
+    real(kind=kreal),intent(in) :: storekmat(:,:,:)                                  
+    real(kind=kreal),intent(in) :: QSL(:,:)       
+    real(kind=kreal),intent(in) :: storeRphi(:,:)                                                             
+    real(kind=kreal),intent(in) :: storeRu(:,:,:)                                  
+    integer :: i,i_elmt,ielmt,j,n,ndzero , i_elmtfs, i_gll, ctr  , ictr, i_ctr, j_ctr                                
+    integer :: ggdof_elmt(NEDOF), ggdof_elmt_fs(NEDOF)                                                    
+                                                                                     
+    PetscInt irow,jcol                                                               
+    Vec   vdiag                                                                      
+    PetscScalar rval                                                                 
+    PetscScalar,pointer :: diag_array(:)                                             
+                                                                                     
+    real(kind=8) :: xval
+    
+    ! Set and assemble matrix.
+    !  - Note that MatSetValues() uses 0-based row and column numbers
+    !  in Fortran as well as in C (as set here in the array "col").
+    
+    call MatZeroEntries(Amat,ierr) ! set all vals to 0
+    CHKERRA(ierr)
+    call sync_process
+    rval=1.0
+    
+    ! need some counters to avoid the theta stuff: 
+    i_ctr = 0
+    j_ctr = 0
+
+
+    ! entirely in solid                                                              
+    do i_elmt=1,nelmt                                                                
+      ielmt=i_elmt                                                                   
+      ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
+      ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0   
+      
+      
+      write(*,*)ggdof_elmt
+
+
+      do i=1,NEDOF    
+        
+        i_ctr = i_ctr + 1 ! Counts i index for DOF    
+        
+        if (i_ctr.eq.5)then 
+          ! DOF for theta, ignore 
+          i_ctr = 0
+        else
+          do j=1,NEDOF 
+                                                                
+            irow  = i
+            jcol  = j   
+            j_ctr = j_ctr + 1 
+            
+
+            if (j_ctr.eq.5)then 
+              ! DOF for theta, ignore 
+              j_ctr = 0
+            else
+              ! Displacement or Phi DOF 
+              if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
+                
+                xval=storekmat(i,j,ielmt)       
+                                           
+                if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
+                  write(logunit,*)'ERROR: stiffness matrix has nonfinite value/s!',myrank,ielmt,&
+                  mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
+                  flush(logunit)
+                  stop                                                                     
+                endif                                                                     
+                call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &  
+                storekmat(i,j,ielmt),ADD_VALUES,ierr)                                      
+                CHKERRA(ierr)         
+                
+                write(*,*)ggdof_elmt(irow), ',  ', ggdof_elmt(jcol), ': '
+                write(*,*)storekmat(i,j,ielmt)
+
+              endif !if ggdof != 0       
+            endif !jctr=5                                                           
+          enddo   ! j   
+        endif ! if ictr = 5 
+      enddo    ! i                                                                       
+    enddo  ! ielmt   
+    
+    
+
+    ! Add sea level FS values 
+    do i_elmtfs = 1, nelmt_fs
+  
+      ! Get the index of the DOFs for this element 
+      ggdof_elmt_fs = reshape(ggdof(:,gnum_fs(:, i_elmtfs)),(/NEDOF/))                         
+      ggdof_elmt_fs = ggdof_elmt_fs - 1      ! indexing from 0                   
+
+      ! Initialise counters
+      ctr  = 0  ! Loops through each DOF so we know each 5th one (theta)
+      ictr = 0  ! Each time ctr = 5 add 1 to this for indexing of QSL
+
+      ! Diagonal for theta component 
+      do i_gll = 1, NEDOF
+        ctr = ctr + 1 
+
+        ! Fifth DOF for each element is theta 
+        if(ggdof_elmt_fs(i_gll).ge.0.and.ctr.eq.5)then    
+          ictr = ictr + 1 ! Counts gll index from 1 to ngll2dmax for theta 
+
+          write(*,*)'diag ', ggdof_elmt_fs(i_gll),'  value: ', QSL(ictr, i_elmtfs)
+          call MatSetValues(Amat, 1, ggdof_elmt_fs(i_gll), 1, ggdof_elmt_fs(i_gll),           &  
+          QSL(ictr, i_elmtfs), ADD_VALUES, ierr)                                      
+          CHKERRA(ierr)   
+
+          ctr = 0 ! Reset 
+        endif 
+
+      enddo! i_gll
+  enddo   ! i_elmtfs
+    
+    
+    
+    call MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
+    CHKERRA(ierr)
+    call MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
+    CHKERRA(ierr)
+    
+    if(symmetric_solver)then
+      call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_TRUE,ierr)                            
+      CHKERRA(ierr)  
+    else
+      call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_FALSE,ierr)                            
+      CHKERRA(ierr)  
+    endif
+    
+    !! check symmetry                                                                
+    !call MatDuplicate(Amat,MAT_DO_NOT_COPY_VALUES,AmatT,ierr)                        
+    !CHKERRA(ierr)                                                                   
+    !call MatTranspose(Amat,MAT_INITIAL_MATRIX,AmatT,ierr)                            
+    !CHKERRA(ierr)                                                                   
+    !rval=-1.0                                                                       
+    !call MatAXPY(AmatT,rval,Amat,SAME_NONZERO_PATTERN,ierr)                          
+    !call MatNorm(Amat,NORM_FROBENIUS,mnorm,ierr)                                    
+    !if(myrank==0)print*,'Matrix norm:',mnorm                                        
+    !call MatNorm(AmatT,NORM_FROBENIUS,mnorm,ierr)                                    
+    !if(myrank==0)print*,'Symmetry norm:',mnorm                                      
+    !call MatDestroy(AmatT,ierr)                                                      
+    !if(myrank==0)print*,'matrix setting & assembly complete11!'                     
+    !call sync_process                                                               
+                                                                                     
+    call MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr)                               
+    call MatGetDiagonal(Amat,vdiag,ierr)                                             
+    call VecGetLocalSize(vdiag,n,ierr)                                               
+    CHKERRA(ierr)                                                                    
+    call VecGetArrayF90(vdiag,diag_array,ierr)                                       
+    CHKERRA(ierr)                                                                    
+    ndzero=count(diag_array==0.)                                                     
+    if(ndzero.gt.0)then                                                              
+      write(logunit,*)'WARNING: NZEROs in diagonal:',myrank,n, &
+      count(diag_array==0.),minval(abs(diag_array)),maxval(abs(diag_array))                                
+      flush(logunit)
+    endif                                                                            
+    call VecRestoreArrayF90(vdiag,diag_array,ierr)                                   
+    call sync_process                                                                
+    call VecDestroy(vdiag,ierr)
+                                                          
+    end subroutine petsc_set_stiffness_matrix_SL
+    !===============================================================================
+    
+
+
+
+
+
+
+
+
+
 
 end module parsolver_petsc
 !===============================================================================

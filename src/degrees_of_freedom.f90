@@ -16,23 +16,26 @@ contains
 
 ! This subroutine sets number of degrees of freedom and IDs of nodal dof  
 subroutine initialize_dof()
-use global,only:edofu,edofphi,idofu,nenode,idofphi,nndofu,nndofphi,nndof,      &
-                nedofu,nedofphi,nedof,ISDISP_DOF,ISPOT_DOF, nedofsl, ISSL_DOF, & 
-                nndofsl, idofsl, edofsl, SLlogunit
+use global
 implicit none
-integer :: i_dof,idof
+integer :: i_dof,idof, nelmt_fs, ios
+character(len=80) :: data_path
+character(len=80) :: fname
+integer :: errcode
+character(len=250) :: errtag
+
+
+
 ! total number of degrees of freedom per node
 nndof    = 0
 nedofu   = 0  
-nedofphi = 0
-nedofsl  = 0 
+nedofphi = 0 
 nedof    = 0
 
 ! initialise dof IDs
 idof    = 0
 idofu   = 0
 idofphi = 0
-idofsl  = 0
 
 
 ! displacement
@@ -72,29 +75,30 @@ endif
 
 
 
-! Sea level (theta): 
-if(ISSL_DOF)then
-  write(*,*)'ISSL_DOF is : ', ISSL_DOF 
-  write(SLlogunit,*)'ISSL_DOF is : ', ISSL_DOF, ' -- Activating SL degrees of freedom' 
-  
-  
-  nndof   = nndof + nndofsl   ! Add 1 to nodal degrees of freedom
-  nedofsl = NNDOFSL*nenode    ! SL dof on each gll pt (1) x num of GLL pts
-  nedof   = nedof + nedofsl   ! Add this to total DOF for each element
-  do i_dof=1, nndofsl
-    idof=idof+1
-    idofsl(i_dof)=idof        ! Assign ID of sea level in order of DOFs
-  enddo
+if(ISSL_DOF)then 
+  nndof = nndof + 1 
 
-  allocate(edofsl(nedofsl))
-  write(SLlogunit,*)'Currently adding SL DOF to every node - in future implementation should only be for surface nodes to save memory'
+  ! Assert that all DOFs are on: 
+  if (nndof/=5)then 
+    write(*,*)'ERROR: Trying to calculate SL but not 5 DOFs switched on'
+    stop 
+  endif
 
-endif
+  ! Note here we are setting a possible DOF for theta on every GLL in an 
+  ! element...of course it can only actually be on the surface but 
+  ! for now it is convenient ... may be a memory issue if mesh is huge
+  ! For things like kmat
+  nedof = nedof + nenode  
+          
+endif 
+
 
 
 
 end subroutine initialize_dof
 !===============================================================================
+
+
 
 ! This subroutine sets IDs for the elemental degrees of freedom for
 ! u and \phi which may be used to map the elemental matrices
@@ -104,6 +108,7 @@ use global,only:ISDISP_DOF,ISPOT_DOF,ISSL_DOF, nedofu,nedofphi,ngll,nndofu, &
 implicit none
 integer :: i,iu(NNDOFU),iphi,j,nu, isl
 integer :: iu0, iphi0, isl0
+
 
 ! order ux,uy,uz,\phi
 edofu=-9999
@@ -119,6 +124,7 @@ isl=0
 nu=0
 iu=0
 do i=1,NGLL
+
   if(ISDISP_DOF)then
     iu(1)=iu0+1
     nu=nu+1
@@ -127,15 +133,16 @@ do i=1,NGLL
 
     do j=2,NNDOFU
       nu=nu+1
-
       iu(j)=iu(j-1)+1
       edofu(nu)=iu(j)
+
     enddo
 
     iu0=iu(NNDOFU) ! this will be overwritten if POT_DOF is present
     iphi0=iu(NNDOFU)
-
   endif
+
+
   if(ISPOT_DOF)then
     iphi=iphi0+1
     edofphi(i)=iphi
@@ -144,16 +151,17 @@ do i=1,NGLL
     iphi0=iphi
   endif
 
-  if(ISSL_DOF)then
-    isl=isl0+1
-    edofsl(i)=isl
-
-    iu0=isl    ! Not sure when this will be overwritetn!
-    isl0=isl
-  endif
 enddo
 
 
+
+ ! if(ISSL_DOF)then
+ !   isl=isl0+1
+ !   edofsl(i)=isl
+
+ !   iu0=isl    ! Not sure when this will be overwritetn!
+ !   isl0=isl
+ ! endif
 
 
 
@@ -267,11 +275,13 @@ endif
 ! Sea Level
 if(ISSL_DOF)then
   ! only for nodes on the free surface
-  do i_face=1, nelmt_fs  
+  do i_face = 1, nelmt_fs  
     ! Get g_num values of this face 
     numf  = gnum_fs(:,i_face)
     ! Set these nodes for the index idofsl to 1 (activate them) 
-    gdof(idofsl, numf)=1
+    ! Note here that for SL to be solved we need displacement and 
+    ! phi to be solved so theta will always be the 5th dof slot 
+    gdof(5, numf) = 1
   enddo 
 endif
 
@@ -282,28 +292,67 @@ end subroutine activate_dof
 
 ! This subroutine finalizes the global degrees of freedom IDs.
 subroutine finalize_gdof(errcode,errtag)
-use global,only:gdof,neq,nndof,nnode,g_num,part_path,proc_str,file_head
-use global,only:myrank,nedof
+use global, only:gdof,neq,nndof,nnode,g_num,part_path,proc_str,file_head
+use global, only:myrank,nedof, ISSL_DOF, SLlogunit
+use free_surface
 implicit none
 integer,intent(out) :: errcode
 character(len=250) :: ofname
 character(len=250),intent(out) :: errtag
-integer :: i,istat,j
+integer :: i,istat,j, neqsl
 
 errtag="ERROR: unknown!"
 errcode=-1
 ! Compute modified gdof
 neq=0
+neqsl = 0
 
-do j=1,ubound(gdof,2)
-  do i=1,ubound(gdof,1)
-    if(gdof(i,j)/=0)then
-      neq=neq+1
-      gdof(i,j)=neq
-    endif
+write(SLlogunit,*)
+write(SLlogunit,*)'Finalising DOFs: '
+
+if (ISSL_DOF)then 
+  ! If SL then we want to run it as original version first by ignoring 
+  ! the theta, and then tag on the theta DOF after 
+
+  do j=1,ubound(gdof,2)
+    do i=1,ubound(gdof,1)-1 ! -1 so that not including theta
+      if(gdof(i,j)/=0)then
+        neq=neq+1
+        gdof(i,j)=neq
+      endif
+    enddo
   enddo
-enddo
 
+  write(SLlogunit,*)' - Number of eq. for U, Phi: ', neq
+
+  ! Now index the SL ones 
+  do j=1,ubound(gdof,2)
+      if(gdof(5,j)/=0)then ! always 5th dof 
+        neq=neq+1
+        gdof(5,j)=neq
+        neqsl = neqsl + 1 
+      endif
+  enddo
+
+
+  write(SLlogunit,*)' - Number of eq. for theta : ', neqsl
+  write(SLlogunit,*)'   .......................................'
+  write(SLlogunit,*)' - Total number of eqns    : ', neq
+  write(SLlogunit,*)'   .......................................'
+  write(SLlogunit,*)
+
+else
+  ! Original version 
+  do j=1,ubound(gdof,2)
+    do i=1,ubound(gdof,1)
+      if(gdof(i,j)/=0)then
+        neq=neq+1
+        gdof(i,j)=neq
+      endif
+    enddo
+  enddo
+
+endif 
 
 
 
@@ -335,6 +384,33 @@ errcode=0
 return
 end subroutine finalize_gdof
 !===============================================================================
+
+subroutine sea_level_dof()
+  ! DOF setup for the sea level stuff - requires free surface to be run first.
+  use global 
+  use free_surface 
+  implicit none 
+
+  integer :: ldof, i 
+
+  allocate(edofsl(nnode_fs))
+
+  ! Get last degree of freedom from phi + 1: 
+  ldof = edofphi(nedofphi) + 1
+
+  ! DOFs for SL are sequence starting with ldof since after u and phi
+  do i = 1, nnode_fs
+    edofsl(i) = ldof
+    ldof = ldof + 1 
+  enddo 
+
+
+end subroutine sea_level_dof
+
+
+
+
+
 
 end module dof
 !===============================================================================

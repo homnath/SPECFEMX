@@ -42,6 +42,11 @@ if(myrank==0) then
 endif
 
 nmax=nelmt*(NEDOF*NEDOF)
+
+write(SLlogunit,*)'NEDOF : ', NEDOF
+write(SLlogunit,*)'nelmt : ', nelmt
+write(SLlogunit,*)'nmax  : ', nmax
+
 allocate(col0(nmax),row0(nmax),gcol0(nmax),grow0(nmax),stat=ierr)
 call check_allocate(ierr,errsrc)
 
@@ -50,9 +55,10 @@ call check_allocate(ierr,errsrc)
 
 if(nproc.eq.1)then
   ggdof=gdof
+  write(SLlogunit,*)'single processor - ggdof = gdof = ', ggdof
+
 else
   ! read global degrees of freedoms from DATABASE files
-  ! inner core
   write(spm,'(i10)')myrank
   fname='tmp/'//trim(file_head)//'_ggdof_proc'//trim(adjustl(spm))
   open(unit=10,file=trim(fname),access='stream',form='unformatted',    &
@@ -98,11 +104,14 @@ else
     'gnum NOT_EQUAL_TO gnum_read!',count(g_num-gnum_read.ne.0)
 endif
 
+
+
 ! total degrees of freedoms
 ngdof=maxscal(maxval(ggdof))
 
 if(myrank==0)then
   write(logunit,'(a,i0)')'Total global degrees of freedom: ',ngdof
+  write(SLlogunit,'(a,i0)')'Total global degrees of freedom: ',ngdof
   flush(logunit)
 endif
 
@@ -141,12 +150,29 @@ iseq=.false.
 ! stage 0: store all elements
 ncount=0
 
+
+write(SLlogunit,*)'PREP SPARSE L1: '
+
 do i_elmt=1,nelmt
+  write(SLlogunit,*)'  i_elmt', i_elmt
+
   ielmt=i_elmt
+  ! Vector for single element of the DOFs GIDs for all nodes 
   egdof=reshape(gdof(:,g_num(:,ielmt)),(/NEDOF/))
+
+  write(SLlogunit,*)'  egdof:'
+  write(SLlogunit,*)'  ', egdof
+
   gegdof=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))
+
+  write(SLlogunit,*)'  gegdof:'
+  write(SLlogunit,*)'  ', gegdof
+
+
   iseq(egdof)=.true.
   idgdof=egdof; idggdof=gegdof
+  
+  ! Check no mismatch between egdof and gegdof
   where(idgdof.gt.0)idgdof=1
   where(idggdof.gt.0)idggdof=1
   if(any((idgdof-idggdof).ne.0))then
@@ -160,26 +186,61 @@ do i_elmt=1,nelmt
     print*,'matID:',mat_id(ielmt)
     stop
   endif
+
+
+  
+  write(SLlogunit,*)'  Looping through i, j for each GLL'
   do i=1,NEDOF
+    !write(SLlogunit,*)'   i    :',i
     do j=1,NEDOF
+      !write(SLlogunit,*)'     j    :',j
+
       igdof=egdof(i)
       jgdof=egdof(j)
+      !write(SLlogunit,*)'      igdof:',igdof
+      !write(SLlogunit,*)'      jgdof:',jgdof
+
       if(igdof.gt.0.and.jgdof.gt.0)then
+        !write(SLlogunit,*)'      Both igdof, jgdof > 0: '
+
         ncount=ncount+1
+        !write(SLlogunit,*)'      ncount += 1 becomes ', ncount
+
         row0(ncount)=igdof
         col0(ncount)=jgdof
         grow0(ncount)=gegdof(i)
         gcol0(ncount)=gegdof(j)
+
+        !write(SLlogunit,*)'      Update index ncount for vectors: '
+        !write(SLlogunit,*)'      row0 : '
+        !write(SLlogunit,*)row0
+        !write(SLlogunit,*)'      col0 : '
+        !write(SLlogunit,*)col0
+
+        !write(SLlogunit,*)'      grow0 : '
+        !write(SLlogunit,*)grow0
+
+        !write(SLlogunit,*)'      gcol0 : '
+        !write(SLlogunit,*)gcol0
       endif
     enddo
   enddo
 enddo
 call sync_process
 
+! Ncount now holds the number of matches (ie the number of times where)
+! two DOFIDs are not zero 
+
+
+
+
 if(count(.not.iseq).gt.1)then
   write(logunit,*)'ERRORSP: some degrees of freedoms missing!',myrank,count(.not.iseq),maxval(gdof)
 endif
 deallocate(iseq)
+
+
+
 neq_actual=maxval(gdof)
 call sync_process
 ! stage 1: assemble duplicates
@@ -192,8 +253,17 @@ do i=1,ncount
   if(ind0(i).lt.0)print*,'IMPOSSIBLE:',myrank,neq,row0(i),col0(i),ind0(i)
 enddo
 
+
+!ind0 is (row-1)*neq  + col 
+! I think it is a numbering of each of the dof elements within the matrix of
+! dof combinations where it goes through each element of a column and then 
+! onto the next row 
+
 call i8_uniinv(ind0,iorder)
-nsparse=maxval(iorder)
+
+
+nsparse=maxval(iorder) ! Number of non-zero elemnts in sparse matrix? 
+
 if(myrank==0)write(logunit,'(a,i0,a,i0)')' neq_local: ',neq,' nsparse_local: ',nsparse
 call sync_process
 allocate(krow_sparse(nsparse),kcol_sparse(nsparse),stat=ierr)
@@ -221,6 +291,7 @@ minval(kgrow_sparse).lt.1.or.minval(kgcol_sparse).lt.1)then
 endif
 
 deallocate(row0,col0,grow0,gcol0,ind0,iorder)
+
 
 ! local DOF to global DOF mapping
 allocate(l2gdof(0:neq),stat=ierr)

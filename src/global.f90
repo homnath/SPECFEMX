@@ -252,7 +252,9 @@ character(len=60),allocatable :: mfile_blk(:)
 real(kind=kreal),allocatable :: bulkmod_blk(:),shearmod_blk(:)
 real(kind=kreal),allocatable :: massdens_elmt(:,:),bulkmod_elmt(:,:),          &
 shearmod_elmt(:,:)
-real(kind=kreal),allocatable :: grav0_nodal(:,:),dgrav0_elmt(:,:,:), g0_nodal(:)
+real(kind=kreal),allocatable :: grav0_nodal(:,:),dgrav0_elmt(:,:,:)
+! WE - g at time 0 (normal to the local vertical) 
+real(kind=kreal),allocatable :: g0_nodal(:)
 ! magnetization
 real(kind=kreal),allocatable :: magnetization_elmt(:,:,:)
 integer :: nwmat
@@ -510,17 +512,18 @@ real(kind=kreal)                  :: SL0_constant  ! Constant initial SL value
 real(kind=kreal), allocatable     :: icnodalSL(:,:)  ! Initial condition for SL (gll pt on face, element on Free Surf.)
 real(kind=kreal), allocatable     :: nodalsl0(:)   ! Store of nodal initial SL 
 
-
-
 ! Sea level degrees of freedom 
 logical :: ISSL_DOF   ! Activates SL or not
 integer,parameter :: nndofsl=1  ! number of sea level degrees of freedom per node - \theta
 integer, dimension(nndofsl) :: idofsl    ! should be an array of size 1 (only 1 dof per node) and the ID will be 5 if phi and u are present
 integer :: nedofsl    ! number of elemental degrees of freedom for sea level
 integer,allocatable :: edofsl(:) !IDs for SL degrees of freedom per element
+real(kind=kreal)     :: SLarea            ! Area of water 
 
 
-
+! Matrices for SL 
+!   only needs to be a vector bc diagonal 
+real(kind=kreal), allocatable :: QSL(:,:), storeRu(:,:,:), storeRphi(:,:)
 
 
 

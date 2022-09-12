@@ -221,6 +221,9 @@ call calc_nondimensionalisation_vals
 call prepare_free_surface(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
+! Prepare SEA LEVEL IF NECESSARY
+call sea_level_dof()
+
 
 case_file=trim(out_path)//trim(file_head)//trim(ptail)//'.case'
 if(nexcav==0)then
@@ -261,6 +264,15 @@ call compute_max_elementsize()
 
 ! Work out which solver to use
 call determine_solver(errcode, errtag)
+
+
+write(*,*)' ************* '
+write(*,*)' edofu:  ', edofu
+write(*,*)' ************* '
+write(*,*)' edofphi:  ', edofphi
+write(*,*)' ************* '
+write(*,*)' edofsl:  ', edofsl
+
 
 
 ! Now, call main routine...
