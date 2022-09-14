@@ -222,7 +222,9 @@ call prepare_free_surface(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
 ! Prepare SEA LEVEL IF NECESSARY
-call sea_level_dof()
+if(ISSL_DOF)then 
+  call sea_level_dof()
+endif 
 
 
 case_file=trim(out_path)//trim(file_head)//trim(ptail)//'.case'
@@ -270,9 +272,10 @@ write(*,*)' ************* '
 write(*,*)' edofu:  ', edofu
 write(*,*)' ************* '
 write(*,*)' edofphi:  ', edofphi
-write(*,*)' ************* '
-write(*,*)' edofsl:  ', edofsl
-
+if(ISSL_DOF)then 
+  write(*,*)' ************* '
+  write(*,*)' edofsl:  ', edofsl
+endif 
 
 
 ! Now, call main routine...

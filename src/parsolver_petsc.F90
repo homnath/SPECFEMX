@@ -131,13 +131,11 @@ call check_allocate(ierr,errsrc)
 
 nzeros=0;
 
-write(SLlogunit,*)'SPARSE PREALLOCATE: '
 write(SLlogunit,*)' nsparse: ', nsparse
 
 do i=1,nsparse
   nzeros(krow_sparse(i))=nzeros(krow_sparse(i))+1
 enddo
-write(SLlogunit,*)' nzeros: ', nzeros
 
 
 
@@ -1213,8 +1211,11 @@ PetscInt    ireason
 !TMP !call KSPSetNullSpace(ksp, nullspace,ierr);
 !TMP !call MatNullSpaceDestroy(nullspace,ierr);
 
+
+
 ! Solve the linear system
 call KSPSolve(ksp,bvec,xvec,ierr)
+
 
 ! View solver info; we could instead use the option -ksp_view
 !call KSPView(ksp,PETSC_VIEWER_STDOUT_WORLD,ierr)
@@ -1385,8 +1386,8 @@ subroutine petsc_create_vector_SL()
     real(kind=kreal),intent(in) :: QSL(:,:)       
     real(kind=kreal),intent(in) :: storeRphi(:,:)                                                             
     real(kind=kreal),intent(in) :: storeRu(:,:,:)                                  
-    integer :: i,i_elmt,ielmt,j,n,ndzero , i_elmtfs, i_gll, ctr  , ictr, i_ctr, j_ctr                                
-    integer :: ggdof_elmt(NEDOF), ggdof_elmt_fs(NEDOF)                                                    
+    integer :: i,i_elmt,ielmt,j,n,ndzero , i_elmtfs, i_gll, ctr  , ictr, i_ctr, j_ctr  , idof, i_dim                             
+    integer :: ggdof_elmt(NEDOF), ggdof_elmt_fs(5,maxngll2d)                                                    
                                                                                      
     PetscInt irow,jcol                                                               
     Vec   vdiag                                                                      
@@ -1415,14 +1416,8 @@ subroutine petsc_create_vector_SL()
       ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
       ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0   
       
-      
-      write(*,*)ggdof_elmt
-
-
       do i=1,NEDOF    
-        
         i_ctr = i_ctr + 1 ! Counts i index for DOF    
-        
         if (i_ctr.eq.5)then 
           ! DOF for theta, ignore 
           i_ctr = 0
@@ -1432,7 +1427,6 @@ subroutine petsc_create_vector_SL()
             irow  = i
             jcol  = j   
             j_ctr = j_ctr + 1 
-            
 
             if (j_ctr.eq.5)then 
               ! DOF for theta, ignore 
@@ -1453,8 +1447,8 @@ subroutine petsc_create_vector_SL()
                 storekmat(i,j,ielmt),ADD_VALUES,ierr)                                      
                 CHKERRA(ierr)         
                 
-                write(*,*)ggdof_elmt(irow), ',  ', ggdof_elmt(jcol), ': '
-                write(*,*)storekmat(i,j,ielmt)
+                !write(*,*)ggdof_elmt(irow), ',  ', ggdof_elmt(jcol), ': '
+                !write(*,*)storekmat(i,j,ielmt)
 
               endif !if ggdof != 0       
             endif !jctr=5                                                           
@@ -1469,28 +1463,58 @@ subroutine petsc_create_vector_SL()
     do i_elmtfs = 1, nelmt_fs
   
       ! Get the index of the DOFs for this element 
-      ggdof_elmt_fs = reshape(ggdof(:,gnum_fs(:, i_elmtfs)),(/NEDOF/))                         
+      ggdof_elmt_fs = reshape(ggdof(:,gnum_fs(:, i_elmtfs)),(/5, maxngll2d/))                         
       ggdof_elmt_fs = ggdof_elmt_fs - 1      ! indexing from 0                   
 
-      ! Initialise counters
-      ctr  = 0  ! Loops through each DOF so we know each 5th one (theta)
-      ictr = 0  ! Each time ctr = 5 add 1 to this for indexing of QSL
+      write(*,*)'______________________________________________________'
+      write(*,*)'DOFS:'
+      do j=1,maxngll2d
+        write(*,*)ggdof_elmt_fs(:,j)
+      enddo 
+
 
       ! Diagonal for theta component 
-      do i_gll = 1, NEDOF
-        ctr = ctr + 1 
+      do i_gll = 1, maxngll2d
+        
+        write(*,*)' igll:', i_gll
+        write(*,*)'   displacement:'
+        ! Displacement AMAT SL contribution
+        do i_dim=1,NDIM 
 
-        ! Fifth DOF for each element is theta 
-        if(ggdof_elmt_fs(i_gll).ge.0.and.ctr.eq.5)then    
-          ictr = ictr + 1 ! Counts gll index from 1 to ngll2dmax for theta 
+          idof = ggdof_elmt_fs(i_dim, i_gll)
 
-          write(*,*)'diag ', ggdof_elmt_fs(i_gll),'  value: ', QSL(ictr, i_elmtfs)
-          call MatSetValues(Amat, 1, ggdof_elmt_fs(i_gll), 1, ggdof_elmt_fs(i_gll),           &  
-          QSL(ictr, i_elmtfs), ADD_VALUES, ierr)                                      
+          if(idof.ge.0)then 
+            write(*,*)'       idof:', idof
+            write(*,*)'       val :', storeRu(i_dim, i_gll, i_elmtfs)
+   
+            call MatSetValues(Amat, 1, idof, 1, idof, storeRu(i_dim, i_gll, i_elmtfs), ADD_VALUES, ierr)                                      
+            CHKERRA(ierr)   
+          endif 
+        enddo 
+        
+
+        write(*,*)'   phi:'
+        ! PHI AMAT SL contribution 
+        idof = ggdof_elmt_fs(4,i_gll)
+        if(idof.ge.0)then    
+          call MatSetValues(Amat, 1, idof, 1, idof, storeRphi(i_gll, i_elmtfs), ADD_VALUES, ierr)                                      
           CHKERRA(ierr)   
 
-          ctr = 0 ! Reset 
+          write(*,*)'       idof:', idof
+          write(*,*)'       val :', storeRphi(i_gll, i_elmtfs)
         endif 
+
+        write(*,*)'   sea level:'
+        ! THETA AMAT 
+        idof = ggdof_elmt_fs(5,i_gll)
+        if(idof.ge.0)then    
+          call MatSetValues(Amat, 1, idof, 1, idof, QSL(i_gll, i_elmtfs), ADD_VALUES, ierr)                                      
+          CHKERRA(ierr)   
+
+          write(*,*)'       idof:', idof
+          write(*,*)'       val :', QSL(i_gll, i_elmtfs)
+        endif 
+
 
       enddo! i_gll
   enddo   ! i_elmtfs

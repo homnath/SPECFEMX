@@ -55,8 +55,6 @@ call check_allocate(ierr,errsrc)
 
 if(nproc.eq.1)then
   ggdof=gdof
-  write(SLlogunit,*)'single processor - ggdof = gdof = ', ggdof
-
 else
   ! read global degrees of freedoms from DATABASE files
   write(spm,'(i10)')myrank
@@ -151,22 +149,15 @@ iseq=.false.
 ncount=0
 
 
-write(SLlogunit,*)'PREP SPARSE L1: '
 
 do i_elmt=1,nelmt
-  write(SLlogunit,*)'  i_elmt', i_elmt
 
   ielmt=i_elmt
   ! Vector for single element of the DOFs GIDs for all nodes 
   egdof=reshape(gdof(:,g_num(:,ielmt)),(/NEDOF/))
 
-  write(SLlogunit,*)'  egdof:'
-  write(SLlogunit,*)'  ', egdof
-
   gegdof=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))
 
-  write(SLlogunit,*)'  gegdof:'
-  write(SLlogunit,*)'  ', gegdof
 
 
   iseq(egdof)=.true.
@@ -189,7 +180,6 @@ do i_elmt=1,nelmt
 
 
   
-  write(SLlogunit,*)'  Looping through i, j for each GLL'
   do i=1,NEDOF
     !write(SLlogunit,*)'   i    :',i
     do j=1,NEDOF
@@ -201,27 +191,14 @@ do i_elmt=1,nelmt
       !write(SLlogunit,*)'      jgdof:',jgdof
 
       if(igdof.gt.0.and.jgdof.gt.0)then
-        !write(SLlogunit,*)'      Both igdof, jgdof > 0: '
 
         ncount=ncount+1
-        !write(SLlogunit,*)'      ncount += 1 becomes ', ncount
 
         row0(ncount)=igdof
         col0(ncount)=jgdof
         grow0(ncount)=gegdof(i)
         gcol0(ncount)=gegdof(j)
 
-        !write(SLlogunit,*)'      Update index ncount for vectors: '
-        !write(SLlogunit,*)'      row0 : '
-        !write(SLlogunit,*)row0
-        !write(SLlogunit,*)'      col0 : '
-        !write(SLlogunit,*)col0
-
-        !write(SLlogunit,*)'      grow0 : '
-        !write(SLlogunit,*)grow0
-
-        !write(SLlogunit,*)'      gcol0 : '
-        !write(SLlogunit,*)gcol0
       endif
     enddo
   enddo

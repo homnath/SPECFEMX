@@ -154,17 +154,6 @@ do i=1,NGLL
 enddo
 
 
-
- ! if(ISSL_DOF)then
- !   isl=isl0+1
- !   edofsl(i)=isl
-
- !   iu0=isl    ! Not sure when this will be overwritetn!
- !   isl0=isl
- ! endif
-
-
-
 return
 end subroutine set_element_dof
 !===============================================================================
@@ -393,13 +382,13 @@ subroutine sea_level_dof()
 
   integer :: ldof, i 
 
-  allocate(edofsl(nnode_fs))
+  allocate(edofsl(maxngll2d))
 
   ! Get last degree of freedom from phi + 1: 
   ldof = edofphi(nedofphi) + 1
 
   ! DOFs for SL are sequence starting with ldof since after u and phi
-  do i = 1, nnode_fs
+  do i = 1, maxngll2d
     edofsl(i) = ldof
     ldof = ldof + 1 
   enddo 

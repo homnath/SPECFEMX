@@ -102,8 +102,8 @@ use solver_petsc
   
 
         write(*,*)'About to run solver...iteration:'
-        call petsc_print_vector()
-        call petsc_print_matrix()
+        !call petsc_print_vector()
+        !call petsc_print_matrix()
 
 
         call petsc_solve(du(1:), ksp_iter, ksp_convreason)
@@ -174,7 +174,7 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
   ! IO 
   real(kind=kreal),allocatable :: nodalu(:,:), u(:), nodalphi(:), nodalsl(:)
   ! local: 
-  integer :: i_dof, i_node, idof
+  integer :: i_dof, i_node, idof, i, num(maxngll2d), i_elmt, i_gll 
 
 
   ! Code: 
@@ -183,6 +183,13 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
     ! therefore, NOT u(t+1)=u(t)+du
     ! u contains both diaplacement and/or gravity
     ! displacement
+
+
+  !write(*,*)' ____________________ GDOF ____________________'
+  !do i=1,nnode
+  !  write(*,*)gdof(:,i)
+  !enddo 
+  
   if(ISDISP_DOF)then
     do i_dof=1,nndofu
       idof=idofu(i_dof)
@@ -208,17 +215,35 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
   endif
 
 
+  !write(*,*)'Update the SL vector'
+
   ! Sea level
   if(ISSL_DOF)then
-    do i_dof=1,nndofsl
-      do i_node=1,nnode_fs
-        if(gdof(5,i_node)/=0)then
-          ! \theta is a scalar
-          nodalsl(i_node)=u(gdof(idof,i_node))
+    do i_elmt=1,nelmt_fs
+      num = gnum_fs(:,i_elmt)
+
+      !write(*,*)'i_elmt :  ',  i_elmt
+      !write(*,*)'num    :  ',  num
+
+      do i_gll=1,maxngll2d
+        i_node = num(i_gll)
+
+        if(gdof(5, i_node)/=0)then
+          !write(*,*)'igll             :  ',    i_gll
+          !write(*,*)'inode            :  ',    i_node
+          !write(*,*)'gdof(5,i_node)   :  ',   gdof(5,i_node)
+          !write(*,*)'u(gdof(5,i_node)):  ', u(gdof(5,i_node))
+          !write(*,*)'rgnum_fs(i_gll, i_elmt) : ',rgnum_fs(i_gll, i_elmt)
+          !write(*,*)
+          
+          nodalsl(rgnum_fs(i_gll, i_elmt)) = u(gdof(5,i_node))
         endif
-      enddo
+      enddo 
     enddo
   endif
+
+
+
 
 
 end subroutine update_nodal_u_vector

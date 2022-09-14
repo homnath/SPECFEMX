@@ -134,6 +134,8 @@ real(kind=kreal) :: uerr,maxu,maxdu
 !u: solution (summed over du)
 real(kind=kreal),allocatable :: du(:),u(:),olddu(:)
 
+integer :: i
+
 ! Source frequency function
 real(kind=kreal) :: sff
 real(kind=kreal),allocatable :: eld(:),eload(:),bload(:),   &
@@ -337,6 +339,11 @@ call finalize_gdof(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 log_msg = 'complete!' ; call write_ifproc0()
 
+
+!write(*,*)' GDOF: '
+!do i=1,nnode
+!  write(*,*)gdof(:,i)
+!enddo cat
 
 
 call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
@@ -582,7 +589,7 @@ endif
 
 ! Initialise Sea Level 
 if(is_SL)then 
-  call prepare_sea_level()
+  call prepare_sea_level(nodalsl)
   call set_original_sea_level()
 
   ! Save initial sea level if flagged: 
@@ -594,15 +601,10 @@ if(is_SL)then
   call update_ocean_function(u, errcode, errtag, use_s0=.true.)  ! Calc ocean func
   call calculate_SL_A()                                          ! Calc SL area 
   
-
-  write(*,*)'Ocean area: ', SLarea
-  
-  write(*,*)'MADE HERE.'
-
   call calc_SL_LHS() 
 endif 
 
-write(*,*)'MADE OUT.'
+
 
 
 
@@ -813,6 +815,7 @@ loop_step: do i_step=istep0,nstep
     enddo
   endif
 
+
   ! set BC nodal potential to nodalphi array
   if(ISPOT_DOF)then
     do i_dof=1,nndofphi
@@ -858,9 +861,11 @@ nonlinear: do i_nliter=1,NL_MAXITER
     else
       resload=load-bodyload
     endif
+
     resload(0)=ZERO
     maxresload=maxscal(maxval(abs(resload)))
     maxbodyload=maxscal(maxval(abs(bodyload)))
+    
     if(myrank==0)then
       write(logunit,'(a,i0,1x,e12.5,1x,e12.5)')' Residual NL: ',i_nliter, &
       maxresload,maxbodyload
@@ -871,10 +876,11 @@ nonlinear: do i_nliter=1,NL_MAXITER
     ! starting timer
     call cpu_time(cpu_tstart)
 
-    
+
     call run_solver(resload, dprecon, ndscale, storekmat, du, &
                     scale_ang_freq2, ksp_iter, errcode, ksp_convreason, &
                     errtag, isscale_ang_freq)
+
 
 
     call write_cpu_timer(format_str,cpu_tstart,cpu_tend,telap)
@@ -892,11 +898,15 @@ nonlinear: do i_nliter=1,NL_MAXITER
       flush(logunit)
     endif
 
+
+
+
     if(isplastic)then
       u=du
     else
       u=u+du
     endif
+
 
     maxu=maxscal(maxval(abs(u)))
 
@@ -905,13 +915,19 @@ nonlinear: do i_nliter=1,NL_MAXITER
     call check_convergence(uerr, maxu, maxdu, u, & 
     olddu, resload, nl_isconv, i_nliter)
 
+
+
+
     call sync_process()
-     
     call update_nodal_u_vector(u, nodalu, nodalphi, nodalsl)
+
+
 
     ! Reset bodyload to ZERO for Viscoelastic iteration.
     ! We need to reconcile platic and viscoelastic iterations.
     if(.not.isplastic)bodyload=ZERO; !viscoload=ZERO
+
+
 
     if(ISDISP_DOF)then
       log_msg = trim('computing elemental stress') ;   call write_ifproc0() 
@@ -943,6 +959,8 @@ nonlinear: do i_nliter=1,NL_MAXITER
       endif
       !-------------------------------------------------------------------------
       
+
+
       if(allelastic)exit nonlinear
 
       ! Calculate stress and strain for viscoelastic elements
@@ -1224,7 +1242,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
       call write_scalar_to_file(nnode,DIM_GPOT*nodalphi,ext='gpot',istep=i_step) 
       ! On the free surface
       if(savedata%fsplot)then
-        call write_scalar_to_file_freesurf(nnode_fs,DIM_GPOT*nodalphi(gnode_fs),&
+        call write_scalar_to_file_freesurf(nnode_fs, DIM_GPOT*nodalphi(gnode_fs),&
         ext='gpot',istep=i_step) 
       endif
       if(savedata%fsplot_plane)then

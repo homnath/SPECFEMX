@@ -151,6 +151,7 @@ if(istraction)then
           q(2)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) ! *face_normal(2) !only in Y direction
           ftracload(3:nfdof:3)=ftracload(3:nfdof:3)+ &
           q(3)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) ! *face_normal(3) !only in Z direction
+          
         enddo
         load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
       enddo

@@ -164,6 +164,16 @@ write(*, *)' Created SL log file'
 write(SLlogunit, '(A,/,A)')' ****** CREATED SL LOG FILE ****** ', ' '
 
 ! Write summary of SL inputs: 
+
+write(SLlogunit,*)
+write(SLlogunit,*)'-----------------------------------------------------'
+write(SLlogunit,*)'SL IS_SL         :  ', IS_SL
+write(SLlogunit,*)'SL DOF           :  ', ISSL_DOF
+write(SLlogunit,*)'Save original SL :  ', savedata%sl0
+write(SLlogunit,*)'-----------------------------------------------------'
+write(SLlogunit,*)
+
+
 write(SLlogunit, *)'Sea level data read from:  ', trim(slfile)
 if(IS_CART_SIM)then
     call summarise_SL_input_cart()
@@ -206,16 +216,16 @@ subroutine write_SL0_to_ensight()
     write(SLlogunit,*)'  --> Max sea level: ', maxval(nodalsl0)
     
 
+    
 
     ! On the free surface
     if(savedata%fsplot)then
       call write_scalar_to_file_freesurf(nnode_fs, nodalsl0, &
       ext='sl0',istep=0) 
     endif
-
     
     if(savedata%fsplot_plane)then
-      call write_scalar_to_file_freesurf(nnode_fs,nodalsl0(gnode_fs), &
+      call write_scalar_to_file_freesurf(nnode_fs, nodalsl0, &
       ext='sl0', istep=0,plane=.true.) 
     endif
 
@@ -224,11 +234,8 @@ subroutine write_SL0_to_ensight()
     end subroutine write_SL0_to_ensight
 ! ################# END  LOG AND OUTPUT FUNCTIONS  ####################
 
-
-
-
-! ###################### INITIAL SETUP FUNCTIONS  #####################
-subroutine prepare_sea_level()
+! #################    INITIAL SETUP FUNCTIONS    #####################
+subroutine prepare_sea_level(nodalsl)
     use global 
     use free_surface
     use set_precision
@@ -236,8 +243,8 @@ subroutine prepare_sea_level()
 
     implicit none 
 
-    real(kind=kreal), allocatable ::  nodalsl(:)
     integer :: istattemp, istat
+    real(kind=kreal), allocatable :: nodalsl(:)
 
     write(SLlogunit, *)'Preparing sea level variables...'
     
@@ -261,11 +268,11 @@ subroutine prepare_sea_level()
     endif
 
     ! Need to move to ISSL_DOF when implemented properly
-    allocate(QSL(maxngll2d, nelmt_fs),       stat=istattemp)   ! Store Rphi 
+    allocate(QSL(maxngll2d, nelmt_fs),           stat=istattemp)! Rphi 
     istat=istat+istattemp
-    allocate(storeRphi(maxngll2d, nelmt_fs), stat=istattemp)   ! Store QSL 
+    allocate(storeRphi(maxngll2d, nelmt_fs),     stat=istattemp)! QSL 
     istat=istat+istattemp
-    allocate(storeRu(NDIM, maxngll2d, nelmt_fs),   stat=istattemp)! Store Ru 
+    allocate(storeRu(NDIM, maxngll2d, nelmt_fs), stat=istattemp)! Ru 
     istat=istat+istattemp
 
     QSL        = ZERO
@@ -285,15 +292,19 @@ subroutine prepare_sea_level()
         stop
     else 
         nodalsl = ZERO
+        
         write(SLlogunit, *)'  --> Created Ru matrix'
         write(SLlogunit, *)'  --> Created Rphi matrix'
         write(SLlogunit, *)'  --> Created QSL matrix'
-        write(SLlogunit, *)'  --> Created sea level (nodalsl) vector'
+        write(SLlogunit, *)'  --> Created sea level (nodalsl) vector:'
     endif
 
 
     write(SLlogunit,*)'  ✓ Prepared sea level. '
     write(SLlogunit,*)
+
+
+    return 
 end subroutine prepare_sea_level
 
 
@@ -348,10 +359,6 @@ subroutine set_original_sea_level()
                     ! Get Z coordinates for the face and global IDs 
                     z_coord = g_coord(3,  gnum_fs(i_gll,i_face))
                     theta   = SL0_constant - z_coord 
-                    
-                    !write(SLlogunit,*)'zcoord: ', z_coord
-                    !write(SLlogunit,*)'theta: ', theta
-
                     
                     if(theta.gt.0.0_kreal)then
                         nodalsl0(rgnum_fs(i_gll, i_face)) = theta
@@ -581,6 +588,8 @@ subroutine calc_SL_LHS()
 
         do i_gll = 1, nfgll 
             
+            gid = gnum_fs(i_gll, i_elmtfs) ! Global ID of node
+
             ! Calculate the magnitude of the 2D jacobian 
             dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
             dx_deta = matmul(coord,dshape4(2,:,i_gll))
@@ -591,27 +600,25 @@ subroutine calc_SL_LHS()
             face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
             detjac2d=sqrt(dot_product(face_normal,face_normal))
 
-            pi_2d = theta_tf * gw(i_gll)*detjac2d
-            
+            pi_2d = theta_tf * gw(i_gll)*detjac2d ! Weights*jacw
+
             ! Map QSL diag matrix to vector
             ! QSL(rgnum_fs(i_gll, i_elmtfs)) = QSL(rgnum_fs(i_gll, i_elmtfs)) + theta_tf*pi_2d 
+            ! NOTE THAT THE INTEGRAL IS MULTIPLIED BY RHO_W*g so need to multiply also at each GLL pt 
             ! Will assemble in the Petsc loops 
             ! I dont think the addition is needed
-            QSL(i_gll, i_elmtfs) = QSL(i_gll, i_elmtfs) + theta_tf*pi_2d 
-
+            QSL(i_gll, i_elmtfs) = QSL(i_gll, i_elmtfs) + (theta_tf*pi_2d)* g0_nodal(gid)*rho_water
             
             ! Calculate diag R_phi and R_u matrices: 
-            gid = gnum_fs(i_gll, i_elmtfs) ! Global ID of node
-
-            ! map R_phi                         
-            !phi_ind = (NDIM+1) * gid            ! Index for mapping? 
             rphival = pi_2d*(gcal(gid, i_gll, i_elmtfs) - oceanf(i_elmtfs, i_gll)*iRsum)
-            storeRphi(i_gll, i_elmtfs) = rphival 
+            storeRphi(i_gll, i_elmtfs) =    -(rho_water/g0_nodal(gid)) * rphival 
+
 
 
             do j=1,NDIM
-                storeRu(j, i_gll, i_elmtfs) = rphival*grav0_nodal(j,gid)
+                storeRu(j, i_gll, i_elmtfs) = -(rho_water/g0_nodal(gid))* rphival*grav0_nodal(j,gid)
             enddo 
+
 
         enddo! i_gll
     enddo   ! i_elmtfs
@@ -625,6 +632,13 @@ end subroutine calc_SL_LHS
 
 
 
+
+subroutine calc_SL_RHS(slload)
+    use global 
+    use free_surface 
+    implicit none 
+
+end subroutine calc_SL_RHS
 
 
 

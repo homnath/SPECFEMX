@@ -506,6 +506,11 @@ character(len=250) :: log_msg
 logical :: IS_CART_SIM, IS_GLOB_SIM , is_SL, SL0_is_constant
 character(len=250) :: slfile                ! Input file name 
 
+
+! Constants: 
+real(kind=kreal),parameter :: rho_water_dim = 999.87_kreal !kg/m^3 for 0 Centrigrade
+real(kind=kreal)::  rho_water  !kg/m^3 for 0 Centrigrade
+
 ! Sea Level variables
 real(kind=kreal), allocatable     :: oceanf(:,:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
 real(kind=kreal)                  :: SL0_constant  ! Constant initial SL value 

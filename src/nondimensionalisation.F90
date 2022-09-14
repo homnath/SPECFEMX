@@ -189,11 +189,13 @@ subroutine calc_nondimensionalisation_vals
 
     if(IS_SL)then
       SL0_constant = SL0_constant*NONDIM_L
+      rho_water    = rho_water_dim*NONDIM_DENSITY
     endif 
     
     pole_coord0=pole_coord0*NONDIM_L
     pole_coord1=pole_coord1*NONDIM_L
     axis_range=axis_range*NONDIM_L
+
 
 
   end subroutine apply_nondimensionalisation
