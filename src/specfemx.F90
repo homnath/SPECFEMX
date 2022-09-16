@@ -267,11 +267,14 @@ call compute_max_elementsize()
 ! Work out which solver to use
 call determine_solver(errcode, errtag)
 
-
-write(*,*)' ************* '
-write(*,*)' edofu:  ', edofu
-write(*,*)' ************* '
-write(*,*)' edofphi:  ', edofphi
+if(ISDISP_DOF)then 
+  write(*,*)' ************* '
+  write(*,*)' edofu:  ', edofu
+endif
+if(ISPOT_DOF)then
+  write(*,*)' ************* '
+  write(*,*)' edofphi:  ', edofphi
+endif 
 if(ISSL_DOF)then 
   write(*,*)' ************* '
   write(*,*)' edofsl:  ', edofsl

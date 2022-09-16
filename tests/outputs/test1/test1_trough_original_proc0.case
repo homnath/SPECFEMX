@@ -1,0 +1,6 @@
+FORMAT
+type:  ensight gold
+
+GEOMETRY
+model:    test1_trough_original_proc0.geo
+

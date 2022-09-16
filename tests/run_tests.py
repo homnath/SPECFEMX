@@ -70,7 +70,11 @@ ts = 0 # timestep
 # File path for SPECFEMX_SL results we are testing
 trial_fpath = f'./outputs/test{test_no}/{fname}_proc0.case'
 # File path for results from SPECFEMX (stable) from HNG repo
-stable_fpath = f'./outputs/test{test_no}/{fname}_proc0.case'
+stable_fpath = f'./stable_outputs/test{test_no}/{fname}_proc0.case'
+
+print('Loading data from:')
+print(f'• TEST  : {trial_fpath}')
+print(f'• STABLE: {stable_fpath}')
 
 
 # Get the data for each variable (e.g. strain, displacement)
@@ -93,7 +97,6 @@ try:
 except: 
     errstr = f'Number of variables outputted/loaded here is different: trial = {trial.ntestvars} stable = {stable.ntestvars} \n trial  variables: {trial.testvarnames} \n stable variables: {stable.testvarnames} \n ' 
     raise ValueError(errstr)
-
 
 
 for i in range(trial.ntestvars):
