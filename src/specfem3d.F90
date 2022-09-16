@@ -1366,11 +1366,11 @@ loop_step: do i_step=istep0,nstep
           ext='eps',istep=0)
           ! On the free surface
           if(savedata%fsplot)then
-            call write_vector_to_file_freesurf(nnode_fs,DIM_MOD*strain_nodal(:,gnode_fs),&
+            call write_vector_to_file_freesurf(nnode_fs,strain_nodal(:,gnode_fs),&
             ext='eps',istep=0)
           endif
           if(savedata%fsplot_plane)then
-            call write_vector_to_file_freesurf(nnode_fs,DIM_MOD*strain_nodal(:,gnode_fs),&
+            call write_vector_to_file_freesurf(nnode_fs,strain_nodal(:,gnode_fs),&
             ext='eps',istep=0,plane=.true.)
           endif
           if(trim(devel_example).eq.'axial_rod')then
