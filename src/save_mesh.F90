@@ -40,6 +40,8 @@ use serial_library
 
     ! write original meshes
     log_msg = trim('writing original mesh...') ;   call write_ifproc0()
+    write(*,*)'out path:', trim(out_path)//trim(file_head)
+
     if(infbc)then
         ! classify finite/infinite elements for multiblock data plot
         npart=3

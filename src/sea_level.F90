@@ -661,19 +661,17 @@ subroutine calc_R_internal(i_elmtfs, iface, nfgll, gw, dshape4, num4, internalsu
     integer ::  i_gll, gid
 
     ! Code
-    
     internalsum = ZERO
 
     do i_gll = 1, nfgll 
-        
         ! Calculate the magnitude of the 2D jacobian 
         dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
         dx_deta = matmul(coord,dshape4(2,:,i_gll))
 
         ! Calc normal and therefore jac dec (2D) on the fly
-        face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
-        face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
-        face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+        face_normal(1) = dx_dxi(2) *dx_deta(3) - dx_deta(2)*dx_dxi(3) 
+        face_normal(2) = dx_deta(1)*dx_dxi(3)  - dx_dxi(1)*dx_deta(3)
+        face_normal(3) = dx_dxi(1) *dx_deta(2) - dx_deta(1)*dx_dxi(2)
         detjac2d=sqrt(dot_product(face_normal,face_normal))
 
         ! Get global ID of node: 

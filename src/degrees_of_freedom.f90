@@ -14,6 +14,7 @@ character(len=500),private :: errsrc
 contains
 !-------------------------------------------------------------------------------
 
+
 ! This subroutine sets number of degrees of freedom and IDs of nodal dof  
 subroutine initialize_dof()
 use global
@@ -395,6 +396,11 @@ subroutine sea_level_dof()
 
 
 end subroutine sea_level_dof
+
+
+
+
+
 
 
 

@@ -48,7 +48,6 @@ IF(ISPARALLEL)
   SET(srcparsem
      set_precision_mpi.f90
      mpi_library.f90
-     other_forces.f90
      math_library_mpi.f90
      relaxation_time.f90
      ghost_library_mpi.f90
@@ -110,6 +109,9 @@ SET(srcboth
    save_variables.F90
    nonlinearloop.F90
    sea_level.F90
+   bcs_and_dof.F90
+   other_forces.F90
+   initialise_arrays.F90
    )
 
 

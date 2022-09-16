@@ -323,7 +323,7 @@ return
 end subroutine apply_bc
 !===============================================================================
 !WE - applies non-zero boundary conditions originally in specfem3d.f90
-subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload)
+subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload, nodalu, nodalphi)
   use global 
   use set_precision
   use math_constants
@@ -332,9 +332,9 @@ subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload)
   ! IO 
   integer,allocatable :: num(:),  egdof(:)
   real(kind=kreal), allocatable :: kmat(:,:),storekmat(:,:,:), & 
-                                   bcnodalv(:,:), ubcload(:)
+                                   bcnodalv(:,:), ubcload(:), nodalu(:,:), nodalphi(:)
   ! Local 
-  integer :: i_elmt, i,  ielmt, iedof, j_node, i_dof
+  integer :: i_elmt, i,  ielmt, iedof, j_node, i_dof, j_dof, idof
 
 ! Modify RHS vector for prescribed displacements
   ! i.e. if boundary dispalcements are not equal to zero
@@ -355,6 +355,29 @@ subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload)
       enddo
     enddo
   enddo ! i_elmt
+
+
+
+  ! Set non-zero BC values in nodalu 
+  ! set BC nodal displacements to nodalu array
+  if(ISDISP_DOF)then
+    do i_dof=1,nndofu
+      idof=idofu(i_dof)
+      do j_dof=1,nnode
+        if(bcnodalv(idof,j_dof)/=ZERO)nodalu(i_dof,j_dof)=bcnodalv(idof,j_dof)
+      enddo
+    enddo
+  endif
+
+  ! set BC nodal potential to nodalphi array
+  if(ISPOT_DOF)then
+    do i_dof=1,nndofphi
+      idof=idofphi(i_dof)
+      do j_dof=1,nnode
+        if(bcnodalv(idof,j_dof)/=ZERO)nodalphi(j_dof)=bcnodalv(idof,j_dof)
+      enddo
+    enddo
+  endif
 
 
 

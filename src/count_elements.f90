@@ -194,4 +194,28 @@ end subroutine
 !end subroutine calc_prestress
 
 
+
+subroutine calculate_valency(node_valency, num)
+  use global
+  implicit none 
+
+  ! IO variables 
+  integer,allocatable::num(:),node_valency(:)
+
+  ! Local: 
+  integer :: i_elmt, ielmt 
+
+  allocate(node_valency(nnode))
+  node_valency=0
+  do i_elmt=1,nelmt
+    ielmt=i_elmt
+    num=g_num(:,ielmt)
+    node_valency(num)=node_valency(num)+1
+  enddo
+
+  return 
+end subroutine calculate_valency
+
+
+
 end module count_elements

@@ -2,7 +2,7 @@ module save_variables
 contains 
 
 
-subroutine save_potential_variables(nodalphi,nodalg, nodalB,node_valency, i_step)
+subroutine save_pot_variables(nodalphi,nodalg, nodalB,node_valency, i_step)
 ! USES
 use global 
 use postprocess
@@ -27,92 +27,92 @@ use serial_library
     ! CODE: 
     ! plot gravity potential
     if(savedata%gpot)then
-        call write_scalar_to_file(nnode,DIM_GPOT*nodalphi,ext='gpot',istep=i_step) 
-        ! On the free surface
-        if(savedata%fsplot)then
-          call write_scalar_to_file_freesurf(nnode_fs,DIM_GPOT*nodalphi(gnode_fs), &
-          ext='gpot',istep=i_step) 
-        endif
-        if(savedata%fsplot_plane)then
-          call write_scalar_to_file_freesurf(nnode_fs,DIM_GPOT*nodalphi(gnode_fs), &
-          ext='gpot',istep=i_step,plane=.true.) 
-        endif
+      call write_scalar_to_file(nnode,DIM_GPOT*nodalphi,ext='gpot',istep=i_step) 
+      ! On the free surface
+      if(savedata%fsplot)then
+        call write_scalar_to_file_freesurf(nnode_fs, DIM_GPOT*nodalphi(gnode_fs),&
+        ext='gpot',istep=i_step) 
       endif
-      if(savedata%mpot)then
-        call write_scalar_to_file(nnode,DIM_MPOT*nodalphi,ext='mpot',istep=i_step) 
-        ! On the free surface
-        if(savedata%fsplot)then
-          call write_scalar_to_file_freesurf(nnode_fs,DIM_MPOT*nodalphi(gnode_fs), &
-          ext='mpot',istep=i_step) 
-        endif
-        if(savedata%fsplot_plane)then
-          call write_scalar_to_file_freesurf(nnode_fs,DIM_MPOT*nodalphi(gnode_fs), &
-          ext='mpot',istep=i_step,plane=.true.) 
-        endif
+      if(savedata%fsplot_plane)then
+        call write_scalar_to_file_freesurf(nnode_fs,DIM_GPOT*nodalphi(gnode_fs),&
+        ext='gpot',istep=i_step,plane=.true.) 
       endif
-      
-      ! Gravitational
+    endif
+    if(savedata%mpot)then
+      call write_scalar_to_file(nnode,DIM_MPOT*nodalphi,ext='mpot',istep=i_step) 
+      ! On the free surface
+      if(savedata%fsplot)then
+        call write_scalar_to_file_freesurf(nnode_fs,DIM_MPOT*nodalphi(gnode_fs),&
+        ext='mpot',istep=i_step) 
+      endif
+      if(savedata%fsplot_plane)then
+        call write_scalar_to_file_freesurf(nnode_fs,DIM_MPOT*nodalphi(gnode_fs),&
+        ext='mpot',istep=i_step,plane=.true.) 
+      endif
+    endif
+    
+    ! Gravitational
+    if(savedata%agrav)then
+      ! Compute acceleration due to gravity
+      call compute_gradient_of_scalar(nodalphi,nodalg)
+      if(nproc.gt.1)then
+        call assemble_ghosts_nodal_vector(nodalg,nodalg)
+      endif
+      ! compute average on the sharing nodes
+      do i_comp=1,ndim
+        nodalg(i_comp,:)=nodalg(i_comp,:)/real(node_valency,kreal)
+      enddo
+      ! Plot gravity accelration
       if(savedata%agrav)then
-        ! Compute acceleration due to gravity
-        call compute_gradient_of_scalar(nodalphi,nodalg)
-        if(nproc.gt.1)then
-          call assemble_ghosts_nodal_vector(nodalg,nodalg)
+        call write_vector_to_file(nnode,DIM_G*nodalg,ext='grav',istep=i_step)
+        ! On the free surface
+        if(savedata%fsplot)then
+          call write_vector_to_file_freesurf(nnode_fs,DIM_G*nodalg(:,gnode_fs),&
+          ext='grav',istep=i_step)
         endif
-        ! compute average on the sharing nodes
-        do i_comp=1,ndim
-          nodalg(i_comp,:)=nodalg(i_comp,:)/real(node_valency,kreal)
-        enddo
-        ! Plot gravity accelration
-        if(savedata%agrav)then
-          call write_vector_to_file(nnode,DIM_G*nodalg,ext='grav',istep=i_step)
-          ! On the free surface
-          if(savedata%fsplot)then
-            call write_vector_to_file_freesurf(nnode_fs,DIM_G*nodalg(:,gnode_fs), &
-            ext='grav',istep=i_step)
-          endif
-          if(savedata%fsplot_plane)then
-            call write_vector_to_file_freesurf(nnode_fs,DIM_G*nodalg(:,gnode_fs), &
-            ext='grav',istep=i_step,plane=.true.)
-          endif
+        if(savedata%fsplot_plane)then
+          call write_vector_to_file_freesurf(nnode_fs,DIM_G*nodalg(:,gnode_fs),&
+          ext='grav',istep=i_step,plane=.true.)
         endif
       endif
-  
-  
-      ! Magnetic
+    endif
+    ! Magnetic
+    if(savedata%magb)then
+      ! Compute magnetic field
+      call compute_premagnetic_field(nodalphi,nodalB)
+      if(nproc.gt.1)then
+        call assemble_ghosts_nodal_vector(nodalB,nodalB)
+      endif
+      ! Compute average on the sharing nodes
+      do i_comp=1,ndim
+        nodalB(i_comp,:)=nodalB(i_comp,:)/real(node_valency,kreal)
+      enddo
+      ! Multiply by \mu_0
+      nodalB=MAG_CONS*nodalB
+      ! Plot magnetic field
       if(savedata%magb)then
-        ! Compute magnetic field
-        call compute_premagnetic_field(nodalphi,nodalB)
-        if(nproc.gt.1)then
-          call assemble_ghosts_nodal_vector(nodalB,nodalB)
+        call write_vector_to_file(nnode,DIM_B*nodalB,ext='magb',istep=i_step)
+        ! On the free surface
+        if(savedata%fsplot)then
+          call write_vector_to_file_freesurf(nnode_fs,DIM_B*nodalB(:,gnode_fs),&
+          ext='magb',istep=i_step)
         endif
-        ! Compute average on the sharing nodes
-        do i_comp=1,ndim
-          nodalB(i_comp,:)=nodalB(i_comp,:)/real(node_valency,kreal)
-        enddo
-        ! Multiply by \mu_0
-        nodalB=MAG_CONS*nodalB
-        ! Plot magnetic field
-        if(savedata%magb)then
-          call write_vector_to_file(nnode,DIM_B*nodalB,ext='magb',istep=i_step)
-          ! On the free surface
-          if(savedata%fsplot)then
-            call write_vector_to_file_freesurf(nnode_fs,DIM_B*nodalB(:,gnode_fs), &
-            ext='magb',istep=i_step)
-          endif
-          if(savedata%fsplot_plane)then
-            call write_vector_to_file_freesurf(nnode_fs,DIM_B*nodalB(:,gnode_fs), &
-            ext='magb',istep=i_step,plane=.true.)
-          endif
+        if(savedata%fsplot_plane)then
+          call write_vector_to_file_freesurf(nnode_fs,DIM_B*nodalB(:,gnode_fs),&
+          ext='magb',istep=i_step,plane=.true.)
         endif
       endif
+    endif
 
-      return 
-end subroutine save_potential_variables
+end subroutine save_pot_variables
+
+
+
 
 
 subroutine save_displacement_variables(strain_elmt, strain_nodal, &
                                        stress_elmt, stress_nodal, & 
-                                       nodalu, node_valency, i_step)
+                                       nodalu, node_valency, i_step )
 
     ! USES
 use global 
@@ -135,7 +135,11 @@ use serial_library
     real(kind=kreal),allocatable :: strain_elmt(:,:,:),strain_nodal(:,:),      &
 stress_elmt(:,:,:),stress_nodal(:,:)
 
+  real(kind=kreal):: dm 
+
+
     ! CODE: 
+    
     ! plot displacement
     if(savedata%disp)then
         call write_vector_to_file(nnode,DIM_L*nodalu,ext='dis',istep=i_step) 
@@ -192,10 +196,13 @@ stress_elmt(:,:,:),stress_nodal(:,:)
           call write_vector_to_file_freesurf(nnode_fs,strain_nodal(:,gnode_fs),&
           ext='eps',istep=i_step,plane=.true.)
         endif
+
+        if(trim(devel_example).eq.'axial_rod')then
+          write(77,*)0.0,strain_nodal(1,2099)                               
+          flush(77) 
+        endif
       endif
-      !if(devel_mgll)then
-      !  call compute_save_density_perturbation(nodalu,errcode,errtag)
-      !endif
+
 end subroutine save_displacement_variables
 
 
