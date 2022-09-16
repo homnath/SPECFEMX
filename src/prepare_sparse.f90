@@ -191,7 +191,6 @@ do i=1,ncount
   ind0(i)=int(neq,kint8)*(int(row0(i),kint8)-1_kint8)+int(col0(i),kint8)
   if(ind0(i).lt.0)print*,'IMPOSSIBLE:',myrank,neq,row0(i),col0(i),ind0(i)
 enddo
-
 call i8_uniinv(ind0,iorder)
 nsparse=maxval(iorder)
 if(myrank==0)write(logunit,'(a,i0,a,i0)')' neq_local: ',neq,' nsparse_local: ',nsparse

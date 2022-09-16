@@ -652,7 +652,7 @@ end subroutine insertion_sort
 ! Author: Michel Olagnon
 ! orderpack 2.0
 ! source: http://www.fortran-2000.com/rank/
-Subroutine i8_uniinv (XDONT, IGOEST)
+subroutine i8_uniinv (XDONT, IGOEST)
 ! UNIINV = Merge-sort inverse ranking of an array, with removal of
 ! duplicate entries.
 ! this routine is similar to pure merge-sort ranking, but on
@@ -666,10 +666,16 @@ integer(kind=kint8),intent(in)  :: XDONT(:)
 integer(kind=kint8),intent(out) :: IGOEST(:)
 
 integer(kind=kint8) :: XTST, XDONA, XDONB
-integer(kind=kint8), dimension (SIZE(IGOEST)) :: JWRKT, IRNGT
+! This gives segmentation faults in some cases!
+!integer(kind=kint8), dimension (SIZE(IGOEST)) :: JWRKT, IRNGT
+! Therefore, I changed to allocatable arrays.
+integer(kind=kint8),dimension(:),allocatable :: JWRKT, IRNGT
 integer(kind=kint8) :: LMTNA, LMTNC, IRNG, IRNG1, IRNG2, NUNI
-integer(kind=kint8) :: NVAL, IIND, IWRKD, IWRK, IWRKF, JINDA, IINDA, IINDB
+integer(kind=kint8) :: N, NVAL, IIND, IWRKD, IWRK, IWRKF, JINDA, IINDA, IINDB
 
+N = size(IGOEST)
+allocate(JWRKT(N),IRNGT(N))
+NVAL = Min (SIZE(XDONT), SIZE(IGOEST))
 NVAL = Min (SIZE(XDONT), SIZE(IGOEST))
 select case (NVAL)
 case (:0)
@@ -856,6 +862,7 @@ do IWRK = 1, NVAL
   endif
   IGOEST (IRNG) = NUNI
 enddo
+deallocate(JWRKT,IRNGT)
 return
 end subroutine i8_uniinv
 !===============================================================================
@@ -884,10 +891,15 @@ integer,intent(in)  :: XDONT(:)
 integer,intent(out) :: IGOEST(:)
 
 integer :: XTST, XDONA, XDONB
-integer, dimension (SIZE(IGOEST)) :: JWRKT, IRNGT
+! This gives segmentation faults in some cases!
+!integer, dimension (SIZE(IGOEST)) :: JWRKT, IRNGT
+! Therefore, I changed to allocatable arrays.
+integer,dimension(:),allocatable :: JWRKT, IRNGT
 integer :: LMTNA, LMTNC, IRNG, IRNG1, IRNG2, NUNI
-integer :: NVAL, IIND, IWRKD, IWRK, IWRKF, JINDA, IINDA, IINDB
+integer :: N, NVAL, IIND, IWRKD, IWRK, IWRKF, JINDA, IINDA, IINDB
 
+N = size(IGOEST)
+allocate(JWRKT(N),IRNGT(N))
 NVAL = Min (SIZE(XDONT), SIZE(IGOEST))
 select case (NVAL)
 case (:0)
@@ -1074,6 +1086,7 @@ do IWRK = 1, NVAL
   endif
   IGOEST (IRNG) = NUNI
 enddo
+deallocate(JWRKT,IRNGT)
 return
 end subroutine i_uniinv
 !===============================================================================
