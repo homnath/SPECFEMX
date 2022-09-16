@@ -5,8 +5,8 @@ arc/
 tmp/
 bin/
 mero_kitab/
-output/
-output*/
+./output/
+./output*/
 partition/
 viscoelastic/
 EXAMPLES/
