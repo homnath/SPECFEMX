@@ -633,15 +633,6 @@ end subroutine calc_SL_LHS
 
 
 
-subroutine calc_SL_RHS(slload)
-    use global 
-    use free_surface 
-    implicit none 
-
-end subroutine calc_SL_RHS
-
-
-
 
 
 

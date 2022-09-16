@@ -1,0 +1,42 @@
+#pre information
+preinfo: nproc=1, method='sem', &
+         ngllx=3, nglly=3,       &
+         ngllz=3, nenode=8,      &
+         ngnode=8, inp_path='./tests/input_files/test1', &
+         out_path='./tests', pot_type='gravity',&
+         pot_dof=1, disp_dof=1, grav0=1
+
+#mesh information
+mesh: xfile='trough_coord_x', &
+      yfile='trough_coord_y', &
+      zfile='trough_coord_z', &
+      confile='trough_connectivity', &
+      fsfile='trough_free_surface', &
+      idfile='trough_material_id', &
+      gfile='trough_ghost'
+
+#boundary conditions
+bc: ubc=1, &
+    uxfile='trough_ssbcux', &
+    uyfile='trough_ssbcuy', &
+    uzfile='trough_ssbcuz'
+
+#material list
+material: matfile='trough_material_list',density=1
+
+
+#traction file:
+traction: trfile='trough_traction'
+
+#sea level: 
+#sealevel: slfile='trough_SL', savesl0=1, solvesl=1
+
+#control parameters
+control: ksp_tol=1e-6, ksp_maxiter=1000, nl_tol=1e-4, nl_maxiter=1
+
+#save data
+save: disp=1, strain=1, fsplot=1
+
+#devel
+#devel: nondim=0, mgll=1
+devel: nondim=0
