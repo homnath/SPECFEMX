@@ -23,7 +23,7 @@ Only the following line types are permitted.
 \item[mesh:]      mesh information
 \item[bc:]        boundary conditions information
 \item[traction:]  traction information [optional]
-\item[mraction:]  magnetic traction information [optional]
+\item[mtraction:]  magnetic traction information [optional]
 \item[eqsource:]  earthquake source information [optional]
 \item[stress0:]   initial stress information [optional]. It is generally necessary for multistage excavation.
 \item[benchmark:] benchmark information [Optional]. This is necessary to compute benchmark results. Benchmark results are not avaible for all cases.
@@ -97,6 +97,12 @@ Only the following arguments under the specified line types are permitted.\\
 \end{adescription}
 
 \texttt{\underline{traction:}}
+\begin{adescription}{nl\_maxiter}
+  \item[trfile]: file name of traction specification [string].
+  \\
+\end{adescription}
+
+\texttt{\underline{mtraction:}}
 \begin{adescription}{nl\_maxiter}
   \item[trfile]: file name of traction specification [string].
   \\
@@ -535,6 +541,40 @@ The following data specify the two tractions: a uniformly distributed traction a
 ...\\
 ...}\\
 
+\subsection{Magnetic traction file: \texttt{trfile}}
+
+This file is necessary only for the magnetic anomalies simulations. This file contains the magnetic traction information on the model in the following format:\\
+
+\emph{traction type} (integer, 0 = inherit magnetization from the parent elements, 1 = define uniform magnetization)\\
+if \emph{traction type} = 0\\
+  Nothing to do\\
+if \emph{traction type} = 1\\
+  \emph{Magnetization, FlagForInclinationOrLatitude (0=inc or 1=lat),InclinationOrLatitudeAngle Declination, Azimuth} (SI unit but angle in degrees)\\
+\emph{number of entities} (points for point load or faces for distributed load)\\
+\emph{elementID entityID \\
+elementID entityID \\
+elementID entityID \\
+...\\
+...\\}
+
+This can be repeated as many times as there are tractions.\\
+
+Example:\\
+The following data specify the one traction: inherit magnetization from the parent elements.\\\\
+
+\texttt{0\\
+363\\
+56 1\\
+57 1\\
+58 1\\
+59 1\\
+60 1\\
+61 1\\
+62 1\\
+...\\
+...\\
+...}\\
+
 \subsection{Material list file: \texttt{matfile}}
 
 This file contains material properties of each material regions. Material properties must be listed in a sequential order of the unique material IDs. In addition, this data file optionally contains the information on the water condition of material regions. Material regions or material IDs must be consistent with the Material IDs (Element IDs) defined in \texttt{idfile}. The \texttt{matfile} has the following format:\\\\
@@ -616,6 +656,15 @@ $x_n$ $y_n$ $z_n$ $v_{pn}$ $v_{sn}$ $\rho_n$\\
 }\\
 
 where, $n=n_x \times n_y \times n_z$ is the total number of grid points. 
+\\
+\\
+For magnetic anomalies, add the following information in the material list file:\\
+\\
+\texttt{magnetization:}\\
+\emph{NumberOfMagnetizationBlocks\\
+materialID, Magnetization, FlagForInclinationOrLatitude (0=inc or 1=lat), InclinationOrLatitudeAngle, Declination, Azimuth} (SI unit but angle in degrees)\\
+\emph{...\\
+...\\}
 
 \subsection{Water surface file: \texttt{wsfile}}
 
