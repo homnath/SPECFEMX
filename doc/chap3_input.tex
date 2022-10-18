@@ -66,7 +66,7 @@ Only the following arguments under the specified line types are permitted.\\
   \item[yfile] : file name of $y$-coordinates [string].
   \item[zfile] : file name of $z$-coordinates [string].
   \item[confile]: file name of mesh connectivity [string].
-  \item[fsfile]: file name of free surface [string]. Use an empty file if there is no free surface.
+  \item[fsfile]: file name of free surface [string]. Use an empty file if there is no free surface or the free surface isn't necessary.
   \item[idfile]: file name of element IDs [string].
   \item[gfile]: file name of ghost interfaces, i.e., partition interfaces [string]. Only required for parallel processing.  \\
 \end{adescription}
@@ -403,6 +403,32 @@ Example:\\\\
 33 37 43 39 35 38 44 41 \\
 ...\\
 ...\\}
+
+\subsection{Free surface file: \texttt{fsfile}}
+
+This file contains the free surface information on the model in the following format:\\
+
+\emph{number of entities} (faces)\\
+\emph{elementID entityID \\
+elementID entityID \\
+elementID entityID \\
+...\\
+...\\}
+
+Example:\\
+The following data specify the free surface file.\\\\
+
+\texttt{363\\
+56 1\\
+57 1\\
+58 1\\
+59 1\\
+60 1\\
+61 1\\
+62 1\\
+...\\
+...\\
+...}\\
 
 \subsection{Element IDs (or Material IDs) file: \texttt{idfile}}
 
