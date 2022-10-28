@@ -1,0 +1,17 @@
+\chapter{Testing}
+\label{chap:testing}
+\section{A primer on testing}
+
+
+Testing is only briefly implemented in SPECFEMX to date. We will continue to improve this through time. Due to the usage of global variables, unit testing becomes somewhat problematic so we currently rely on testing complete runs only. All testing capabilities are stored in the ```tests``` directory. Within this directory there exists the following: 
+\begin{\itemize}
+\item ```readme.md``` - A readme file 
+\item ```run_tests.py``` - The main python script that drives the testing (and hosts the test classes)
+\item ```input_files``` - the input files used for different tests  
+\item ```slurms``` - slurm scripts to run these tests on the Princeton Tiger cluster 
+\item ```stable_outputs``` - Stable output files that are tested against 
+\end{\itemize}
+
+The premise of the testing at current is as follows: 
+\begin{enumerate}
+\end{enumerate}
