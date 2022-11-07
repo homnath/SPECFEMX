@@ -711,7 +711,9 @@ if(steptype.eq.FREQSTEP)then
 endif
 
 ! Compute mass matrix
-call compute_mass_elastic(storemmat,errcode,errtag)
+if(ISDISP_DOF)then
+  call compute_mass_elastic(storemmat,errcode,errtag)
+endif
 
 if(isplastic)then
   ! Compute minimum pseudo-time step for viscoplasticity
