@@ -182,6 +182,7 @@ mtraction: do
   enddo ! i_face
   trac_stat=.true.
 enddo mtraction
+if(myrank==0)print*,'bp mtraction'
 close(11)
 deallocate(dshape_quad4)
 deallocate(gll_weights,lagrange_gll,dlagrange_gll)

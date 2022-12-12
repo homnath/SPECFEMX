@@ -848,7 +848,9 @@ loop_step: do i_step=istep0,nstep
       write(logunit,*)'complete!',maxval(abs(extload))
       flush(logunit)
     endif
+    call sync_process()
   endif
+  print*,'bp0'
   ! compute load contributed by the earthquake slip
   ! split-node apparoch: prescribe the slip on the fault explicitly
   if(iseqsource.and.eqsource_type.eq.3)then
@@ -897,6 +899,7 @@ loop_step: do i_step=istep0,nstep
     endif
   endif
   
+  print*,'bp2'
   ! Modify RHS vector for prescribed displacements
   ! WARNING: need to check for nedofu
   do i_elmt=1,nelmt
@@ -915,6 +918,8 @@ loop_step: do i_step=istep0,nstep
       enddo
     enddo
   enddo ! i_elmt
+
+  print*,'bp1'
   if(solver_type.eq.builtin_solver)then
     ! Compute diagonal precoditioner
     dprecon=ZERO
@@ -995,6 +1000,7 @@ loop_step: do i_step=istep0,nstep
   endif
   ksp_tot=0; nl_iter=0
 
+  print*,'bp3'
   ! only for fault
   load=selfload+extload+ubcload+rhoload
 
