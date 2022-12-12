@@ -110,10 +110,15 @@ mtraction: do
   endif
     
   read(11,*)nface
+  print*,myrank,'START: bp mtraction',nface
   do i_face=1,nface
+    print*,myrank,'IN-1: bp mtraction',i_face
     read(11,*)ielmt,iface
+    print*,myrank,'IN--1: bp mtraction',i_face,ielmt,iface
     imat=mat_id(ielmt)
+    print*,myrank,'IN+1: bp mtraction',imat,.not.ismagnet_blk(imat)
     if(.not.ismagnet_blk(imat))then
+      print*,'yesss!'
       write(errtag,'(a)')'ERROR: mtraction element is unmagnetic!'
       return
     endif
@@ -121,6 +126,8 @@ mtraction: do
     !  imatmag=imat_to_imatmag(imat)
     !  M=magnetization_blk(:,imatmag)
     !endif
+    nfgll=ngllxy
+    print*,myrank,'IN0: bp mtraction',i_face,iface,nfgll
     if(iface==1 .or. iface==3)then
       nfgll=ngllzx
       lagrange_gll(1:nfgll,1:nfgll)=lagrange_gll_zx
@@ -159,6 +166,7 @@ mtraction: do
     num=g_num(:,ielmt)
     coord=g_coord(:,num(hexface(iface)%gnode))
     fgdof(1:nfdofphi)=reshape(gdof(idofphi,g_num(hexface(iface)%node,ielmt)),(/nfdofphi/))
+    print*,myrank,'IN1: bp mtraction',i_face,nfgll
     ftracload=zero
     ! compute numerical integration
     do i_gll=1,nfgll
@@ -179,8 +187,10 @@ mtraction: do
     enddo ! i_gll
     load(fgdof(1:nfdofphi))=load(fgdof(1:nfdofphi))+ftracload(1:nfdofphi)
     deallocate(Mgll)
+    print*,myrank,'IN: bp mtraction',i_face
   enddo ! i_face
   trac_stat=.true.
+  print*,myrank,'END: bp mtraction'
 enddo mtraction
 if(myrank==0)print*,'bp mtraction'
 close(11)

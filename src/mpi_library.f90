@@ -66,15 +66,16 @@ end subroutine check_allocate
 subroutine control_error(errcode,errtag,stdout,myrank)
 implicit none
 integer,intent(in) :: errcode
-character(*),intent(in) :: errtag
+character(len=*),intent(in) :: errtag
 integer,intent(in) :: stdout,myrank
 integer :: ierr
 
+! any of the MPI process can have ERROR, NOT necessarily 0 process
+! DO NOT use if(myrank==0) here!
 if(errcode.eq.0)return
 ! print error message and stop execution
-if(myrank==0)write(stdout,'(a)')trim(errtag)
+write(stdout,'(a)')trim(errtag)
 flush(stdout)
-call close_process
 ! stop all the MPI processes, and exit
 write(stdout,'(a)')'aborting MPI...'
 call MPI_ABORT(MPI_COMM_WORLD,errcode,ierr)

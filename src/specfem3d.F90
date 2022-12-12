@@ -842,15 +842,19 @@ loop_step: do i_step=istep0,nstep
       flush(logunit)
     endif
     call apply_mtraction(extload,errcode,errtag)
-    call sync_process
+    if(myrank==0)print*,'bp000'
+    !call sync_process
     call control_error(errcode,errtag,stdout,myrank)
     if(myrank==0)then
       write(logunit,*)'complete!',maxval(abs(extload))
       flush(logunit)
     endif
-    call sync_process()
+    print*,myrank,'bp00'
   endif
-  print*,'bp0'
+  
+  call sync_process
+  if(myrank==0)print*,'bp0'
+ 
   ! compute load contributed by the earthquake slip
   ! split-node apparoch: prescribe the slip on the fault explicitly
   if(iseqsource.and.eqsource_type.eq.3)then
@@ -899,7 +903,8 @@ loop_step: do i_step=istep0,nstep
     endif
   endif
   
-  print*,'bp2'
+  call sync_process
+  if(myrank==0)print*,'bp2'
   ! Modify RHS vector for prescribed displacements
   ! WARNING: need to check for nedofu
   do i_elmt=1,nelmt
@@ -919,7 +924,10 @@ loop_step: do i_step=istep0,nstep
     enddo
   enddo ! i_elmt
 
-  print*,'bp1'
+  call sync_process
+  if(myrank==0)print*,'bp3'
+  if(myrank==0)print*,solver_type,builtin_solver
+  
   if(solver_type.eq.builtin_solver)then
     ! Compute diagonal precoditioner
     dprecon=ZERO
@@ -979,6 +987,9 @@ loop_step: do i_step=istep0,nstep
     endif
   endif !(solver_type.eq.builtin_solver)
 
+  call sync_process
+  if(myrank==0)print*,'bp4'
+  
   extload(0)=ZERO
   ! set BC nodal displacements to nodalu array
   if(ISDISP_DOF)then
@@ -989,6 +1000,10 @@ loop_step: do i_step=istep0,nstep
       enddo
     enddo
   endif
+  
+  call sync_process
+  if(myrank==0)print*,'bp5'
+  
   ! set BC nodal potential to nodalphi array
   if(ISPOT_DOF)then
     do i_dof=1,nndofphi
@@ -1000,7 +1015,8 @@ loop_step: do i_step=istep0,nstep
   endif
   ksp_tot=0; nl_iter=0
 
-  print*,'bp3'
+  call sync_process
+  if(myrank==0)print*,'bp6'
   ! only for fault
   load=selfload+extload+ubcload+rhoload
 
