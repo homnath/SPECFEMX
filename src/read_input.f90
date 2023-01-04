@@ -159,6 +159,7 @@ ISSL_DOF     = .false.
 IS_CART_SIM  = .false.
 IS_GLOB_SIM  = .false.
 is_SL        = .false.
+savedata%sl = .false. 
 savedata%sl0 = .false. 
 
 ! Default savedata options
@@ -995,6 +996,7 @@ do
     call seek_integer('solvesl',ival,args,narg,istat)
     if(istat==0.and.ival.eq.1)then 
       ISSL_DOF = .true.
+      savedata%sl    = .true.
       write(*,*)' SOLVING SEA LEVEL'
     else 
       write(*,*)' WARNING: SL FILE PARSED BUT NOT SOLVING FOR SEA LEVEL'

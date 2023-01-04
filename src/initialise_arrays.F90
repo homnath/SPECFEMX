@@ -8,7 +8,7 @@ module initialise_arrays
 subroutine initialise_RHS_vectors(load, bodyload, selfload, viscoload, &
                                   resload, du, u, kmat, storekmat,     &
                                   storemmat, rhoload, ubcload, nodalu, & 
-                                  visco_q0, elas_e0)
+                                  visco_q0, elas_e0, extload)
 
 use global 
 use math_constants
@@ -46,7 +46,6 @@ bodyload  = ZERO
 selfload  = ZERO
 viscoload = ZERO
 slipload  = ZERO ! slip load
-extload   = ZERO ! incremental external load
 ubcload   = ZERO
 load      = ZERO
 u         = ZERO

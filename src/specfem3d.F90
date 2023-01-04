@@ -301,7 +301,7 @@ call log_KSP_summary()
 call initialise_RHS_vectors(load, bodyload, selfload, viscoload, &
                             resload, du, u, kmat, storekmat,     &
                             storemmat, rhoload, ubcload, nodalu, & 
-                            visco_q0, elas_e0)
+                            visco_q0, elas_e0, extload)
 
 
 
@@ -370,7 +370,8 @@ endif
 call prepare_gravity()
 
 
-! Built-in preconditioner stuff? 
+
+! Allocate for built-in preconditioner stuff? 
 if(solver_type.eq.builtin_solver .or. solver_diagscale)then
   allocate(dprecon(0:neq))
 endif
@@ -418,7 +419,6 @@ endif
 if(isbodyload)then
   call compute_bodyload(selfload,selfweight=isselfweight)
 endif 
-
 
 
 ! Initialise Sea Level 
@@ -498,20 +498,46 @@ loop_step: do i_step=istep0,nstep
   endif
 
   ubcload=ZERO
-  !extload=ZERO
   rhoload=ZERO
-    !  ____________________  END INITIALISE VALUES   ____________________
+  !  ___________________  END INITIALISE VALUES   ____________________
 
 
 
   ! ____________________________________________________________________
   !!!!  CALCULATING ELASTIC/ LIENAR VISCOELASIC STIFFNESS MATRIX  
-  if(steptype.eq.FREQSTEP)then
-    call get_stiffness_matrix_freq()
-
+if(steptype.eq.FREQSTEP)then
+    ! compute elastic stiffness matrix for time = 0
+    if(i_step==0)then
+      call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+    endif
+    
+    ! Set Petsc stiffness matrix
+    if(solver_type.eq.petsc_solver)then
+      if (ISSL_DOF)then 
+        call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
+        slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,    &
+        reuse_pc_bool=.false.,freq_bool=.true.)   
+      else 
+        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+        ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.true.)   
+      endif 
+    endif
 else ! TIMESTEPPING not freqstepping 
-    call get_stiffness_matrix_elastic()
-
+  if(i_step==1)then 
+    ! compute elastic stiffness matrix for time = 0
+    call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+  
+    if(solver_type.eq.petsc_solver)then
+      if (ISSL_DOF)then 
+        call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL, & 
+        slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,     &
+        reuse_pc_bool=.false.,freq_bool=.false.)   
+      else 
+        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+        ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
+      endif 
+    endif
+  
   elseif(i_step==2)then
     ! Since we use a uniform dt, following routine has to be called only once 
     ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
@@ -520,24 +546,20 @@ else ! TIMESTEPPING not freqstepping
     call compute_stiffness_viscoelastic(nelmt_viscoelas,             &   
                                         eid_viscoelas, dt, relaxtime,&
                                         storekmat, errcode, errtag)
-
+  
     if(solver_type.eq.petsc_solver)then
       if (ISSL_DOF)then 
         call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
-        storeRu, storeRphi, storemmat, ang_freq, scale_ang_freq2,    &
+        slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,    &
         reuse_pc_bool=.true.,freq_bool=.false.)   
       else 
         call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
         ang_freq, scale_ang_freq2, reuse_pc_bool=.true.,freq_bool=.false.)   
-      endif 
-    endif
-
-  endif
+      endif ! ISDOF
+    endif ! Petsc solver
+  endif ! istep 
 endif ! if(steptype.eq.FREQSTEP)
 ! ____________  FINISHED CALC. STIFFNESS MATRIX  _________________
-end subroutine get_stiffness_matrix()
-
-
 
 
 
@@ -666,6 +688,10 @@ nonlinear: do i_nliter=1,NL_MAXITER
     call sync_process()
     call update_nodal_u_vector(u, nodalu, nodalphi, nodalsl)
 
+    if(myrank.eq.0.and.ISSL_DOF)then
+      write(SLlogunit,*)
+      write(SLlogunit,*)'Max value: ', maxval(nodalsl)
+    endif 
 
     ! Reset bodyload to ZERO for Viscoelastic iteration.
     ! We need to reconcile platic and viscoelastic iterations.
@@ -740,6 +766,25 @@ nonlinear: do i_nliter=1,NL_MAXITER
                                 i_step=0)
       endif
       
+      if(ISSL_DOF)then 
+        write(SLlogunit,*)'Saving SL to free surface'
+        write(SLlogunit,*)'Saving the current SL values'
+        write(SLlogunit,*)'  --> Min sea level: ', minval(DIM_L*nodalsl)
+        write(SLlogunit,*)'  --> Max sea level: ', maxval(DIM_L*nodalsl)
+
+        if(savedata%fsplot)then
+          call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalsl, &
+          ext='sl',istep=0) 
+        endif
+        
+        if(savedata%fsplot_plane)then
+          call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalsl, &
+          ext='sl', istep=0,plane=.true.) 
+        endif
+      endif 
+
+
+
       if(nstep.le.1.and.NL_MAXITER.le.1)then
         exit loop_step 
       endif
@@ -794,7 +839,8 @@ enddo loop_step ! i_step time/frequency stepping loop
 ! ++++++++++++++++ END OF TIME LOOPING CODE ++++++++++++++++++++++++
 
 
-
+write(*,*)'Completed timesteps. Cleaning up... '
+write(SLlogunit,*)'Completed timesteps. Cleaning up... '
 
 ! ----------------------------- CLEANUP --------------------------------
 if(savedata%strain)then

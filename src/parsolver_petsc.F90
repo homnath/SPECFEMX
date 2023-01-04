@@ -834,7 +834,9 @@ rval=1.0
 do i_elmt=1,nelmt                                                                
   ielmt=i_elmt                                                                   
   ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
-  ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0                            
+  ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0   
+  
+
   do i=1,NEDOF                                                                   
     do j=1,NEDOF                                                                 
     irow=i; jcol=j                                                               
@@ -1110,7 +1112,7 @@ end subroutine set_petsc_stiffness
 
 
 
-subroutine set_petsc_stiffness_SL(isscale_ang_freq, storekmat,  QSL, storeRu, storeRphi, storemmat, &
+subroutine set_petsc_stiffness_SL(isscale_ang_freq, storekmat,  QSL, slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, &
   ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)
 
 ! USES 
@@ -1118,11 +1120,17 @@ use set_precision
 use output_to_user 
 
  implicit none 
- real(kind=kreal), allocatable :: storeRu(:,:,:), QSL(:,:), storeRphi(:,:)
+ real(kind=kreal), allocatable :: QSL(:,:), slc_uu(:,:,:,:,:),       &
+                                  slc_pu(:,:,:,:), slc_ut(:,:,:,:),  &
+                                  slc_pp(:,:,:),   slc_pt(:,:,:),    & 
+                                  slc_up(:,:,:,:)
  real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:)
  real(kind=kreal) :: ang_freq, scale_ang_freq2
 
  logical reuse_pc_bool, freq_bool, isscale_ang_freq
+
+
+
 
 ! CODE: 
    if (freq_bool)then 
@@ -1133,7 +1141,7 @@ use output_to_user
        call write_ifproc0()
        call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
    else 
-       call petsc_set_stiffness_matrix_SL(storekmat, QSL, storeRu, storeRphi)
+       call petsc_set_stiffness_matrix_SL(storekmat, QSL, slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt)
        log_msg = trim(' petsc_set_stiffness_matrix with SEA LEVEL: SUCCESS!') ;   
        call write_ifproc0()
        write(SLlogunit,*)'petsc_set_stiffness_matrix with SEA LEVEL: SUCCESS!'
@@ -1376,147 +1384,165 @@ subroutine petsc_create_vector_SL()
 
 
 
-  subroutine petsc_set_stiffness_matrix_SL(storekmat, QSL, storeRu, storeRphi)
-    use math_library_mpi,only:sumscal
-    use ieee_arithmetic
-    use free_surface
-    implicit none
-    
-    real(kind=kreal),intent(in) :: storekmat(:,:,:)                                  
-    real(kind=kreal),intent(in) :: QSL(:,:)       
-    real(kind=kreal),intent(in) :: storeRphi(:,:)                                                             
-    real(kind=kreal),intent(in) :: storeRu(:,:,:)                                  
-    integer :: i,i_elmt,ielmt,j,n,ndzero , i_elmtfs, i_gll, ctr  , ictr, i_ctr, j_ctr  , idof, i_dim                             
-    integer :: ggdof_elmt(NEDOF), ggdof_elmt_fs(5,maxngll2d)                                                    
-                                                                                     
-    PetscInt irow,jcol                                                               
-    Vec   vdiag                                                                      
-    PetscScalar rval                                                                 
-    PetscScalar,pointer :: diag_array(:)                                             
-                                                                                     
-    real(kind=8) :: xval
-    
-    ! Set and assemble matrix.
-    !  - Note that MatSetValues() uses 0-based row and column numbers
-    !  in Fortran as well as in C (as set here in the array "col").
-    
-    call MatZeroEntries(Amat,ierr) ! set all vals to 0
-    CHKERRA(ierr)
-    call sync_process
-    rval=1.0
-    
-    ! need some counters to avoid the theta stuff: 
-    i_ctr = 0
-    j_ctr = 0
-
-
-    ! entirely in solid                                                              
-    do i_elmt=1,nelmt                                                                
-      ielmt=i_elmt                                                                   
-      ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
-      ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0   
-      
-      do i=1,NEDOF    
-        i_ctr = i_ctr + 1 ! Counts i index for DOF    
-        if (i_ctr.eq.5)then 
-          ! DOF for theta, ignore 
-          i_ctr = 0
-        else
-          do j=1,NEDOF 
-                                                                
-            irow  = i
-            jcol  = j   
-            j_ctr = j_ctr + 1 
-
-            if (j_ctr.eq.5)then 
-              ! DOF for theta, ignore 
-              j_ctr = 0
-            else
-              ! Displacement or Phi DOF 
-              if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
-                
-                xval=storekmat(i,j,ielmt)       
-                                           
-                if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
-                  write(logunit,*)'ERROR: stiffness matrix has nonfinite value/s!',myrank,ielmt,&
-                  mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
-                  flush(logunit)
-                  stop                                                                     
-                endif                                                                     
-                call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &  
-                storekmat(i,j,ielmt),ADD_VALUES,ierr)                                      
-                CHKERRA(ierr)         
-                
-                !write(*,*)ggdof_elmt(irow), ',  ', ggdof_elmt(jcol), ': '
-                !write(*,*)storekmat(i,j,ielmt)
-
-              endif !if ggdof != 0       
-            endif !jctr=5                                                           
-          enddo   ! j   
-        endif ! if ictr = 5 
-      enddo    ! i                                                                       
-    enddo  ! ielmt   
-    
-    
-
-    ! Add sea level FS values 
-    do i_elmtfs = 1, nelmt_fs
+  subroutine petsc_set_stiffness_matrix_SL(storekmat, QSL, slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt)
+  use math_library_mpi,only:sumscal
+  use ieee_arithmetic
+  use free_surface
+  implicit none
   
-      ! Get the index of the DOFs for this element 
-      ggdof_elmt_fs = reshape(ggdof(:,gnum_fs(:, i_elmtfs)),(/5, maxngll2d/))                         
-      ggdof_elmt_fs = ggdof_elmt_fs - 1      ! indexing from 0                   
+  real(kind=kreal),intent(in) :: storekmat(:,:,:)                                  
+  real(kind=kreal),intent(in) :: QSL(:,:), slc_uu(:,:,:,:,:),       &
+                                 slc_pu(:,:,:,:), slc_ut(:,:,:,:),  &
+                                 slc_pp(:,:,:),   slc_pt(:,:,:),    & 
+                                 slc_up(:,:,:,:)      
+                                 
+  integer :: i, i_elmt, ielmt, j, n, k,l, ndzero , i_elmtfs, ctr, ictr, & 
+             i_ctr, j_ctr, idof, i_dim, idof_abg, idof_stn, abg, stn                            
+  integer :: ggdof_elmt(NEDOF), ggdof_elmt_fs(5,maxngll2d), dofs_abg(5),  dofs_stn(5)                                            
+                                                                                    
+  PetscInt irow,jcol                                                               
+  Vec   vdiag                                                                      
+  PetscScalar rval                                                                 
+  PetscScalar,pointer :: diag_array(:)                                             
+                                                                                    
+  real(kind=8) :: xval
+  
+  ! Set and assemble matrix.
+  !  - Note that MatSetValues() uses 0-based row and column numbers
+  !  in Fortran as well as in C (as set here in the array "col").
+  
+  call MatZeroEntries(Amat,ierr) ! set all vals to 0
+  CHKERRA(ierr)
+  call sync_process
+  rval=1.0
+  
+  ! need some counters to avoid the theta stuff: 
+  i_ctr = 0
+  j_ctr = 0
 
-      write(*,*)'______________________________________________________'
-      write(*,*)'DOFS:'
-      do j=1,maxngll2d
-        write(*,*)ggdof_elmt_fs(:,j)
-      enddo 
 
+  ! entirely in solid                                                              
+  do i_elmt=1,nelmt                                                                
+    ielmt=i_elmt                                                                   
+    ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
+    ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0   
+    
+    do i=1,NEDOF    
+      i_ctr = i_ctr + 1 ! Counts i index for DOF    
+      if (i_ctr.eq.5)then 
+        ! DOF for theta, ignore 
+        i_ctr = 0
+      else
+        do j=1,NEDOF 
+                                                              
+          irow  = i
+          jcol  = j   
+          j_ctr = j_ctr + 1 
 
-      ! Diagonal for theta component 
-      do i_gll = 1, maxngll2d
-        
-        write(*,*)' igll:', i_gll
-        write(*,*)'   displacement:'
-        ! Displacement AMAT SL contribution
-        do i_dim=1,NDIM 
+          if (j_ctr.eq.5)then 
+            ! DOF for theta, ignore 
+            j_ctr = 0
+          else
+            ! Displacement or Phi DOF 
+            if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
+              
+              xval=storekmat(i,j,ielmt)       
+                                          
+              if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
+                write(logunit,*)'ERROR: stiffness matrix has nonfinite value/s!',myrank,ielmt,&
+                mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
+                flush(logunit)
+                stop                                                                     
+              endif                                                                     
+              call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &  
+              storekmat(i,j,ielmt),ADD_VALUES,ierr)                                      
+              CHKERRA(ierr)         
+              
+              !write(*,*)ggdof_elmt(irow), ',  ', ggdof_elmt(jcol), ': '
+              !write(*,*)storekmat(i,j,ielmt)
 
-          idof = ggdof_elmt_fs(i_dim, i_gll)
+            endif !if ggdof != 0       
+          endif !jctr=5                                                           
+        enddo   ! j   
+      endif ! if ictr = 5 
+    enddo    ! i                                                                       
+  enddo  ! ielmt   
+    
+    
 
-          if(idof.ge.0)then 
-            write(*,*)'       idof:', idof
-            write(*,*)'       val :', storeRu(i_dim, i_gll, i_elmtfs)
+  ! Add sea level FS values to LHS matrix 
+  do i_elmtfs = 1, nelmt_fs
+
+    ! Get the index of the DOFs for this element 
+    ggdof_elmt_fs = reshape(ggdof(:,gnum_fs(:, i_elmtfs)),(/5, maxngll2d/))                         
+    ggdof_elmt_fs = ggdof_elmt_fs - 1      ! indexing from 0                   
+
    
-            call MatSetValues(Amat, 1, idof, 1, idof, storeRu(i_dim, i_gll, i_elmtfs), ADD_VALUES, ierr)                                      
+    ! Loop through alpha,beta,gamma and then sigma,tau,nu GLL index
+    do abg = 1, maxngll2d
+      dofs_abg = ggdof_elmt_fs(:, abg) ! DOF ids for abg node
+
+
+      ! SET THETA ELEMENTS OF MATRIX  ( QSL matrix)
+      if(dofs_abg(5).ge.0)then    
+        call MatSetValues(Amat, 1, dofs_abg(5), 1, dofs_abg(5), QSL(abg, i_elmtfs), ADD_VALUES, ierr)                                      
+        CHKERRA(ierr)   
+      endif 
+
+
+      ! Loop through STN 
+      do stn = 1, maxngll2d
+        dofs_stn = ggdof_elmt_fs(:, stn) ! DOF ids for stn node
+
+
+        ! Phi_dot Phi_tilde coupling 
+        if(dofs_abg(4).ge.0.and.dofs_stn(4).ge.0)then    
+          call MatSetValues(Amat, 1, dofs_stn(4), 1, dofs_abg(4), slc_pp(abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+          CHKERRA(ierr)   
+        endif 
+
+
+        ! Phi_dot Theta_tilde 
+        if(dofs_abg(4).ge.0.and.dofs_stn(5).ge.0)then    
+          call MatSetValues(Amat, 1, dofs_stn(5), 1, dofs_abg(4), slc_pt(abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+          CHKERRA(ierr)   
+        endif
+
+
+        do k=1,NDIM
+
+          ! Phi_dot U_tilde 
+          if(dofs_abg(4).ge.0.and.dofs_stn(k).ge.0)then    
+            call MatSetValues(Amat, 1, dofs_stn(k), 1, dofs_abg(4), slc_pu(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
             CHKERRA(ierr)   
-          endif 
-        enddo 
-        
+          endif
 
-        write(*,*)'   phi:'
-        ! PHI AMAT SL contribution 
-        idof = ggdof_elmt_fs(4,i_gll)
-        if(idof.ge.0)then    
-          call MatSetValues(Amat, 1, idof, 1, idof, storeRphi(i_gll, i_elmtfs), ADD_VALUES, ierr)                                      
-          CHKERRA(ierr)   
-
-          write(*,*)'       idof:', idof
-          write(*,*)'       val :', storeRphi(i_gll, i_elmtfs)
-        endif 
-
-        write(*,*)'   sea level:'
-        ! THETA AMAT 
-        idof = ggdof_elmt_fs(5,i_gll)
-        if(idof.ge.0)then    
-          call MatSetValues(Amat, 1, idof, 1, idof, QSL(i_gll, i_elmtfs), ADD_VALUES, ierr)                                      
-          CHKERRA(ierr)   
-
-          write(*,*)'       idof:', idof
-          write(*,*)'       val :', QSL(i_gll, i_elmtfs)
-        endif 
+          ! U_dot Theta_tilde 
+          if(dofs_abg(k).ge.0.and.dofs_stn(5).ge.0)then    
+            call MatSetValues(Amat, 1, dofs_stn(5), 1, dofs_abg(k), slc_ut(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+            CHKERRA(ierr)   
+          endif
 
 
-      enddo! i_gll
+          ! U_dot Phi_tilde
+          if(dofs_abg(k).ge.0.and.dofs_stn(4).ge.0)then    
+            call MatSetValues(Amat, 1, dofs_stn(4), 1, dofs_abg(k), slc_up(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+            CHKERRA(ierr)   
+          endif
+          
+
+          do l=1,NDIM
+            ! U_dot U_tilde 
+            if(dofs_abg(k).ge.0.and.dofs_stn(l).ge.0)then    
+              call MatSetValues(Amat, 1, dofs_stn(l), 1, dofs_abg(k), slc_uu(k, abg, l, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+              CHKERRA(ierr)   
+            endif
+          enddo !l
+
+        enddo !k
+
+      enddo! stn
+    enddo! abg
   enddo   ! i_elmtfs
     
     

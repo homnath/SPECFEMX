@@ -168,6 +168,7 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
   ! USES
   use global
   use free_surface
+  use math_constants
   implicit none 
 
 
@@ -215,34 +216,24 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
   endif
 
 
-  !write(*,*)'Update the SL vector'
-
   ! Sea level
   if(ISSL_DOF)then
     do i_elmt=1,nelmt_fs
       num = gnum_fs(:,i_elmt)
 
-      !write(*,*)'i_elmt :  ',  i_elmt
-      !write(*,*)'num    :  ',  num
 
       do i_gll=1,maxngll2d
         i_node = num(i_gll)
 
         if(gdof(5, i_node)/=0)then
-          !write(*,*)'igll             :  ',    i_gll
-          !write(*,*)'inode            :  ',    i_node
-          !write(*,*)'gdof(5,i_node)   :  ',   gdof(5,i_node)
-          !write(*,*)'u(gdof(5,i_node)):  ', u(gdof(5,i_node))
-          !write(*,*)'rgnum_fs(i_gll, i_elmt) : ',rgnum_fs(i_gll, i_elmt)
-          !write(*,*)
-          
           nodalsl(rgnum_fs(i_gll, i_elmt)) = u(gdof(5,i_node))
         endif
-      enddo 
+      enddo !i_gll 
+
     enddo
   endif
 
-
+  
 
 
 

@@ -170,6 +170,7 @@ write(SLlogunit,*)'-----------------------------------------------------'
 write(SLlogunit,*)'SL IS_SL         :  ', IS_SL
 write(SLlogunit,*)'SL DOF           :  ', ISSL_DOF
 write(SLlogunit,*)'Save original SL :  ', savedata%sl0
+write(SLlogunit,*)'Save original SL :  ', savedata%sl
 write(SLlogunit,*)'-----------------------------------------------------'
 write(SLlogunit,*)
 
@@ -267,20 +268,41 @@ subroutine prepare_sea_level(nodalsl)
         istat=istat+istattemp
     endif
 
-    ! Need to move to ISSL_DOF when implemented properly
-    allocate(QSL(maxngll2d, nelmt_fs),           stat=istattemp)! Rphi 
-    istat=istat+istattemp
-    allocate(storeRphi(maxngll2d, nelmt_fs),     stat=istattemp)! QSL 
-    istat=istat+istattemp
-    allocate(storeRu(NDIM, maxngll2d, nelmt_fs), stat=istattemp)! Ru 
-    istat=istat+istattemp
-
-    QSL        = ZERO
-    storeRphi  = ZERO
-    storeRu    = ZERO
+ 
 
 
     if(ISSL_DOF)then 
+
+        ! Allocate LHS matrices for SL to be assembled into stiffness
+        ! matrix: 
+        !   QSL     - coupling Q matrix (theta, theta integral)
+        !   slc_uu  - U_dot,   U_tilde   coupling  
+        !   slc_pu  - Phi_dot, U_tilde   coupling  
+        !   slc_ut  - U_dot,   SL_tilde  coupling  
+
+        !   slc_pp  - Phi_dot, Phi_tilde coupling  
+        !   slc_pt  - Phi_dot, SL_tilde  coupling  
+        !   slc_up  - U_dot,   Phi_tilde coupling  
+        !   
+        allocate(QSL(maxngll2d, nelmt_fs),                          &
+                 slc_uu(NDIM, maxngll2d, NDIM, maxngll2d, nelmt_fs),&
+                 slc_pu(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
+                 slc_ut(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
+                 slc_up(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
+                 slc_pp(maxngll2d, maxngll2d, nelmt_fs),            &
+                 slc_pt(maxngll2d, maxngll2d, nelmt_fs),            &
+                 stat=istattemp) 
+
+        ! Initialise LHS arrays
+        QSL     = ZERO
+        slc_uu  = ZERO
+        slc_pu  = ZERO
+        slc_ut  = ZERO
+        slc_pp  = ZERO
+        slc_pt  = ZERO
+        slc_up  = ZERO
+
+
         allocate(nodalsl(nnode_fs), stat=istattemp)
         istat=istat+istattemp
     endif 
@@ -375,33 +397,6 @@ end subroutine set_original_sea_level
 ! ################### END INITIAL SETUP FUNCTIONS  #####################
 
 
-
-
-real(kind=kreal) function gcal(gid, i_gll, i_elmt)
-! Calculates G (see overleaf doc.)
-use global, only: g0_nodal, grav0_nodal
-use math_constants
-use set_precision
-implicit none
-
-! IO variables
-integer, intent(in) :: gid, i_gll, i_elmt 
-! Local 
-integer :: j ! loop vars
-real(kind=kreal) :: theta_tf, phi_tf, u_tf(NDIM), jsum
-
-! TFs are 1 unless running code tests
-theta_tf = ONE
-phi_tf = ONE
-u_tf = ONE
-
-jsum = ZERO ! initialise
-do j = 1, NDIM
-    jsum = jsum + u_tf(j)*grav0_nodal(j, gid)
-enddo 
-
-gcal = g0_nodal(gid)*theta_tf + (oceanf(i_elmt, i_gll)*(phi_tf + jsum))  
-end function gcal
 
 
 
@@ -554,7 +549,7 @@ subroutine calc_SL_LHS()
     ! The Q matrix is literally just the test function multiplied
     ! by the Jac 2D 
 
-    integer                        :: i_elmtfs, i_gll ! loops
+    integer                        :: i_elmtfs         ! loops
     real(kind=kreal)               :: detjac2d        ! 2d jacobian
     integer                        :: iface           ! face ID for elmt 
     integer                        :: i_elmt          ! face ID for elmt 
@@ -563,8 +558,12 @@ subroutine calc_SL_LHS()
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
     real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
                                     dx_dxi(NDIM), dx_deta(NDIM)
-    integer :: num4(4), gid, phi_ind, u_ind, j
-    real(kind=kreal) :: theta_tf, pi_2d, iRsum, rphival, ruval
+    integer :: num4(4), gid, phi_ind, u_ind, j,k, abg, xyg, gid_abg, gid_xyg, i_dim
+    real(kind=kreal) :: theta_tf, pi_2d_abg, pi_2d_xyg, area_inv, &
+                        ival, iival, rho_over_g, phi_tf, u_tf(NDIM)
+
+    real(kind=kreal) :: g0abg, grav_abgj, Cabg, utfj, g0xyg, Cxyg, v1,rho_Ag
+
 
     ! Code
     allocate(gw(maxngll2d))
@@ -575,7 +574,9 @@ subroutine calc_SL_LHS()
 
 
     theta_tf = ONE
-
+    u_tf = ONE
+    phi_tf = ONE
+    area_inv = ONE/SLarea
 
     do i_elmtfs = 1, nelmt_fs
         ! Get details of face
@@ -583,45 +584,106 @@ subroutine calc_SL_LHS()
         num4   = gnum4_fs(:, i_elmtfs)
         coord  = g_coord(:,num4)
 
-        ! Get internal sum used for R matrix calculations 
-            call calc_R_internal(i_elmtfs, iface, nfgll, gw, dshape4, num4, iRsum)
+       
+        do abg = 1, nfgll ! ABG
+            gid_abg = gnum_fs(abg, i_elmtfs) ! Global ID of node ABG
 
-        do i_gll = 1, nfgll 
-            
-            gid = gnum_fs(i_gll, i_elmtfs) ! Global ID of node
-
-            ! Calculate the magnitude of the 2D jacobian 
-            dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
-            dx_deta = matmul(coord,dshape4(2,:,i_gll))
-
-            ! Calc normal and therefore jac dec (2D) on the fly
+            ! Get Jacobian_2d x weights for ABG 
+            dx_dxi  = matmul(coord,dshape4(1,:,abg))
+            dx_deta = matmul(coord,dshape4(2,:,abg))
             face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
             face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
             face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-            detjac2d=sqrt(dot_product(face_normal,face_normal))
+            pi_2d_abg   = theta_tf * gw(abg)*sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
 
-            pi_2d = theta_tf * gw(i_gll)*detjac2d ! Weights*jacw
-
-            ! Map QSL diag matrix to vector
-            ! QSL(rgnum_fs(i_gll, i_elmtfs)) = QSL(rgnum_fs(i_gll, i_elmtfs)) + theta_tf*pi_2d 
-            ! NOTE THAT THE INTEGRAL IS MULTIPLIED BY RHO_W*g so need to multiply also at each GLL pt 
-            ! Will assemble in the Petsc loops 
-            ! I dont think the addition is needed
-            QSL(i_gll, i_elmtfs) = QSL(i_gll, i_elmtfs) + (theta_tf*pi_2d)* g0_nodal(gid)*rho_water
             
-            ! Calculate diag R_phi and R_u matrices: 
-            rphival = pi_2d*(gcal(gid, i_gll, i_elmtfs) - oceanf(i_elmtfs, i_gll)*iRsum)
-            storeRphi(i_gll, i_elmtfs) =    -(rho_water/g0_nodal(gid)) * rphival 
+            ! Non-coupling Kmat terms (ie SL integral)
+            QSL(abg, i_elmtfs) = QSL(abg, i_elmtfs) + (theta_tf*pi_2d_abg)* g0_nodal(gid_abg)*rho_water
 
 
+            ! Factor of rho/g outside of integral 
+            rho_over_g =  (-rho_water/g0_nodal(gid_abg))       ! -rho/g
+            rho_Ag     =  rho_water/(g0_nodal(gid_abg)*SLarea) !  rho/g*Area
+
+            ! Get the values here because they are repeated lots 
+            g0abg      = g0_nodal(gid_abg)      ! g0 abg 
+            Cabg       = oceanf(i_elmtfs, abg)  ! Ocean func abg
+
+
+            ! UPDATE THE ABG-ABG INDICES: 
+            ! Phi_dot theta_tilde
+            slc_pt(abg, abg, i_elmtfs) = slc_pt(abg, abg, i_elmtfs) + (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
+            ! Phi_dot phi_tilde
+            slc_pp(abg, abg, i_elmtfs) = slc_pp(abg, abg, i_elmtfs) + (phi_tf * pi_2d_abg * Cabg * rho_over_g)
+            
 
             do j=1,NDIM
-                storeRu(j, i_gll, i_elmtfs) = -(rho_water/g0_nodal(gid))* rphival*grav0_nodal(j,gid)
-            enddo 
+                grav_abgj = grav0_nodal(j, gid_abg)
+
+                ! Phi_dot u_tilde
+                slc_pu(j, abg, abg, i_elmtfs) = slc_pu(j, abg, abg, i_elmtfs) + (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g) 
+
+                ! u_dot theta_tilde
+                slc_ut(j, abg, abg, i_elmtfs) = slc_ut(j, abg, abg, i_elmtfs) + (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)
+
+                ! u_dot phi_tilde
+                slc_up(j, abg, abg, i_elmtfs) = slc_up(j, abg, abg, i_elmtfs) + (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
+
+                do k=1,NDIM
+                    ! u_dot u_phi 
+                    slc_uu(j, abg, k, abg, i_elmtfs) = slc_uu(j, abg, k, abg, i_elmtfs) + (Cabg * pi_2d_abg * grav0_nodal(j, gid_abg) *  u_tf(k) * grav0_nodal(k, gid_abg)  * rho_over_g)
+                enddo !k
+            enddo  ! j 
 
 
-        enddo! i_gll
-    enddo   ! i_elmtfs
+
+
+
+            ! Diagonal+non-diagonal components of Kmat coupling SL 
+            do xyg = 1, nfgll !XYG
+                gid_xyg = gnum_fs(xyg, i_elmtfs) ! Global ID of node XYG
+
+                ! Get Jacobian_2d x weights for XYG 
+                dx_dxi  = matmul(coord,dshape4(1,:,xyg))
+                dx_deta = matmul(coord,dshape4(2,:,xyg))
+                face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
+                face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+                face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+
+                
+                pi_2d_xyg  = theta_tf * gw(xyg)*sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
+                g0xyg      = g0_nodal(gid_xyg)      ! g0 abg 
+                Cxyg       = oceanf(i_elmtfs, xyg)  ! Ocean func abg
+
+
+
+                ! Note here that ABG is the index of the variable
+                ! and XYG is the test function so when we assemble the 
+                ! matrix, ABG should be the column index 
+
+                slc_pt(abg, xyg, i_elmtfs) = slc_pt(abg, xyg, i_elmtfs) + (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg)*rho_Ag
+
+                slc_pp(abg, xyg, i_elmtfs) = slc_pp(abg, xyg, i_elmtfs) + ( Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg)*rho_Ag
+
+
+                do j=1,NDIM
+                    v1 = pi_2d_abg * Cabg * grav0_nodal(j, gid_abg) * pi_2d_xyg 
+
+                    slc_pu(j, abg, xyg, i_elmtfs) = slc_pu(j, abg, xyg, i_elmtfs) + (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  grav0_nodal(j, gid_xyg) )*rho_Ag
+
+                    slc_ut(j, abg, xyg, i_elmtfs) = slc_ut(j, abg, xyg, i_elmtfs) + (v1 * g0xyg * theta_tf )*rho_Ag 
+
+                    slc_up(j, abg, xyg, i_elmtfs) = slc_up(j, abg, xyg, i_elmtfs) + (v1 * Cxyg * phi_tf)*rho_Ag
+
+                    do k = 1, NDIM 
+                        slc_uu(j, abg, k, xyg, i_elmtfs) = slc_uu(j, abg, k, xyg, i_elmtfs)  + (v1 * Cxyg * u_tf(k) *   grav0_nodal(k, gid_xyg))*rho_Ag
+                    enddo ! k 
+
+                enddo ! j
+
+            enddo! xyg
+        enddo! abg
+    enddo! i_elmtfs
 
     write(SLlogunit,*)'  ✓ Calculated LHS'
 
@@ -635,53 +697,6 @@ end subroutine calc_SL_LHS
 
 
 
-
-
-subroutine calc_R_internal(i_elmtfs, iface, nfgll, gw, dshape4, num4, internalsum)
-    ! Calculates internal summation in both R matrices 
-    use global
-    use element
-    use free_surface
-    use integration
-    use math_constants
-    implicit none 
-    ! IO variables
-    integer                        :: i_elmtfs  ! loops
-    integer                        :: iface           ! face ID for elmt 
-    integer                        :: nfgll           ! ngll on 2D face
-    real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
-    real(kind=kreal), allocatable  :: dshape4(:,:,:)
-    real(kind=kreal)               :: coord(ndim,4)
-    integer                        :: num4(4)
-    ! RETURNS:
-    real(kind=kreal)               :: internalsum
-
-    ! Local 
-    real(kind=kreal) :: face_normal(3), dx_dxi(NDIM), dx_deta(NDIM), detjac2d  
-    integer ::  i_gll, gid
-
-    ! Code
-    internalsum = ZERO
-
-    do i_gll = 1, nfgll 
-        ! Calculate the magnitude of the 2D jacobian 
-        dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
-        dx_deta = matmul(coord,dshape4(2,:,i_gll))
-
-        ! Calc normal and therefore jac dec (2D) on the fly
-        face_normal(1) = dx_dxi(2) *dx_deta(3) - dx_deta(2)*dx_dxi(3) 
-        face_normal(2) = dx_deta(1)*dx_dxi(3)  - dx_dxi(1)*dx_deta(3)
-        face_normal(3) = dx_dxi(1) *dx_deta(2) - dx_deta(1)*dx_dxi(2)
-        detjac2d=sqrt(dot_product(face_normal,face_normal))
-
-        ! Get global ID of node: 
-        gid = gnum_fs(i_gll, i_elmtfs)
-        internalsum = internalsum + (gw(i_gll) * detjac2d * gcal(gid, i_gll, i_elmtfs))
-    enddo! i_gll
-
-
-    internalsum = internalsum/SLarea
-end subroutine calc_R_internal 
 
     
 

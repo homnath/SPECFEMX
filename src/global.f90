@@ -479,6 +479,7 @@ type savedata_options
   logical :: mpot,magb
   logical :: infinite
   logical :: sl0 ! initial sea level
+  logical :: sl  ! current sea level
   ! Free surface plot. If this option is .TRUE., and the free surface file is
   ! given, the result will be plotted on the free surface.
   logical :: fsplot,fsplot_plane 
@@ -501,6 +502,8 @@ character(len=250) :: log_msg
 
 
 
+
+! _________________________ SEA LEVEL STUFF ___________________________
 
 ! Flag for cartesian or global simulation 
 logical :: IS_CART_SIM, IS_GLOB_SIM , is_SL, SL0_is_constant
@@ -528,7 +531,10 @@ real(kind=kreal)     :: SLarea            ! Area of water
 
 ! Matrices for SL 
 !   only needs to be a vector bc diagonal 
-real(kind=kreal), allocatable :: QSL(:,:), storeRu(:,:,:), storeRphi(:,:)
+real(kind=kreal), allocatable :: QSL(:,:),        slc_uu(:,:,:,:,:),  &
+                                 slc_pu(:,:,:,:), slc_ut(:,:,:,:),  &
+                                 slc_pp(:,:,:),   slc_pt(:,:,:),    & 
+                                 slc_up(:,:,:,:)
 
 
 

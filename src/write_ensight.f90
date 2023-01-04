@@ -179,6 +179,10 @@ if(savedata%sl0)then
   write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','sea_level0',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.sl0'
 endif
+if(savedata%sl)then
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','sea_level',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.sl'
+endif
 if(savedata%agrav)then
   write(11,'(a,i0,a,a,a,a,/)')'vector per node: ',ts,' ','gravity_acceleration',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.grav'
