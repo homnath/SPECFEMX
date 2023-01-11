@@ -495,13 +495,20 @@ character(len=1),parameter :: CR=achar(13) ! carriage return to overwrite
 ! format string for time step
 character(len=20) :: tstep_sformat
 ! Log file all information
-character(len=250) :: log_file, SL_log_file
+character(len=250) :: log_file, SL_log_file, ICE_log_file
 ! file unit ID for log file
-integer :: logunit=7, SLlogunit=57
+integer :: logunit=7, SLlogunit=57, ICElogunit=67
 integer :: stdout=6
 
 character(len=250) :: log_msg
 
+
+
+! _________________________ ICE PARAMETERS _________________________
+character(len=250) :: icefile                ! Input file name 
+logical :: is_ICE
+integer, allocatable  :: iceobjs(:,:) !  list of ice objects read in, 
+integer ::  nice_obj            !num of ice objs.
 
 
 

@@ -97,6 +97,8 @@ errtag=""; errcode=-1
 !******************************************************************************
 !******************************************************************************
 
+
+
 ! Start up MPI 
 call start_process()
 
@@ -107,11 +109,19 @@ call process_user_input(cmd, tdate, ttime, tzone, ios, path, &
                         cpu_tstart)
 
 
+ismesh_only = .true.
+
 ! Create SL log file  
 if(is_SL)then 
   write(*,*)' Creating SL log file ... '
   call start_SL_log(errcode, errtag)
   flush(SLlogunit)
+endif 
+
+if(is_ICE)then 
+  write(*,*)' Creating ICE log file ... '
+  call start_ICE_log(errcode, errtag)
+  flush(ICElogunit)
 endif 
 
 ! Calculate model extents for individual processors/whole model

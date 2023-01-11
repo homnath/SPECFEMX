@@ -181,14 +181,11 @@ do i_elmt=1,nelmt
 
   
   do i=1,NEDOF
-    !write(SLlogunit,*)'   i    :',i
     do j=1,NEDOF
-      !write(SLlogunit,*)'     j    :',j
 
       igdof=egdof(i)
       jgdof=egdof(j)
-      !write(SLlogunit,*)'      igdof:',igdof
-      !write(SLlogunit,*)'      jgdof:',jgdof
+ 
 
       if(igdof.gt.0.and.jgdof.gt.0)then
 

@@ -171,8 +171,6 @@ write(SLlogunit,*)'SL IS_SL         :  ', IS_SL
 write(SLlogunit,*)'SL DOF           :  ', ISSL_DOF
 write(SLlogunit,*)'Save original SL :  ', savedata%sl0
 write(SLlogunit,*)'Save SL          :  ', savedata%sl
-write(SLlogunit,*)'Save original ice:  ', savedata%ice0
-write(SLlogunit,*)'Save ice         :  ', savedata%ice
 write(SLlogunit,*)'-----------------------------------------------------'
 write(SLlogunit,*)
 
@@ -188,7 +186,62 @@ else
     stop
 endif 
 end subroutine start_SL_log
+
+
+
+
+subroutine start_ICE_log(errcode, errtag)
+
+use global
+#if(USE_MPI)
+use mpi_library
+#else 
+use serial_library
+#endif  
+implicit none 
+    
+    character(len=250) :: errtag
+    integer :: ios, errcode
+    
+    
+    ! Create file 
+    if(myrank==0)then
+        ICE_log_file = trim(file_head)//'ICE.log'
+        open(unit=ICElogunit,file=trim(ICE_log_file),status='replace',action='write',iostat=ios)
+        if(ios.ne.0)then
+            write(errtag,'(a)')'ERROR: cannot open log file: '//trim(ICE_log_file)
+            call control_error(errcode,errtag,stdout,myrank)
+        endif
+    endif 
+    
+    ! Write confirmation of file: 
+    write(*, *)' Created ICE log file'
+    write(ICElogunit, '(A,/,A)')' ****** CREATED SL LOG FILE ****** ', ' '
+    
+    ! Write summary of SL inputs: 
+    
+    write(ICElogunit,*)
+    write(ICElogunit,*)'-----------------------------------------------------'
+    write(ICElogunit,*)'IS_ICE            :  ', IS_ICE
+    write(ICElogunit,*)'Save original ICE :  ', savedata%ice0
+    write(ICElogunit,*)'Save SL           :  ', savedata%ice
+    write(ICElogunit,*)'-----------------------------------------------------'
+    write(ICElogunit,*)
+    
+    
+    write(ICElogunit, *)'Ice data read from:  ', trim(slfile)
+    if(IS_CART_SIM)then
+        call summarise_ICE_input_cart()
+    elseif(IS_GLOB_SIM)then 
+        write(*,*) 'GLOBAL SIMULATIONS NOT IMPLEMETED YET'
+        stop
+    else
+        write(*,*) 'SIMULATION MUST BE GLOBAL OR CARTESIAN'
+        stop
+    endif 
+    end subroutine start_ICE_log
         
+
 
 
 subroutine summarise_SL_input_cart()
@@ -205,6 +258,15 @@ subroutine summarise_SL_input_cart()
     endif 
 end subroutine summarise_SL_input_cart
 
+
+
+subroutine summarise_ICE_input_cart()
+    use global 
+    implicit none 
+
+    write(ICElogunit,*)
+    write(ICElogunit,*)'Model setup          : Cartesian'
+end subroutine summarise_ICE_input_cart
 
 
 
@@ -372,7 +434,7 @@ end subroutine prepare_sea_level
 
 
 
-subroutine set_original_sea_ice_level()
+subroutine set_original_sea_level()
     ! Uses
     use set_precision
     use global 
@@ -414,6 +476,7 @@ subroutine set_original_sea_ice_level()
             do i_face=1, nelmt_fs  
 
                 ! Now with integration weights, ngll etc for face: 
+                ! I DONT THINK WE NEED TO CALL THIS? 
                 call get_fs_details(i_face, iface, nfgll, gll_weight, ds_quad4)
 
 
@@ -433,13 +496,102 @@ subroutine set_original_sea_ice_level()
 
 
 
-    ! Set the initial ice levels: 
-
-
-
-
     deallocate(ds_quad4, gll_weight,lag_gll, dlag_gll)
-end subroutine set_original_sea_ice_level
+end subroutine set_original_sea_level
+
+
+
+subroutine set_original_ice_level()
+    ! Takes the user inputted ice data read from ice file and sets initial ice values
+    ! Uses
+    use set_precision
+    use global 
+    use integration
+    use free_surface
+    use math_constants
+
+    ! Local vars: 
+    integer :: i_obj ! loop var
+    integer :: iceobjtype
+
+    ! Code: 
+
+    ! Loop through each ice object user inputted :
+    do i_obj = 1, nice_obj
+        
+        iceobjtype = iceobjs(i_obj, 1)
+
+        if (iceobjtype.eq.1) then 
+            ! Single point of ice 
+            write(*,*)'ERROR: Single ice point not implemented yet!'
+            stop
+        elseif (iceobjtype.eq.2) then 
+            ! Cylinder - args: x, y, rad, height
+            call add_ice_cylinder(iceobjs(i_obj,2:5))
+        else
+            ! Invalid entry
+            write(*,*)'ERROR: Unknown ice object type: ', iceobjtype
+            stop
+        endif 
+    enddo 
+
+end subroutine set_original_ice_level
+
+
+
+subroutine add_ice_cylinder(params)
+    ! Adds a cylinder of ice in the required location
+    ! Uses
+    use set_precision
+    use global 
+    use integration
+    use free_surface
+    use math_constants
+
+    ! IO vars: 
+    integer :: params(4) ! x, y, rad, height
+
+    ! Local vars: 
+    integer :: i_obj ! loop var
+    integer :: iceobjtype
+    real(kind=kreal):: x, y, r, h
+
+    ! Cylinder params 
+    x = params(1)
+    y = params(2)
+    r = params(3)
+    h = params(4)
+
+    ! Add to log file: 
+    write(ICElogunit,*)' --  Creating cylinder '
+    write(ICElogunit,*)'      ->  centre (x,y): ', x, y
+    write(ICElogunit,*)'      ->  height      : ', h
+    write(ICElogunit,*)'      ->  radius      : ', r
+ 
+    ! Searches for nodes on FS that are within the radius of cylinder
+    ! Loop through each face on the free surface
+    do i_face=1, nelmt_fs  
+
+        ! For each GLL point get the coordinates
+        do i_gll = 1, nfgll 
+            ! Get X, Y, Z coordinates for the face 
+            coord   = g_coord(:,  gnum_fs(i_gll,i_face))
+            x_coord = coord(1)
+            y_coord = coord(2)
+
+            ! Cartesian distance to the point: 
+            dis = ((x_coord - x)**2 + (y_coord - y)**2)**0.5
+            if (dis.LE.r)then 
+                ! Add ice height to nodal point: 
+                nodalice0(rgnum_fs(i_gll, i_face)) = h
+                write(ICElogunit,*)'NEED TO CHECK DIMENSIONS (NONDIM) of cylinder coords.'
+        enddo 
+    enddo 
+
+
+end subroutine add_ice_cylinder
+
+
 
 ! ################### END INITIAL SETUP FUNCTIONS  #####################
 

@@ -279,11 +279,7 @@ call sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv, &
                        jac, bmat, nodalu, nodalg, nodalphi, nodalB,& 
                        tot_neq, max_neq, min_neq)
 
-! Output gDOF to SLLog                       
-write(SLlogunit,*)
-write(SLlogunit,*)'GDOF: '
-write(SLlogunit,*) gdof
-write(SLlogunit,*)
+
 
 
 
@@ -430,7 +426,7 @@ endif
 ! Initialise Sea Level 
 if(is_SL)then 
   call prepare_sea_level(nodalsl)
-  call set_original_sea_ice_level()
+  call set_original_sea_level()
 
   
   ! Save initial sea level if flagged: 

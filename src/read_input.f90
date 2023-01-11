@@ -73,7 +73,9 @@ logical,allocatable :: ismat(:)
 
 
 ! Sea level variables: 
-integer :: sl_read_ctr
+integer :: sl_read_ctr, nline
+! Ice variables: 
+integer :: ice_read_ctr, ice_stat, t1, t2 ,t3 
 
 
 ! Magnetization
@@ -161,8 +163,14 @@ IS_GLOB_SIM  = .false.
 is_SL        = .false.
 savedata%sl = .false. 
 savedata%sl0 = .false. 
-savedata%ice = .false. 
+
+
+! Ice defaults: 
+ice_stat      = 0 
+IS_ICE        = .false.
+savedata%ice  = .false. 
 savedata%ice0 = .false. 
+
 
 ! Default savedata options
 savedata%model=.false.
@@ -968,6 +976,35 @@ do
   endif
 
 
+! read ice part: 
+  if (trim(token)=='ice:')then
+    write(*,*)'Detected ICE flag'
+    if(ice_stat==1)then
+      write(errtag,*)'ERROR: copy of line type ice: not permitted!'
+      return
+    endif
+
+    ! Means ICE is involved
+    call split_string(tag,',',args,narg)
+    icefile   = get_string('icefile',args,narg)
+    ice_stat  = 1
+    is_ICE    = .true.
+    write(*,*)'WILL FETCH INFO FROM ICE FILE: ', trim(icefile)
+
+    ! Save ice0 
+    call seek_integer('saveice0',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%ice0    = .true.
+      savedata%fsplot  = .true.
+      write(*,*)' SAVING INITIAL ICE LEVEL'
+    endif 
+
+    cycle
+  endif 
+
+
+
+
 
 
 ! read sea level part
@@ -993,16 +1030,7 @@ do
       write(*,*)' SAVING INITIAL SEA LEVEL'
     endif 
 
-    ! Save ice0 
-    call seek_integer('saveice0',issave,args,narg,istat)
-    if(istat==0 .and. issave==1)then 
-      savedata%ice0    = .true.
-      savedata%fsplot  = .true.
-      write(*,*)' SAVING INITIAL ICE LEVEL'
-    endif 
-
-
-
+   
     ! In this case will actually solve for SL 
     call seek_integer('solvesl',ival,args,narg,istat)
     if(istat==0.and.ival.eq.1)then 
@@ -1244,10 +1272,64 @@ if(is_SL)then
           write(*,*)trim(line)
 
         END SELECT
+      endif 
+
+    elseif(read_stat==-1)then 
+      ! End of File: 
+      exit 
+    else
+      ! Error reading line  
+      write(*,*)'ERROR READING LINE OF SEA LEVEL FILE '    
+    endif 
+  enddo 
+endif 
 
 
 
 
+
+! Read ICE file: 
+! Read Sea Level file: 
+ice_read_ctr = 0 
+if(is_ICE)then 
+
+  ! Open the file
+  fname= trim(data_path)//trim(icefile)//trim(ptail_inp)
+  open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
+  if( ios /= 0 ) then
+    write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
+    return
+  endif
+
+  ! Read first line - number of different ice objects (deltas, cylinders...)
+  do 
+    read(11,*,IOSTAT=read_stat)line 
+
+    if (read_stat==0)then 
+      ! Line read and needs processing 
+      if (isblank(line) .or. iscomment(line,'#'))then
+        cycle 
+      else 
+        ! Line isnt a comment so process it: 
+        ! First line must be the number of ice objects 
+        nice_obj = str2int(trim(line))
+        ice_read_ctr = ice_read_ctr + 1 
+
+        ! Allocate the iceobj array - stores details read in
+        ! max params to describe object is currently 5....
+        allocate(iceobjs(nice_obj, 5))
+        ! Reading an object: 
+
+
+        do nline = 1, nice_obj
+          read(11,'(A)',IOSTAT=read_stat)line   
+          call split_string(tag,',',args,narg)
+          write(*,*) 'tag:', tag
+          write(*,*) 'args:', args         
+          write(*,*) 'narg:', narg
+          write(*,*)
+
+        enddo 
       endif 
 
     elseif(read_stat==-1)then 
@@ -1259,8 +1341,11 @@ if(is_SL)then
     endif 
 
   enddo 
-
 endif 
+
+
+
+
 
 
 
