@@ -836,10 +836,20 @@ do i_elmt=1,nelmt
   ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
   ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0   
   
+  !write(logunit,*) 
+  !write(logunit,*) 
+  !write(logunit,*) 'ielmt     : ', i_elmt
+  !write(logunit,*) 'ggdof_elmt: '
+  !write(logunit,*) ggdof_elmt
+
+
 
   do i=1,NEDOF                                                                   
     do j=1,NEDOF                                                                 
-    irow=i; jcol=j                                                               
+    irow=i; jcol=j 
+
+
+    
     if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
@@ -850,7 +860,13 @@ do i_elmt=1,nelmt
         stop                                                                     
       endif                                                                     
       call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &  
-      storekmat(i,j,ielmt),ADD_VALUES,ierr)                                      
+      storekmat(i,j,ielmt),ADD_VALUES,ierr)
+      
+
+          
+
+      !write(logunit,*)'  ',ggdof_elmt(irow), ggdof_elmt(jcol), storekmat(i,j,ielmt)
+      
       CHKERRA(ierr)                                                              
     endif                                                                        
     enddo                                                                        
@@ -904,6 +920,11 @@ call sync_process
 call VecDestroy(vdiag,ierr)
                                                       
 end subroutine petsc_set_stiffness_matrix
+
+
+
+
+
 !===============================================================================
 
 subroutine petsc_set_stiffness_matrix_freq(storekmat,storemmat,freq,           &
@@ -1100,6 +1121,7 @@ use output_to_user
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
     else 
         call petsc_set_stiffness_matrix(storekmat)
+
         log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   
         call write_ifproc0()
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
@@ -1112,7 +1134,7 @@ end subroutine set_petsc_stiffness
 
 
 
-subroutine set_petsc_stiffness_SL(isscale_ang_freq, storekmat,  QSL, slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, &
+subroutine set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL, slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, &
   ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)
 
 ! USES 
@@ -1397,8 +1419,9 @@ subroutine petsc_create_vector_SL()
                                  slc_up(:,:,:,:)      
                                  
   integer :: i, i_elmt, ielmt, j, n, k,l, ndzero , i_elmtfs, ctr, ictr, & 
-             i_ctr, j_ctr, idof, i_dim, idof_abg, idof_stn, abg, stn                            
-  integer :: ggdof_elmt(NEDOF), ggdof_elmt_fs(5,maxngll2d), dofs_abg(5),  dofs_stn(5)                                            
+             i_ctr, j_ctr, idof, i_dim, idof_abg, idof_stn, abg, stn , j_cycles, i_cycles                          
+  integer :: ggdof_elmt(NEDOF), ggdof_elmt_fs(5,maxngll2d), dofs_abg(5),  dofs_stn(5)  
+  
                                                                                     
   PetscInt irow,jcol                                                               
   Vec   vdiag                                                                      
@@ -1411,6 +1434,7 @@ subroutine petsc_create_vector_SL()
   !  - Note that MatSetValues() uses 0-based row and column numbers
   !  in Fortran as well as in C (as set here in the array "col").
   
+
   call MatZeroEntries(Amat,ierr) ! set all vals to 0
   CHKERRA(ierr)
   call sync_process
@@ -1422,16 +1446,29 @@ subroutine petsc_create_vector_SL()
 
 
   ! entirely in solid                                                              
-  do i_elmt=1,nelmt                                                                
+  do i_elmt=1,nelmt    
+  
     ielmt=i_elmt                                                                   
     ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
     ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0   
     
+    !write(logunit,*) 
+    !write(logunit,*) 
+    !write(logunit,*) 'ielmt     : ', i_elmt
+    !write(logunit,*) 'ggdof_elmt: '
+    !write(logunit,*) ggdof_elmt
+
+    i_cycles = 0 
     do i=1,NEDOF    
-      i_ctr = i_ctr + 1 ! Counts i index for DOF    
+      i_ctr = i_ctr + 1 ! Counts i index for DOF  
+      j_cycles = 0  
+      !write(logunit,*)'  i_ctr: ', i_ctr
+
       if (i_ctr.eq.5)then 
         ! DOF for theta, ignore 
         i_ctr = 0
+        i_cycles = i_cycles + 1
+
       else
         do j=1,NEDOF 
                                                               
@@ -1439,9 +1476,13 @@ subroutine petsc_create_vector_SL()
           jcol  = j   
           j_ctr = j_ctr + 1 
 
+
           if (j_ctr.eq.5)then 
             ! DOF for theta, ignore 
             j_ctr = 0
+            j_cycles = j_cycles + 1
+            !write(logunit,*)'---- reset j ----  '
+
           else
             ! Displacement or Phi DOF 
             if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
@@ -1453,13 +1494,17 @@ subroutine petsc_create_vector_SL()
                 mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
                 flush(logunit)
                 stop                                                                     
-              endif                                                                     
+              endif 
+
+                                                                    
               call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &  
-              storekmat(i,j,ielmt),ADD_VALUES,ierr)                                      
-              CHKERRA(ierr)         
+              storekmat(i-i_cycles,j-j_cycles,ielmt),ADD_VALUES,ierr)                                      
+              CHKERRA(ierr)      
               
-              !write(*,*)ggdof_elmt(irow), ',  ', ggdof_elmt(jcol), ': '
-              !write(*,*)storekmat(i,j,ielmt)
+
+
+              !write(logunit,*) ggdof_elmt(irow), ggdof_elmt(jcol), storekmat(i-i_cycles,j-j_cycles,ielmt)
+              
 
             endif !if ggdof != 0       
           endif !jctr=5                                                           
@@ -1469,7 +1514,6 @@ subroutine petsc_create_vector_SL()
   enddo  ! ielmt   
     
     
-
   ! Add sea level FS values to LHS matrix 
   do i_elmtfs = 1, nelmt_fs
 
@@ -1477,7 +1521,7 @@ subroutine petsc_create_vector_SL()
     ggdof_elmt_fs = reshape(ggdof(:,gnum_fs(:, i_elmtfs)),(/5, maxngll2d/))                         
     ggdof_elmt_fs = ggdof_elmt_fs - 1      ! indexing from 0                   
 
-   
+  
     ! Loop through alpha,beta,gamma and then sigma,tau,nu GLL index
     do abg = 1, maxngll2d
       dofs_abg = ggdof_elmt_fs(:, abg) ! DOF ids for abg node
@@ -1544,6 +1588,8 @@ subroutine petsc_create_vector_SL()
       enddo! stn
     enddo! abg
   enddo   ! i_elmtfs
+  
+  
     
     
     

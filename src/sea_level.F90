@@ -170,7 +170,9 @@ write(SLlogunit,*)'-----------------------------------------------------'
 write(SLlogunit,*)'SL IS_SL         :  ', IS_SL
 write(SLlogunit,*)'SL DOF           :  ', ISSL_DOF
 write(SLlogunit,*)'Save original SL :  ', savedata%sl0
-write(SLlogunit,*)'Save original SL :  ', savedata%sl
+write(SLlogunit,*)'Save SL          :  ', savedata%sl
+write(SLlogunit,*)'Save original ice:  ', savedata%ice0
+write(SLlogunit,*)'Save ice         :  ', savedata%ice
 write(SLlogunit,*)'-----------------------------------------------------'
 write(SLlogunit,*)
 
@@ -217,8 +219,6 @@ subroutine write_SL0_to_ensight()
     write(SLlogunit,*)'  --> Max sea level: ', maxval(nodalsl0)
     
 
-    
-
     ! On the free surface
     if(savedata%fsplot)then
       call write_scalar_to_file_freesurf(nnode_fs, nodalsl0, &
@@ -233,7 +233,37 @@ subroutine write_SL0_to_ensight()
     write(SLlogunit,*)'  ✓ Saved original sea level '
     write(SLlogunit,*)
     end subroutine write_SL0_to_ensight
+
+
+    subroutine write_ICE0_to_ensight()
+        use global 
+        use postprocess
+        use free_surface
+        implicit none 
+    
+        write(SLlogunit,*)'Saving the original ICE values'
+        write(SLlogunit,*)'  --> Min ice level: ', minval(nodalice0)
+        write(SLlogunit,*)'  --> Max ice level: ', maxval(nodalice0)
+        
+    
+        ! On the free surface
+        if(savedata%fsplot)then
+          call write_scalar_to_file_freesurf(nnode_fs, nodalice0, &
+          ext='ice0',istep=0) 
+        endif
+        
+        if(savedata%fsplot_plane)then
+          call write_scalar_to_file_freesurf(nnode_fs, nodalice0, &
+          ext='ice0', istep=0,plane=.true.) 
+        endif
+    
+        write(SLlogunit,*)'  ✓ Saved original ice level '
+        write(SLlogunit,*)
+        end subroutine write_ICE0_to_ensight
+
+
 ! ################# END  LOG AND OUTPUT FUNCTIONS  ####################
+
 
 ! #################    INITIAL SETUP FUNCTIONS    #####################
 subroutine prepare_sea_level(nodalsl)
@@ -254,7 +284,9 @@ subroutine prepare_sea_level(nodalsl)
     ! If running SL then probably want ocean function: 
     if(IS_SL)then 
         write(SLlogunit,*)'  + number of unique FS nodes: ', nnode_fs
-        allocate(oceanf(nelmt_fs, maxngll2d)) ! Allocate ocean function 
+        allocate(oceanf(nelmt_fs, maxngll2d), stat=istattemp) ! Allocate ocean function 
+        istat=istat+istattemp
+
         oceanf=ZERO 
         write(SLlogunit, *)'  --> Created ocean function'
     endif 
@@ -262,8 +294,9 @@ subroutine prepare_sea_level(nodalsl)
 
     ! Create store for initial SL 
     if(savedata%sl0)then 
-        allocate(nodalsl0(nnode_fs), stat=istattemp)
+        allocate(nodalsl0(nnode_fs), nodalice0(nnode_fs), stat=istattemp)
         nodalsl0 = ZERO
+        nodalice0 = ZERO
         write(SLlogunit, *)'  --> Created initial SL (nodal)'
         istat=istat+istattemp
     endif
@@ -293,6 +326,9 @@ subroutine prepare_sea_level(nodalsl)
                  slc_pt(maxngll2d, maxngll2d, nelmt_fs),            &
                  stat=istattemp) 
 
+        ! Update error alloc status
+        istat=istat+istattemp
+                 
         ! Initialise LHS arrays
         QSL     = ZERO
         slc_uu  = ZERO
@@ -302,7 +338,7 @@ subroutine prepare_sea_level(nodalsl)
         slc_pt  = ZERO
         slc_up  = ZERO
 
-
+        ! Allocate nodal sea level 
         allocate(nodalsl(nnode_fs), stat=istattemp)
         istat=istat+istattemp
     endif 
@@ -314,17 +350,21 @@ subroutine prepare_sea_level(nodalsl)
         stop
     else 
         nodalsl = ZERO
-        
-        write(SLlogunit, *)'  --> Created Ru matrix'
-        write(SLlogunit, *)'  --> Created Rphi matrix'
+        ! Output confirmation to log. 
         write(SLlogunit, *)'  --> Created QSL matrix'
-        write(SLlogunit, *)'  --> Created sea level (nodalsl) vector:'
+        write(SLlogunit, *)'  --> Created slc_uu matrix (U_dot, U_tilde)'
+        write(SLlogunit, *)'  --> Created slc_pu matrix (Φ_dot, U_tilde)'
+        write(SLlogunit, *)'  --> Created slc_ut matrix (U_dot, θ_tilde)'
+        write(SLlogunit, *)'  --> Created slc_pp matrix (Φ_dot, Φ_tilde)'
+        write(SLlogunit, *)'  --> Created slc_pt matrix (Φ_dot, θ_tilde)'
+        write(SLlogunit, *)'  --> Created slc_up matrix (U_dot, Φ_tilde)'
+        write(SLlogunit, *)'  --> Created sea level (nodalsl) vector'
     endif
+
 
 
     write(SLlogunit,*)'  ✓ Prepared sea level. '
     write(SLlogunit,*)
-
 
     return 
 end subroutine prepare_sea_level
@@ -332,7 +372,7 @@ end subroutine prepare_sea_level
 
 
 
-subroutine set_original_sea_level()
+subroutine set_original_sea_ice_level()
     ! Uses
     use set_precision
     use global 
@@ -360,6 +400,7 @@ subroutine set_original_sea_level()
 
     ! Code:
     nodalsl0 = 0.0_kreal
+    nodalice0 = 0.0_kreal
 
     ! For cartesian: 
     if(IS_CART_SIM)then
@@ -391,8 +432,14 @@ subroutine set_original_sea_level()
     endif 
 
 
+
+    ! Set the initial ice levels: 
+
+
+
+
     deallocate(ds_quad4, gll_weight,lag_gll, dlag_gll)
-end subroutine set_original_sea_level
+end subroutine set_original_sea_ice_level
 
 ! ################### END INITIAL SETUP FUNCTIONS  #####################
 
@@ -402,9 +449,10 @@ end subroutine set_original_sea_level
 
 
 subroutine update_ocean_function(u, errcode, errtag, use_s0)
-! Routine checks each GLL point on the surface to see if its theta
-! Value is 0 or not - if it is 0 then the ocean function becomes 0 
-! if SL is larger than 0 then ocean function is 1.
+! Routine checks each GLL point on the surface to see if it is part of the ocean set
+! see Crawford et al 2018, eqn 31-32.
+! Set contains any nodes in which rho_w * theta > rho_i * I 
+! Bit of an issue here because we need the values of theta, I not their rates (time derivs)
 use global 
 use free_surface
 implicit none 
@@ -421,6 +469,8 @@ integer          :: i_face, iface, numf(maxngll2d), i_numf, i_node, nfgll
 integer          :: i_gll 
 real(kind=kreal) :: theta
 
+
+write(SLlogunit,*)'WARNING: NEED TO ACCURATELY IMPLEMENT OCEAN SET/OCEAN FUNCTION BASED ON ICE CONDITION - see Crawford et al 2018, eqn 31'
 
 ! We may want the ocean function but not running simulation 
 ! - in that case we need to use nodalsl0 rather than u 
@@ -447,7 +497,7 @@ if (use_s0)then
                 ! Sea level is zero - ocean func is 0 
                 oceanf(i_face, i_gll) = 0.0_kreal
 
-                else 
+            else 
                 write(errtag,'(a)')'SEA LEVEL VALUE IS NEGATIVE!! '
                 return
             endif 
@@ -455,7 +505,7 @@ if (use_s0)then
         enddo 
     enddo
 else
-    write(*, *)'ERROR: UPDATING OCEAN FUNCTION NOT IMPLEMENTED FOR CALCULATIONS'
+    write(*, *)'ERROR: UPDATING OCEAN FUNCTION NOT IMPLEMENTED FOR CALCULATIONS YET'
     stop
 endif 
 
@@ -522,7 +572,7 @@ subroutine calculate_SL_A()
     write(SLlogunit,*)'  ✓ Calculated sea level area. '
 
     ! Escape if no water. 
-    if(SLarea.eq.ZERO)then 
+    if(SLarea.lt.ZERO .or. SLarea.eq.ZERO)then 
         write(*,*)'ERROR: area of ocean = 0 -- NO WATER!!!' 
         stop 
     endif 
@@ -549,7 +599,7 @@ subroutine calc_SL_LHS()
     ! The Q matrix is literally just the test function multiplied
     ! by the Jac 2D 
 
-    integer                        :: i_elmtfs         ! loops
+    integer                        :: i_elmtfs        ! loops
     real(kind=kreal)               :: detjac2d        ! 2d jacobian
     integer                        :: iface           ! face ID for elmt 
     integer                        :: i_elmt          ! face ID for elmt 
@@ -572,12 +622,14 @@ subroutine calc_SL_LHS()
     write(SLlogunit,*)
     write(SLlogunit,*)'Calculating LHS matrices'
 
-
+    ! Test functions. 
     theta_tf = ONE
     u_tf = ONE
     phi_tf = ONE
+    ! Inverse area
     area_inv = ONE/SLarea
 
+    ! Loop through each element on the free surface 
     do i_elmtfs = 1, nelmt_fs
         ! Get details of face
         call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
@@ -594,27 +646,28 @@ subroutine calc_SL_LHS()
             face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
             face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
             face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-            pi_2d_abg   = theta_tf * gw(abg)*sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
+            pi_2d_abg   =  gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
 
             
-            ! Non-coupling Kmat terms (ie SL integral)
-            QSL(abg, i_elmtfs) = QSL(abg, i_elmtfs) + (theta_tf*pi_2d_abg)* g0_nodal(gid_abg)*rho_water
-
-
-            ! Factor of rho/g outside of integral 
-            rho_over_g =  (-rho_water/g0_nodal(gid_abg))       ! -rho/g
-            rho_Ag     =  rho_water/(g0_nodal(gid_abg)*SLarea) !  rho/g*Area
-
             ! Get the values here because they are repeated lots 
             g0abg      = g0_nodal(gid_abg)      ! g0 abg 
             Cabg       = oceanf(i_elmtfs, abg)  ! Ocean func abg
+
+
+            ! Non-coupling Kmat terms (ie SL integral)
+            QSL(abg, i_elmtfs) = QSL(abg, i_elmtfs) - (theta_tf * pi_2d_abg * g0abg * rho_water)
+
+
+            ! Factor of rho/g outside of integral 
+            rho_over_g =  (-rho_water/g0abg)       ! -rho/g
+            rho_Ag     =  (rho_over_g / SLarea)    ! -rho/(g*Area)
 
 
             ! UPDATE THE ABG-ABG INDICES: 
             ! Phi_dot theta_tilde
             slc_pt(abg, abg, i_elmtfs) = slc_pt(abg, abg, i_elmtfs) + (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
             ! Phi_dot phi_tilde
-            slc_pp(abg, abg, i_elmtfs) = slc_pp(abg, abg, i_elmtfs) + (phi_tf * pi_2d_abg * Cabg * rho_over_g)
+            slc_pp(abg, abg, i_elmtfs) = slc_pp(abg, abg, i_elmtfs) + (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
             
 
             do j=1,NDIM
@@ -631,7 +684,7 @@ subroutine calc_SL_LHS()
 
                 do k=1,NDIM
                     ! u_dot u_phi 
-                    slc_uu(j, abg, k, abg, i_elmtfs) = slc_uu(j, abg, k, abg, i_elmtfs) + (Cabg * pi_2d_abg * grav0_nodal(j, gid_abg) *  u_tf(k) * grav0_nodal(k, gid_abg)  * rho_over_g)
+                    slc_uu(j, abg, k, abg, i_elmtfs) = slc_uu(j, abg, k, abg, i_elmtfs) + (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
                 enddo !k
             enddo  ! j 
 
@@ -651,9 +704,9 @@ subroutine calc_SL_LHS()
                 face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
 
                 
-                pi_2d_xyg  = theta_tf * gw(xyg)*sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
-                g0xyg      = g0_nodal(gid_xyg)      ! g0 abg 
-                Cxyg       = oceanf(i_elmtfs, xyg)  ! Ocean func abg
+                pi_2d_xyg  =  gw(xyg)*sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
+                g0xyg      =  g0_nodal(gid_xyg)      ! g0 abg 
+                Cxyg       =  oceanf(i_elmtfs, xyg)  ! Ocean func abg
 
 
 
@@ -661,27 +714,27 @@ subroutine calc_SL_LHS()
                 ! and XYG is the test function so when we assemble the 
                 ! matrix, ABG should be the column index 
 
-                slc_pt(abg, xyg, i_elmtfs) = slc_pt(abg, xyg, i_elmtfs) + (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg)*rho_Ag
+                slc_pt(abg, xyg, i_elmtfs) = slc_pt(abg, xyg, i_elmtfs) - (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg *rho_Ag )
 
-                slc_pp(abg, xyg, i_elmtfs) = slc_pp(abg, xyg, i_elmtfs) + ( Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg)*rho_Ag
+                slc_pp(abg, xyg, i_elmtfs) = slc_pp(abg, xyg, i_elmtfs) - (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
 
 
                 do j=1,NDIM
                     v1 = pi_2d_abg * Cabg * grav0_nodal(j, gid_abg) * pi_2d_xyg 
 
-                    slc_pu(j, abg, xyg, i_elmtfs) = slc_pu(j, abg, xyg, i_elmtfs) + (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  grav0_nodal(j, gid_xyg) )*rho_Ag
+                    slc_pu(j, abg, xyg, i_elmtfs) = slc_pu(j, abg, xyg, i_elmtfs) - (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  grav0_nodal(j, gid_xyg) * rho_Ag )
 
-                    slc_ut(j, abg, xyg, i_elmtfs) = slc_ut(j, abg, xyg, i_elmtfs) + (v1 * g0xyg * theta_tf )*rho_Ag 
+                    slc_ut(j, abg, xyg, i_elmtfs) = slc_ut(j, abg, xyg, i_elmtfs) - (v1 * g0xyg * theta_tf * rho_Ag) 
 
-                    slc_up(j, abg, xyg, i_elmtfs) = slc_up(j, abg, xyg, i_elmtfs) + (v1 * Cxyg * phi_tf)*rho_Ag
+                    slc_up(j, abg, xyg, i_elmtfs) = slc_up(j, abg, xyg, i_elmtfs) - (v1 * Cxyg * phi_tf * rho_Ag)
 
                     do k = 1, NDIM 
-                        slc_uu(j, abg, k, xyg, i_elmtfs) = slc_uu(j, abg, k, xyg, i_elmtfs)  + (v1 * Cxyg * u_tf(k) *   grav0_nodal(k, gid_xyg))*rho_Ag
+                        slc_uu(j, abg, k, xyg, i_elmtfs) = slc_uu(j, abg, k, xyg, i_elmtfs)  - (v1 * Cxyg * u_tf(k) *  grav0_nodal(k, gid_xyg) * rho_Ag)
                     enddo ! k 
-
                 enddo ! j
 
             enddo! xyg
+            
         enddo! abg
     enddo! i_elmtfs
 
@@ -692,13 +745,6 @@ subroutine calc_SL_LHS()
 end subroutine calc_SL_LHS
 
 
-
-
-
-
-
-
-    
 
 
 end module

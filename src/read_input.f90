@@ -161,6 +161,8 @@ IS_GLOB_SIM  = .false.
 is_SL        = .false.
 savedata%sl = .false. 
 savedata%sl0 = .false. 
+savedata%ice = .false. 
+savedata%ice0 = .false. 
 
 ! Default savedata options
 savedata%model=.false.
@@ -991,12 +993,22 @@ do
       write(*,*)' SAVING INITIAL SEA LEVEL'
     endif 
 
+    ! Save ice0 
+    call seek_integer('saveice0',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%ice0    = .true.
+      savedata%fsplot  = .true.
+      write(*,*)' SAVING INITIAL ICE LEVEL'
+    endif 
+
+
 
     ! In this case will actually solve for SL 
     call seek_integer('solvesl',ival,args,narg,istat)
     if(istat==0.and.ival.eq.1)then 
       ISSL_DOF = .true.
       savedata%sl    = .true.
+      savedata%ice    = .true.
       write(*,*)' SOLVING SEA LEVEL'
     else 
       write(*,*)' WARNING: SL FILE PARSED BUT NOT SOLVING FOR SEA LEVEL'

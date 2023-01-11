@@ -279,6 +279,12 @@ call sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv, &
                        jac, bmat, nodalu, nodalg, nodalphi, nodalB,& 
                        tot_neq, max_neq, min_neq)
 
+! Output gDOF to SLLog                       
+write(SLlogunit,*)
+write(SLlogunit,*)'GDOF: '
+write(SLlogunit,*) gdof
+write(SLlogunit,*)
+
 
 
 ! Calculate any prestress 
@@ -371,7 +377,7 @@ call prepare_gravity()
 
 
 
-! Allocate for built-in preconditioner stuff? 
+! Allocate for built-in solver preconditioner stuff? 
 if(solver_type.eq.builtin_solver .or. solver_diagscale)then
   allocate(dprecon(0:neq))
 endif
@@ -424,22 +430,28 @@ endif
 ! Initialise Sea Level 
 if(is_SL)then 
   call prepare_sea_level(nodalsl)
-  call set_original_sea_level()
+  call set_original_sea_ice_level()
 
+  
   ! Save initial sea level if flagged: 
   if(savedata%sl0)then 
     call write_SL0_to_ensight()
   endif 
 
+  if(savedata%ice0)then 
+    call write_ICE0_to_ensight()
+  endif 
+
   call update_ocean_function(u, errcode, errtag, use_s0=.true.)  ! Calc ocean func
   call calculate_SL_A()                                          ! Calc SL area 
+
   
   call calc_SL_LHS() 
 endif 
 
 
 
-
+!call close_process()
 
 
 
@@ -574,6 +586,7 @@ endif ! if(steptype.eq.FREQSTEP)
       flush(logunit)
     endif
   endif
+
 
   ! Other types of forces: 
   if(trim(devel_example).eq.'axial_rod')then

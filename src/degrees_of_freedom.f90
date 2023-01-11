@@ -377,6 +377,7 @@ end subroutine finalize_gdof
 
 subroutine sea_level_dof()
   ! DOF setup for the sea level stuff - requires free surface to be run first.
+  ! Takes the last degree of freedom from the Phi variable and starts from +1 of this 
   use global 
   use free_surface 
   implicit none 

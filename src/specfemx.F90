@@ -222,6 +222,9 @@ call prepare_free_surface(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
 ! Prepare SEA LEVEL IF NECESSARY
+! Must be called after initialisation of Free Surface
+! Reason for doing this separately is to keep all of the SL vars at the end
+! by themselves because its only for surface elements. 
 if(ISSL_DOF)then 
   call sea_level_dof()
 endif 
@@ -266,6 +269,7 @@ call compute_max_elementsize()
 
 ! Work out which solver to use
 call determine_solver(errcode, errtag)
+
 
 if(ISDISP_DOF)then 
   write(*,*)' ************* '

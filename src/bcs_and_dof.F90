@@ -109,8 +109,8 @@ enddo
 ! processor
 call sync_process
 if(ismpi .and. nproc.gt.1 .and. myrank.eq.0)then 
-call gindex()
-write(logunit,*)'CALLED GINDEX'
+  call gindex()
+  write(logunit,*)'CALLED GINDEX'
 endif 
 call sync_process
 

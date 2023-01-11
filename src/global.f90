@@ -480,6 +480,8 @@ type savedata_options
   logical :: infinite
   logical :: sl0 ! initial sea level
   logical :: sl  ! current sea level
+  logical :: ice0 ! initial ice level
+  logical :: ice  ! current ice level
   ! Free surface plot. If this option is .TRUE., and the free surface file is
   ! given, the result will be plotted on the free surface.
   logical :: fsplot,fsplot_plane 
@@ -519,6 +521,9 @@ real(kind=kreal), allocatable     :: oceanf(:,:) ! Ocean function - 1 or 0 (see 
 real(kind=kreal)                  :: SL0_constant  ! Constant initial SL value 
 real(kind=kreal), allocatable     :: icnodalSL(:,:)  ! Initial condition for SL (gll pt on face, element on Free Surf.)
 real(kind=kreal), allocatable     :: nodalsl0(:)   ! Store of nodal initial SL 
+real(kind=kreal), allocatable     :: nodalice0(:)   ! Store of nodal initial ice 
+
+
 
 ! Sea level degrees of freedom 
 logical :: ISSL_DOF   ! Activates SL or not
