@@ -5,5 +5,5 @@ This form of SPECFEM-X is for the development of SPECFEM-C prior to any integrat
 
 ## To do list: 
 
-
+- [ ] Add the final weak form term (ice contibution)
 - [ ] Write ocean function updater using ice and theta comparison 

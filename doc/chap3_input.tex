@@ -1,3 +1,4 @@
+% !TEX root = ./manual_SPECFEMX.tex
 \chapter{Input}
 \label{chap:input}
 \section{Main input file}
@@ -33,7 +34,8 @@ Only the following line types are permitted.
 \item[control:]   control of the simulation
 \item[step:]      frequency/time step information
 \item[save:]      options to save data
-\item[sealevel:]  information for sea level simulation
+\item[sealevel:]  ocean information for sea-level simulation
+\item[ice:]       ice information for sea-level simulations
 \item[devel:]     development parameters for experimental features [optional]
 \end{adescription}
 
@@ -211,7 +213,16 @@ Only the following arguments under the specified line types are permitted.\\
 \begin{adescription}{solvesl}
   \item[slfile]: sea level file name  [string].
   \item[savesl0]: saves initial sea level [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[saveOF]: saves the ocean function [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
   \item[solvesl]: solve for sea level? [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \\
+\end{adescription}
+
+
+\texttt{\underline{ice:}}
+\begin{adescription}{solvesl}
+  \item[icefile]: ice file name  [string].
+  \item[saveice0]: saves initial ice distribution [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
   \\
 \end{adescription}
 
@@ -642,18 +653,61 @@ Following data specify the two water surfaces: a horizontal surface and an incli
 1\\
 1 0.0 42.7 12.2 6.1}\\
 
+
+
+
 \subsection{Sea Level file: \texttt{slfile}}
 
 This file contains details required for running a sea level simulation.
-In this file any lines beginning with '#' as the first character are considered
-to be comment lines and are ignored. The information format for this file (ignoring) any comment lines) is: 
-
-line 1: \emph{cartesian or global}: integer value 1 = Cartesian, 2 = Global 
-line 2: \emph{type of initial SL}: integer value 0 = defined by constant Z value - only for cartesian SL simulation 
-line 3: \emph{initial sea level} See full description below
+In this file any lines beginning with a hashtag as the first character are considered
+to be comment lines and are ignored. The information format for this file (ignoring any comment lines) is: 
 
 
-\underline{initial sea level (line 3):}
+\begin{adescription}{slfile format:}
+\item[line 1:]        \emph{cartesian or global}: integer value 1 = Cartesian, 2 = Global
+\item[line 2:]        \emph{type of initial SL}: integer value 0 = defined by constant Z value - only for cartesian SL simulation  
+\item[line 3:]        \emph{initial sea level} See full description below \\ 
+\end{adescription}
+
+
+
+\subsubsection{initial sea level (line 3):}
 Different formats are used based on the input: 
 
-if line2 = 0: Sea level is defined by constant Z value. In this case line 3 is the Z value.
+if line 2 = 0 (Sea level is defined by constant Z value). In this case line 3 is the Z value for a cartesian simulation.
+
+
+\subsection{Ice file: \texttt{icefile}}
+
+This file contains details for ice parameters when running a sea level simulation.
+In this file any lines beginning with a hashtag as the first character are considered
+to be comment lines and are ignored. \\ 
+
+The user can add in as many ice 'objects' as they wish. Objects are defined by a type value and specific parameters. The maximum number of parameters is currently 5, and varies for each type of object. Objects can be: 
+
+\begin{table}[h!]
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llll}
+\hline
+\multicolumn{1}{|c|}{\textbf{Object type}} & \multicolumn{1}{c|}{\textbf{Typeval}} & \multicolumn{1}{l|}{\textbf{Parameters}} & \multicolumn{1}{l|}{\textbf{Description}} \\ \hline
+Delta (single point) & 1 & node  height & Adds ice of a given height (above the solid surface) to a specific node in the mesh \\
+Vertical cylinder & 2 & x, y, radius, height & Vertical cylinder of given height centred on x,y location
+\end{tabular}%
+}
+\end{table}
+
+
+\begin{adescription} {}
+\item[line 1:]        \emph{number of ice objects to add} 
+\item[line 2-:]       \emph{object1}  typeval params  
+\end{adescription}
+
+
+Example:\\
+Here we specify that there will be 2 single bits of ice, placed at nodes 410 and 414 with heights of 5 and 7 respectively, as well as and a cylinder placed at location (x = 4.5, y = 5.5) on the solid surface with a radius of 3.14 and a height of 10. \\\\
+\texttt{
+3\\
+1 414 7 \\
+2 4.5 5.5 3.14 10\\
+1 410 5 \\
+}
