@@ -109,7 +109,7 @@ call process_user_input(cmd, tdate, ttime, tzone, ios, path, &
                         cpu_tstart)
 
 
-ismesh_only = .true.
+ismesh_only = .false.
 
 ! Create SL log file  
 if(is_SL)then 

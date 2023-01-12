@@ -507,7 +507,7 @@ character(len=250) :: log_msg
 ! _________________________ ICE PARAMETERS _________________________
 character(len=250) :: icefile                ! Input file name 
 logical :: is_ICE
-integer, allocatable  :: iceobjs(:,:) !  list of ice objects read in, 
+real(kind=kreal), allocatable  :: iceobjs(:,:) !  list of ice objects read in, 
 integer ::  nice_obj            !num of ice objs.
 
 

@@ -303,9 +303,7 @@ subroutine write_SL0_to_ensight()
         use free_surface
         implicit none 
     
-        write(SLlogunit,*)'Saving the original ICE values'
-        write(SLlogunit,*)'  --> Min ice level: ', minval(nodalice0)
-        write(SLlogunit,*)'  --> Max ice level: ', maxval(nodalice0)
+        write(ICElogunit,*)'Saving the original ICE values'
         
     
         ! On the free surface
@@ -356,9 +354,8 @@ subroutine prepare_sea_level(nodalsl)
 
     ! Create store for initial SL 
     if(savedata%sl0)then 
-        allocate(nodalsl0(nnode_fs), nodalice0(nnode_fs), stat=istattemp)
+        allocate(nodalsl0(nnode_fs), stat=istattemp)
         nodalsl0 = ZERO
-        nodalice0 = ZERO
         write(SLlogunit, *)'  --> Created initial SL (nodal)'
         istat=istat+istattemp
     endif
@@ -462,7 +459,6 @@ subroutine set_original_sea_level()
 
     ! Code:
     nodalsl0 = 0.0_kreal
-    nodalice0 = 0.0_kreal
 
     ! For cartesian: 
     if(IS_CART_SIM)then
@@ -476,7 +472,7 @@ subroutine set_original_sea_level()
             do i_face=1, nelmt_fs  
 
                 ! Now with integration weights, ngll etc for face: 
-                ! I DONT THINK WE NEED TO CALL THIS? 
+                ! needs nfgll at least
                 call get_fs_details(i_face, iface, nfgll, gll_weight, ds_quad4)
 
 
@@ -513,8 +509,13 @@ subroutine set_original_ice_level()
     ! Local vars: 
     integer :: i_obj ! loop var
     integer :: iceobjtype
+    real(kind=kreal) :: params(4)
 
     ! Code: 
+    allocate(nodalice0(nnode_fs))
+    nodalice0 = 0.0_kreal
+
+
 
     ! Loop through each ice object user inputted :
     do i_obj = 1, nice_obj
@@ -527,13 +528,23 @@ subroutine set_original_ice_level()
             stop
         elseif (iceobjtype.eq.2) then 
             ! Cylinder - args: x, y, rad, height
-            call add_ice_cylinder(iceobjs(i_obj,2:5))
+            params = iceobjs(i_obj,2:5)
+            call add_ice_cylinder(params)
         else
             ! Invalid entry
             write(*,*)'ERROR: Unknown ice object type: ', iceobjtype
             stop
         endif 
     enddo 
+
+
+    ! update log file with results: 
+    write(ICElogunit,*)''
+    write(ICElogunit,*)'* Finished setting original ice level '
+    write(ICElogunit,*)'  -->  Number of ice objects added : ', nice_obj
+    write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice0)
+    write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice0)
+
 
 end subroutine set_original_ice_level
 
@@ -549,12 +560,15 @@ subroutine add_ice_cylinder(params)
     use math_constants
 
     ! IO vars: 
-    integer :: params(4) ! x, y, rad, height
+    real(kind=kreal) :: params(4) ! x, y, rad, height
 
     ! Local vars: 
-    integer :: i_obj ! loop var
+    integer :: i_obj,i_face,i_gll, iface,nfgll ,node_ctr
     integer :: iceobjtype
-    real(kind=kreal):: x, y, r, h
+    integer :: ios, errcode
+
+    real(kind=kreal):: x, y, r, h, dis, x_coord, y_coord, coord(3)
+
 
     ! Cylinder params 
     x = params(1)
@@ -567,12 +581,16 @@ subroutine add_ice_cylinder(params)
     write(ICElogunit,*)'      ->  centre (x,y): ', x, y
     write(ICElogunit,*)'      ->  height      : ', h
     write(ICElogunit,*)'      ->  radius      : ', r
- 
+    write(ICElogunit,*)'NEED TO CHECK DIMENSIONS (NONDIM) of cylinder coords.'
+    write(ICElogunit,*)'NOTE READ INPUT IS STILL USING INTEGERS.'
+
     ! Searches for nodes on FS that are within the radius of cylinder
     ! Loop through each face on the free surface
+    node_ctr = 0
     do i_face=1, nelmt_fs  
 
         ! For each GLL point get the coordinates
+        call get_fs_details_noweights(i_face, iface, nfgll)
         do i_gll = 1, nfgll 
             ! Get X, Y, Z coordinates for the face 
             coord   = g_coord(:,  gnum_fs(i_gll,i_face))
@@ -581,12 +599,19 @@ subroutine add_ice_cylinder(params)
 
             ! Cartesian distance to the point: 
             dis = ((x_coord - x)**2 + (y_coord - y)**2)**0.5
+
             if (dis.LE.r)then 
                 ! Add ice height to nodal point: 
                 nodalice0(rgnum_fs(i_gll, i_face)) = h
-                write(ICElogunit,*)'NEED TO CHECK DIMENSIONS (NONDIM) of cylinder coords.'
+                node_ctr = node_ctr + 1 
+            endif 
         enddo 
     enddo 
+
+    write(ICElogunit,*)' ✓ Injected cylinder at ', node_ctr, 'nodal points'
+    flush(ICElogunit)
+
+
 
 
 end subroutine add_ice_cylinder

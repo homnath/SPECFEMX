@@ -75,7 +75,7 @@ logical,allocatable :: ismat(:)
 ! Sea level variables: 
 integer :: sl_read_ctr, nline
 ! Ice variables: 
-integer :: ice_read_ctr, ice_stat, t1, t2 ,t3 
+integer :: ice_read_ctr, ice_stat, t1, t2 ,t3 , k, kold
 
 
 ! Magnetization
@@ -1318,17 +1318,29 @@ if(is_ICE)then
         ! Allocate the iceobj array - stores details read in
         ! max params to describe object is currently 5....
         allocate(iceobjs(nice_obj, 5))
+        iceobjs = -1.0
         ! Reading an object: 
 
 
         do nline = 1, nice_obj
           read(11,'(A)',IOSTAT=read_stat)line   
-          call split_string(tag,',',args,narg)
-          write(*,*) 'tag:', tag
-          write(*,*) 'args:', args         
-          write(*,*) 'narg:', narg
-          write(*,*)
-
+           ! progress string line delimited by space: 
+          
+          kold = 0
+          k    = 250
+          i    = 1
+          do 
+            k = INDEX(trim(line(kold+1:250)), ' ')
+            if (k.eq.0) then
+              ! Either empty or no spaces left.
+              iceobjs(nline, i) = str2real(trim(line(kold+1:)))
+              exit 
+            endif 
+            iceobjs(nline, i) = str2real(line(kold+1:kold+ k-1))
+            kold = k + kold
+            i = i + 1
+            
+          enddo 
         enddo 
       endif 
 

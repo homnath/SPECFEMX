@@ -423,19 +423,23 @@ if(isbodyload)then
 endif 
 
 
+! Initialise ice: 
+if(is_ICE)then
+  call set_original_ice_level()
+
+  if(savedata%ice0)then 
+    call write_ICE0_to_ensight()
+  endif 
+endif 
+
 ! Initialise Sea Level 
 if(is_SL)then 
   call prepare_sea_level(nodalsl)
   call set_original_sea_level()
-
   
   ! Save initial sea level if flagged: 
   if(savedata%sl0)then 
     call write_SL0_to_ensight()
-  endif 
-
-  if(savedata%ice0)then 
-    call write_ICE0_to_ensight()
   endif 
 
   call update_ocean_function(u, errcode, errtag, use_s0=.true.)  ! Calc ocean func
@@ -446,8 +450,8 @@ if(is_SL)then
 endif 
 
 
-
-!call close_process()
+write(*,*)'FINISHED'
+call close_process()
 
 
 
