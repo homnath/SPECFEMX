@@ -171,6 +171,7 @@ write(SLlogunit,*)'SL IS_SL         :  ', IS_SL
 write(SLlogunit,*)'SL DOF           :  ', ISSL_DOF
 write(SLlogunit,*)'Save original SL :  ', savedata%sl0
 write(SLlogunit,*)'Save SL          :  ', savedata%sl
+write(SLlogunit,*)'Save ocean func. :  ', savedata%oceanf
 write(SLlogunit,*)'-----------------------------------------------------'
 write(SLlogunit,*)
 
@@ -223,8 +224,8 @@ implicit none
     write(ICElogunit,*)
     write(ICElogunit,*)'-----------------------------------------------------'
     write(ICElogunit,*)'IS_ICE            :  ', IS_ICE
-    write(ICElogunit,*)'Save original ICE :  ', savedata%ice0
-    write(ICElogunit,*)'Save SL           :  ', savedata%ice
+    write(ICElogunit,*)'Save original ice :  ', savedata%ice0
+    write(ICElogunit,*)'Save ice          :  ', savedata%ice
     write(ICElogunit,*)'-----------------------------------------------------'
     write(ICElogunit,*)
     
@@ -297,6 +298,36 @@ subroutine write_SL0_to_ensight()
     end subroutine write_SL0_to_ensight
 
 
+
+    subroutine write_OF_to_ensight()
+        ! Writes the ocean function to ensight 
+        use global 
+        use postprocess
+        use free_surface
+        implicit none 
+    
+        write(SLlogunit,*)'Saving the Ocean function: '
+        write(SLlogunit,*)' --> total oceanic nodes = ', INT(SUM(nodalOF)), '/', nnode_fs
+
+        
+    
+        ! On the free surface
+        if(savedata%fsplot)then
+          call write_scalar_to_file_freesurf(nnode_fs, nodalOF, &
+          ext='oceanf',istep=0) 
+        endif
+        
+        if(savedata%fsplot_plane)then
+          call write_scalar_to_file_freesurf(nnode_fs, nodalOF, &
+          ext='oceanf', istep=0, plane=.true.) 
+        endif
+    
+        write(SLlogunit,*)'  ✓ Saved ocean function '
+        write(SLlogunit,*)
+        end subroutine write_OF_to_ensight
+
+
+
     subroutine write_ICE0_to_ensight()
         use global 
         use postprocess
@@ -344,7 +375,7 @@ subroutine prepare_sea_level(nodalsl)
     ! If running SL then probably want ocean function: 
     if(IS_SL)then 
         write(SLlogunit,*)'  + number of unique FS nodes: ', nnode_fs
-        allocate(oceanf(nelmt_fs, maxngll2d), stat=istattemp) ! Allocate ocean function 
+        allocate(oceanf(nelmt_fs, maxngll2d), nodalOF(nnode_fs), stat=istattemp) ! Allocate ocean function and nodal ocean func
         istat=istat+istattemp
 
         oceanf=ZERO 
@@ -353,7 +384,7 @@ subroutine prepare_sea_level(nodalsl)
 
 
     ! Create store for initial SL 
-    if(savedata%sl0)then 
+    if(IS_SL)then 
         allocate(nodalsl0(nnode_fs), stat=istattemp)
         nodalsl0 = ZERO
         write(SLlogunit, *)'  --> Created initial SL (nodal)'
@@ -577,13 +608,15 @@ subroutine add_ice_cylinder(params)
     h = params(4)
 
     ! Add to log file: 
+    write(ICElogunit,*)
     write(ICElogunit,*)' --  Creating cylinder '
     write(ICElogunit,*)'      ->  centre (x,y): ', x, y
     write(ICElogunit,*)'      ->  height      : ', h
     write(ICElogunit,*)'      ->  radius      : ', r
     write(ICElogunit,*)'NEED TO CHECK DIMENSIONS (NONDIM) of cylinder coords.'
-    write(ICElogunit,*)'NOTE READ INPUT IS STILL USING INTEGERS.'
+    write(ICElogunit,*)
 
+    
     ! Searches for nodes on FS that are within the radius of cylinder
     ! Loop through each face on the free surface
     node_ctr = 0
@@ -625,10 +658,12 @@ end subroutine add_ice_cylinder
 
 
 
-subroutine update_ocean_function(u, errcode, errtag, use_s0)
+subroutine update_ocean_function(u, errcode, errtag, use_orig)
 ! Routine checks each GLL point on the surface to see if it is part of the ocean set
 ! see Crawford et al 2018, eqn 31-32.
 ! Set contains any nodes in which rho_w * theta > rho_i * I 
+! If use_orig then will use nodalsl0 and nodalice0 instead of nodalsl and nodalice 
+
 ! Bit of an issue here because we need the values of theta, I not their rates (time derivs)
 use global 
 use free_surface
@@ -638,45 +673,40 @@ implicit none
 character(len=250) :: errtag
 integer :: ios, errcode
 real(kind=kreal), allocatable :: u(:)
-logical :: use_s0
+logical :: use_orig
 
 
 ! Local variables 
 integer          :: i_face, iface, numf(maxngll2d), i_numf, i_node, nfgll
 integer          :: i_gll 
-real(kind=kreal) :: theta
+real(kind=kreal) :: theta, I
 
 
 write(SLlogunit,*)'WARNING: NEED TO ACCURATELY IMPLEMENT OCEAN SET/OCEAN FUNCTION BASED ON ICE CONDITION - see Crawford et al 2018, eqn 31'
 
 ! We may want the ocean function but not running simulation 
 ! - in that case we need to use nodalsl0 rather than u 
-if (use_s0)then 
-    ! In this case we can calculate ocean function using nodalsl0: 
-    write(SLlogunit,*)'Calculating ocean function with nodalSL0'
+if (use_orig)then 
+    ! In this case we can calculate ocean function using nodalsl0 and nodalice0: 
+    write(SLlogunit,*)'Calculating ocean function with initial values'
 
     do i_face=1, nelmt_fs  
 
         ! Face number (ie between 1 and 6) and get related properties
         call get_fs_details_noweights(i_face, iface, nfgll)
 
-
         ! Loop through GLL on the surface: 
         do i_gll = 1, nfgll
-            theta = nodalsl0(rgnum_fs(i_gll, i_face))
+            theta =  nodalsl0(rgnum_fs(i_gll, i_face))
+            I     = nodalice0(rgnum_fs(i_gll, i_face))
 
-
-            if (theta.gt.0.0 ) then 
-                ! Sea level is not zero - ocean func is 1 
+            ! if rho_w theta > rho_ice I then part of ocean set
+            if (rho_water * theta .GT. I * rho_ice) then 
                 oceanf(i_face, i_gll) = 1.0_kreal
-
-            elseif(theta==0.0 ) then 
-                ! Sea level is zero - ocean func is 0 
+                nodalOF(rgnum_fs(i_gll, i_face)) = 1.0_kreal
+            else
                 oceanf(i_face, i_gll) = 0.0_kreal
-
-            else 
-                write(errtag,'(a)')'SEA LEVEL VALUE IS NEGATIVE!! '
-                return
+                nodalOF(rgnum_fs(i_gll, i_face)) = 0.0_kreal
             endif 
 
         enddo 
@@ -687,6 +717,7 @@ else
 endif 
 
 write(SLlogunit,*)'  ✓ Updated ocean function. '
+write(SLlogunit,*)''
 
 end subroutine update_ocean_function
 

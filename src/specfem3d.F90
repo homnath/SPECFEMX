@@ -442,10 +442,16 @@ if(is_SL)then
     call write_SL0_to_ensight()
   endif 
 
-  call update_ocean_function(u, errcode, errtag, use_s0=.true.)  ! Calc ocean func
+
+  ! Calc ocean func and output if desired
+  call update_ocean_function(u, errcode, errtag, use_orig=.true.)  
+  if(savedata%oceanf)then
+    call write_OF_to_ensight()
+  endif 
+
   call calculate_SL_A()                                          ! Calc SL area 
 
-  
+  ! Calculate the LHS contributions of the matrix
   call calc_SL_LHS() 
 endif 
 

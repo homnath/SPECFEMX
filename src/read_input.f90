@@ -163,6 +163,7 @@ IS_GLOB_SIM  = .false.
 is_SL        = .false.
 savedata%sl = .false. 
 savedata%sl0 = .false. 
+savedata%oceanf = .false. 
 
 
 ! Ice defaults: 
@@ -170,6 +171,7 @@ ice_stat      = 0
 IS_ICE        = .false.
 savedata%ice  = .false. 
 savedata%ice0 = .false. 
+
 
 
 ! Default savedata options
@@ -1028,6 +1030,14 @@ do
       savedata%sl0    = .true.
       savedata%fsplot = .true.
       write(*,*)' SAVING INITIAL SEA LEVEL'
+    endif 
+
+      ! Save ocean function 
+    call seek_integer('saveOF',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%oceanf  = .true.
+      savedata%fsplot  = .true.
+      write(*,*)' SAVING OCEAN FUNCTION'
     endif 
 
    

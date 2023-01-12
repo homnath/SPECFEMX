@@ -196,6 +196,10 @@ subroutine calc_nondimensionalisation_vals
       SL0_constant = SL0_constant*NONDIM_L
       rho_water    = rho_water_dim*NONDIM_DENSITY
     endif 
+
+    if(IS_ICE)then
+      rho_ice    = rho_ice_dim*NONDIM_DENSITY
+    endif 
     
     pole_coord0=pole_coord0*NONDIM_L
     pole_coord1=pole_coord1*NONDIM_L

@@ -481,6 +481,7 @@ type savedata_options
   logical :: sl0 ! initial sea level
   logical :: sl  ! current sea level
   logical :: ice0 ! initial ice level
+  logical :: oceanf ! ocean function 
   logical :: ice  ! current ice level
   ! Free surface plot. If this option is .TRUE., and the free surface file is
   ! given, the result will be plotted on the free surface.
@@ -511,6 +512,9 @@ real(kind=kreal), allocatable  :: iceobjs(:,:) !  list of ice objects read in,
 integer ::  nice_obj            !num of ice objs.
 
 
+real(kind=kreal),parameter :: rho_ice_dim = 917.00_kreal !kg/m^3 for 0 Centrigrade https://www.cs.mcgill.ca/~rwest/wikispeedia/wpcd/wp/i/Ice.htm
+real(kind=kreal)::  rho_ice                              !may be nondimensionalised
+
 
 ! _________________________ SEA LEVEL STUFF ___________________________
 
@@ -521,10 +525,11 @@ character(len=250) :: slfile                ! Input file name
 
 ! Constants: 
 real(kind=kreal),parameter :: rho_water_dim = 999.87_kreal !kg/m^3 for 0 Centrigrade
-real(kind=kreal)::  rho_water  !kg/m^3 for 0 Centrigrade
+real(kind=kreal)::  rho_water 
+
 
 ! Sea Level variables
-real(kind=kreal), allocatable     :: oceanf(:,:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
+real(kind=kreal), allocatable     :: oceanf(:,:), nodalOF(:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
 real(kind=kreal)                  :: SL0_constant  ! Constant initial SL value 
 real(kind=kreal), allocatable     :: icnodalSL(:,:)  ! Initial condition for SL (gll pt on face, element on Free Surf.)
 real(kind=kreal), allocatable     :: nodalsl0(:)   ! Store of nodal initial SL 
