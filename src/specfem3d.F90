@@ -65,6 +65,7 @@ use save_variables
 use nonlinearloop
 !use bilinear_form
 use sea_level
+use ice
 use bcs_and_dof
 use initialise_arrays
 
@@ -160,7 +161,9 @@ real(kind=kreal),allocatable :: bcnodalv(:,:),nodalu(:,:)
 real(kind=kreal),allocatable :: nodalphi(:),nodalg(:,:)
 
 ! Sea level edit - WE 
-real(kind=kreal),allocatable :: nodalsl(:)
+real(kind=kreal),allocatable :: nodalsl(:)  ! Nodal theta values
+real(kind=kreal),allocatable :: nodalice(:) ! Nodal I values
+real(kind=kreal),allocatable :: iceload(:)  ! load term due to ice.
 
 
 
@@ -303,7 +306,7 @@ call log_KSP_summary()
 call initialise_RHS_vectors(load, bodyload, selfload, viscoload, &
                             resload, du, u, kmat, storekmat,     &
                             storemmat, rhoload, ubcload, nodalu, & 
-                            visco_q0, elas_e0, extload)
+                            visco_q0, elas_e0, extload, iceload)
 
 
 
@@ -368,6 +371,8 @@ if(ISDISP_DOF)then
 endif
 
 
+
+
 ! prepare background gravity data
 call prepare_gravity()
 
@@ -382,9 +387,10 @@ if(solver_diagscale)then
 endif
 
 
-if(trim(devel_example).eq.'axial_rod')then
-  open(77,file=trim(file_head)//"_strain.dat",action="write",status="replace")
-endif
+! WE commented out
+!if(trim(devel_example).eq.'axial_rod')then
+!  open(77,file=trim(file_head)//"_strain.dat",action="write",status="replace")
+!endif
 
 
 
@@ -425,12 +431,16 @@ endif
 
 ! Initialise ice: 
 if(is_ICE)then
+  ! Prepare the ice stuff and set the user-inputted initial condition
+  call prepare_ice(nodalice)
   call set_original_ice_level()
-
+  
+  ! Save original ice to Ensight
   if(savedata%ice0)then 
     call write_ICE0_to_ensight()
   endif 
 endif 
+
 
 ! Initialise Sea Level 
 if(is_SL)then 
@@ -445,6 +455,7 @@ if(is_SL)then
 
   ! Calc ocean func and output if desired
   call update_ocean_function(u, errcode, errtag, use_orig=.true.)  
+
   if(savedata%oceanf)then
     call write_OF_to_ensight()
   endif 
@@ -486,6 +497,7 @@ loop_step: do i_step=istep0,nstep
       flush(logunit)
     endif
 
+  
   elseif(steptype.eq.FREQSTEP)then
     ! Frequency step.
     freq=step
@@ -520,7 +532,7 @@ loop_step: do i_step=istep0,nstep
   !  ___________________  END INITIALISE VALUES   ____________________
 
 
-
+  ! MOVE THIS TO A SEPARATE FILE 
   ! ____________________________________________________________________
   !!!!  CALCULATING ELASTIC/ LIENAR VISCOELASIC STIFFNESS MATRIX  
 if(steptype.eq.FREQSTEP)then
@@ -540,6 +552,7 @@ if(steptype.eq.FREQSTEP)then
         ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.true.)   
       endif 
     endif
+
 else ! TIMESTEPPING not freqstepping 
   if(i_step==1)then 
     ! compute elastic stiffness matrix for time = 0
@@ -585,6 +598,7 @@ endif ! if(steptype.eq.FREQSTEP)
   ! WARNING: i_step==1 is ONLY for rod example
   if((istraction.or.isfstraction).and.i_step==1)then
     log_msg = trim('applying traction...') ;   call write_ifproc0()
+    !WE Reads and adds the traction to the extload variable
     call apply_traction(extload,errcode,errtag)
     call control_error(errcode,errtag,stdout,myrank)
     if(myrank==0)then
@@ -689,7 +703,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
     maxdu=maxscal(maxval(abs(du)))
     call log_ksp_iteration(maxdu, ksp_iter, ksp_convreason)
 
-
+    ! Update the u array with du 
     if(isplastic)then
       u=du
     else
@@ -707,16 +721,19 @@ nonlinear: do i_nliter=1,NL_MAXITER
     call sync_process()
     call update_nodal_u_vector(u, nodalu, nodalphi, nodalsl)
 
+
     if(myrank.eq.0.and.ISSL_DOF)then
       write(SLlogunit,*)
       write(SLlogunit,*)'Max value: ', maxval(nodalsl)
     endif 
+
 
     ! Reset bodyload to ZERO for Viscoelastic iteration.
     ! We need to reconcile platic and viscoelastic iterations.
     if(.not.isplastic)bodyload=ZERO; !viscoload=ZERO
 
 
+    ! WE MOVE THIS INTO A SEPARATE FUNCTION 
     ! Calculate the stress and strain for elastic/viscoelastic elements
     if(ISDISP_DOF)then
       log_msg = trim('computing elemental stress'); call write_ifproc0() 
@@ -798,7 +815,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
         
         if(savedata%fsplot_plane)then
           call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalsl, &
-          ext='sl', istep=0,plane=.true.) 
+          ext='sl', istep=0, plane=.true.) 
         endif
       endif 
 
@@ -814,7 +831,10 @@ nonlinear: do i_nliter=1,NL_MAXITER
     if(nl_isconv)exit nonlinear
 
   enddo nonlinear ! i_nliter=1,NL_MAXITER
-  ! ===================== FINISHED NON-LINEAR LOOP =====================
+  ! ===================== FINISHED NON-LINEAR ITERATIONS =====================
+
+
+
 
 
 ! Update and save things before the next time step starts

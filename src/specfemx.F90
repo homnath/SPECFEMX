@@ -23,6 +23,7 @@ use model
 use gll_library,only:precompute_gll1d,cleanup_gll1d
 use free_surface
 use sea_level
+use ice
 #if (USE_MPI)
 use mpi_library
 use math_library_mpi

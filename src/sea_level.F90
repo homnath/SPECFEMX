@@ -7,7 +7,7 @@ module sea_level
 
     
 
-
+! Probably not worth using as it is SLOW
 subroutine calc_jacdet2d(i_gll, coord, dshape_quad4, detjac)
     use global 
     use set_precision
@@ -29,16 +29,14 @@ subroutine calc_jacdet2d(i_gll, coord, dshape_quad4, detjac)
 
     
     detjac=sqrt(dot_product(face_normal,face_normal))
-
- 
 end subroutine  calc_jacdet2d
 
 
 
 
 
-! #######################  GETTING FS DETAILS #########################
-subroutine get_fs_details(i_face, iface, nfgll, gw, dsq4)
+! ####################### FUNCS FOR GETTING FS DETAILS #########################
+subroutine get_fs_details(i_elmt, iface, nfgll, gw, dsq4)
     use global 
     use set_precision
     use integration 
@@ -46,12 +44,12 @@ subroutine get_fs_details(i_face, iface, nfgll, gw, dsq4)
     implicit none 
 
     ! IO variables: 
-    integer           :: i_face, nfgll ,iface 
+    integer           :: i_elmt, nfgll ,iface 
     real(kind=kreal)  :: gw(:), dsq4(:,:,:)
 
 
     ! Face number (ie between 1 and 6) and get related properties
-    iface = iface_fs(i_face)    
+    iface = iface_fs(i_elmt)    
     if(iface==1 .or. iface==3)then
         nfgll             = ngllzx
         gw(1:nfgll)       = gll_weights_zx
@@ -75,7 +73,7 @@ end subroutine get_fs_details
 
 
 
-subroutine get_fs_details_nodsq(i_face, iface, nfgll, gw)
+subroutine get_fs_details_nodsq(i_elmt, iface, nfgll, gw)
     use global 
     use set_precision
     use integration 
@@ -83,12 +81,12 @@ subroutine get_fs_details_nodsq(i_face, iface, nfgll, gw)
     implicit none 
 
     ! IO variables: 
-    integer           :: i_face, nfgll ,iface 
+    integer           :: i_elmt, nfgll ,iface 
     real(kind=kreal)  :: gw(:)
 
 
     ! Face number (ie between 1 and 6) and get related properties
-    iface = iface_fs(i_face)    
+    iface = iface_fs(i_elmt)    
     if(iface==1 .or. iface==3)then
         nfgll             = ngllzx
         gw(1:nfgll)       = gll_weights_zx
@@ -107,7 +105,7 @@ subroutine get_fs_details_nodsq(i_face, iface, nfgll, gw)
 end subroutine get_fs_details_nodsq
 
 
-subroutine get_fs_details_noweights(i_face, iface, nfgll)
+subroutine get_fs_details_noweights(i_elmt, iface, nfgll)
     use global 
     use set_precision
     use integration 
@@ -115,10 +113,10 @@ subroutine get_fs_details_noweights(i_face, iface, nfgll)
     implicit none 
 
     ! IO variables: 
-    integer           :: i_face, nfgll ,iface 
+    integer           :: i_elmt, nfgll ,iface 
 
     ! Face number (ie between 1 and 6) and get related properties
-    iface = iface_fs(i_face)    
+    iface = iface_fs(i_elmt)    
     if(iface==1 .or. iface==3)then
         nfgll             = ngllzx
       elseif(iface==2 .or. iface==4)then
@@ -131,6 +129,9 @@ subroutine get_fs_details_noweights(i_face, iface, nfgll)
     endif
 end subroutine get_fs_details_noweights
 ! #################### END GETTING FS DETAILS #########################
+
+
+
 
 
 
@@ -191,61 +192,8 @@ end subroutine start_SL_log
 
 
 
-subroutine start_ICE_log(errcode, errtag)
-
-use global
-#if(USE_MPI)
-use mpi_library
-#else 
-use serial_library
-#endif  
-implicit none 
-    
-    character(len=250) :: errtag
-    integer :: ios, errcode
-    
-    
-    ! Create file 
-    if(myrank==0)then
-        ICE_log_file = trim(file_head)//'ICE.log'
-        open(unit=ICElogunit,file=trim(ICE_log_file),status='replace',action='write',iostat=ios)
-        if(ios.ne.0)then
-            write(errtag,'(a)')'ERROR: cannot open log file: '//trim(ICE_log_file)
-            call control_error(errcode,errtag,stdout,myrank)
-        endif
-    endif 
-    
-    ! Write confirmation of file: 
-    write(*, *)' Created ICE log file'
-    write(ICElogunit, '(A,/,A)')' ****** CREATED SL LOG FILE ****** ', ' '
-    
-    ! Write summary of SL inputs: 
-    
-    write(ICElogunit,*)
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit,*)'IS_ICE            :  ', IS_ICE
-    write(ICElogunit,*)'Save original ice :  ', savedata%ice0
-    write(ICElogunit,*)'Save ice          :  ', savedata%ice
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit,*)
-    
-    
-    write(ICElogunit, *)'Ice data read from:  ', trim(slfile)
-    if(IS_CART_SIM)then
-        call summarise_ICE_input_cart()
-    elseif(IS_GLOB_SIM)then 
-        write(*,*) 'GLOBAL SIMULATIONS NOT IMPLEMETED YET'
-        stop
-    else
-        write(*,*) 'SIMULATION MUST BE GLOBAL OR CARTESIAN'
-        stop
-    endif 
-    end subroutine start_ICE_log
-        
-
-
-
 subroutine summarise_SL_input_cart()
+    ! Summarises sea level data for cartesian sims
     use global 
     implicit none 
 
@@ -259,15 +207,6 @@ subroutine summarise_SL_input_cart()
     endif 
 end subroutine summarise_SL_input_cart
 
-
-
-subroutine summarise_ICE_input_cart()
-    use global 
-    implicit none 
-
-    write(ICElogunit,*)
-    write(ICElogunit,*)'Model setup          : Cartesian'
-end subroutine summarise_ICE_input_cart
 
 
 
@@ -299,61 +238,37 @@ subroutine write_SL0_to_ensight()
 
 
 
-    subroutine write_OF_to_ensight()
-        ! Writes the ocean function to ensight 
-        use global 
-        use postprocess
-        use free_surface
-        implicit none 
-    
-        write(SLlogunit,*)'Saving the Ocean function: '
-        write(SLlogunit,*)' --> total oceanic nodes = ', INT(SUM(nodalOF)), '/', nnode_fs
+subroutine write_OF_to_ensight()
+    ! Writes the ocean function to ensight 
+    use global 
+    use postprocess
+    use free_surface
+    implicit none 
 
-        
-    
-        ! On the free surface
-        if(savedata%fsplot)then
-          call write_scalar_to_file_freesurf(nnode_fs, nodalOF, &
-          ext='oceanf',istep=0) 
-        endif
-        
-        if(savedata%fsplot_plane)then
-          call write_scalar_to_file_freesurf(nnode_fs, nodalOF, &
-          ext='oceanf', istep=0, plane=.true.) 
-        endif
-    
-        write(SLlogunit,*)'  ✓ Saved ocean function '
-        write(SLlogunit,*)
-        end subroutine write_OF_to_ensight
+    write(SLlogunit,*)'Saving the Ocean function: '
+    write(SLlogunit,*)' --> total oceanic nodes = ', INT(SUM(nodalOF)), '/', nnode_fs
 
+    
 
+    ! On the free surface
+    if(savedata%fsplot)then
+        call write_scalar_to_file_freesurf(nnode_fs, nodalOF, &
+        ext='oceanf',istep=0) 
+    endif
+    
+    if(savedata%fsplot_plane)then
+        call write_scalar_to_file_freesurf(nnode_fs, nodalOF, &
+        ext='oceanf', istep=0, plane=.true.) 
+    endif
 
-    subroutine write_ICE0_to_ensight()
-        use global 
-        use postprocess
-        use free_surface
-        implicit none 
-    
-        write(ICElogunit,*)'Saving the original ICE values'
-        
-    
-        ! On the free surface
-        if(savedata%fsplot)then
-          call write_scalar_to_file_freesurf(nnode_fs, nodalice0, &
-          ext='ice0',istep=0) 
-        endif
-        
-        if(savedata%fsplot_plane)then
-          call write_scalar_to_file_freesurf(nnode_fs, nodalice0, &
-          ext='ice0', istep=0,plane=.true.) 
-        endif
-    
-        write(SLlogunit,*)'  ✓ Saved original ice level '
-        write(SLlogunit,*)
-        end subroutine write_ICE0_to_ensight
+    write(SLlogunit,*)'  ✓ Saved ocean function '
+    write(SLlogunit,*)
+end subroutine write_OF_to_ensight
 
 
 ! ################# END  LOG AND OUTPUT FUNCTIONS  ####################
+
+
 
 
 ! #################    INITIAL SETUP FUNCTIONS    #####################
@@ -392,8 +307,6 @@ subroutine prepare_sea_level(nodalsl)
     endif
 
  
-
-
     if(ISSL_DOF)then 
 
         ! Allocate LHS matrices for SL to be assembled into stiffness
@@ -474,7 +387,7 @@ subroutine set_original_sea_level()
     ! IO variables
 
     ! Local variables 
-    integer          :: i_face, iface, nfgll, i_gll 
+    integer          :: i_elmt, iface, nfgll, i_gll 
     real(kind=kreal) :: theta, z_coord
    
     real(kind=kreal),dimension(:,:,:), allocatable :: ds_quad4
@@ -500,157 +413,29 @@ subroutine set_original_sea_level()
             ! the z coordinate of the face 
 
             ! Loop for each face on the surface: 
-            do i_face=1, nelmt_fs  
+            do i_elmt=1, nelmt_fs  
 
                 ! Now with integration weights, ngll etc for face: 
                 ! needs nfgll at least
-                call get_fs_details(i_face, iface, nfgll, gll_weight, ds_quad4)
+                call get_fs_details(i_elmt, iface, nfgll, gll_weight, ds_quad4)
 
 
                 ! For each GLL point calculate and store SL0
                 do i_gll = 1, nfgll 
                     ! Get Z coordinates for the face and global IDs 
-                    z_coord = g_coord(3,  gnum_fs(i_gll,i_face))
+                    z_coord = g_coord(3,  gnum_fs(i_gll,i_elmt))
                     theta   = SL0_constant - z_coord 
                     
                     if(theta.gt.0.0_kreal)then
-                        nodalsl0(rgnum_fs(i_gll, i_face)) = theta
+                        nodalsl0(rgnum_fs(i_gll, i_elmt)) = theta
                     endif 
                 enddo 
             enddo 
         endif
     endif 
 
-
-
     deallocate(ds_quad4, gll_weight,lag_gll, dlag_gll)
 end subroutine set_original_sea_level
-
-
-
-subroutine set_original_ice_level()
-    ! Takes the user inputted ice data read from ice file and sets initial ice values
-    ! Uses
-    use set_precision
-    use global 
-    use integration
-    use free_surface
-    use math_constants
-
-    ! Local vars: 
-    integer :: i_obj ! loop var
-    integer :: iceobjtype
-    real(kind=kreal) :: params(4)
-
-    ! Code: 
-    allocate(nodalice0(nnode_fs))
-    nodalice0 = 0.0_kreal
-
-
-
-    ! Loop through each ice object user inputted :
-    do i_obj = 1, nice_obj
-        
-        iceobjtype = iceobjs(i_obj, 1)
-
-        if (iceobjtype.eq.1) then 
-            ! Single point of ice 
-            write(*,*)'ERROR: Single ice point not implemented yet!'
-            stop
-        elseif (iceobjtype.eq.2) then 
-            ! Cylinder - args: x, y, rad, height
-            params = iceobjs(i_obj,2:5)
-            call add_ice_cylinder(params)
-        else
-            ! Invalid entry
-            write(*,*)'ERROR: Unknown ice object type: ', iceobjtype
-            stop
-        endif 
-    enddo 
-
-
-    ! update log file with results: 
-    write(ICElogunit,*)''
-    write(ICElogunit,*)'* Finished setting original ice level '
-    write(ICElogunit,*)'  -->  Number of ice objects added : ', nice_obj
-    write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice0)
-    write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice0)
-
-
-end subroutine set_original_ice_level
-
-
-
-subroutine add_ice_cylinder(params)
-    ! Adds a cylinder of ice in the required location
-    ! Uses
-    use set_precision
-    use global 
-    use integration
-    use free_surface
-    use math_constants
-
-    ! IO vars: 
-    real(kind=kreal) :: params(4) ! x, y, rad, height
-
-    ! Local vars: 
-    integer :: i_obj,i_face,i_gll, iface,nfgll ,node_ctr
-    integer :: iceobjtype
-    integer :: ios, errcode
-
-    real(kind=kreal):: x, y, r, h, dis, x_coord, y_coord, coord(3)
-
-
-    ! Cylinder params 
-    x = params(1)
-    y = params(2)
-    r = params(3)
-    h = params(4)
-
-    ! Add to log file: 
-    write(ICElogunit,*)
-    write(ICElogunit,*)' --  Creating cylinder '
-    write(ICElogunit,*)'      ->  centre (x,y): ', x, y
-    write(ICElogunit,*)'      ->  height      : ', h
-    write(ICElogunit,*)'      ->  radius      : ', r
-    write(ICElogunit,*)'NEED TO CHECK DIMENSIONS (NONDIM) of cylinder coords.'
-    write(ICElogunit,*)
-
-    
-    ! Searches for nodes on FS that are within the radius of cylinder
-    ! Loop through each face on the free surface
-    node_ctr = 0
-    do i_face=1, nelmt_fs  
-
-        ! For each GLL point get the coordinates
-        call get_fs_details_noweights(i_face, iface, nfgll)
-        do i_gll = 1, nfgll 
-            ! Get X, Y, Z coordinates for the face 
-            coord   = g_coord(:,  gnum_fs(i_gll,i_face))
-            x_coord = coord(1)
-            y_coord = coord(2)
-
-            ! Cartesian distance to the point: 
-            dis = ((x_coord - x)**2 + (y_coord - y)**2)**0.5
-
-            if (dis.LE.r)then 
-                ! Add ice height to nodal point: 
-                nodalice0(rgnum_fs(i_gll, i_face)) = h
-                node_ctr = node_ctr + 1 
-            endif 
-        enddo 
-    enddo 
-
-    write(ICElogunit,*)' ✓ Injected cylinder at ', node_ctr, 'nodal points'
-    flush(ICElogunit)
-
-
-
-
-end subroutine add_ice_cylinder
-
-
-
 ! ################### END INITIAL SETUP FUNCTIONS  #####################
 
 
@@ -677,7 +462,7 @@ logical :: use_orig
 
 
 ! Local variables 
-integer          :: i_face, iface, numf(maxngll2d), i_numf, i_node, nfgll
+integer          :: i_elmt, iface, numf(maxngll2d), i_numf, i_node, nfgll
 integer          :: i_gll 
 real(kind=kreal) :: theta, I
 
@@ -690,23 +475,23 @@ if (use_orig)then
     ! In this case we can calculate ocean function using nodalsl0 and nodalice0: 
     write(SLlogunit,*)'Calculating ocean function with initial values'
 
-    do i_face=1, nelmt_fs  
+    do i_elmt=1, nelmt_fs  
 
         ! Face number (ie between 1 and 6) and get related properties
-        call get_fs_details_noweights(i_face, iface, nfgll)
+        call get_fs_details_noweights(i_elmt, iface, nfgll)
 
         ! Loop through GLL on the surface: 
         do i_gll = 1, nfgll
-            theta =  nodalsl0(rgnum_fs(i_gll, i_face))
-            I     = nodalice0(rgnum_fs(i_gll, i_face))
+            theta =  nodalsl0(rgnum_fs(i_gll, i_elmt))
+            I     = nodalice0(rgnum_fs(i_gll, i_elmt))
 
             ! if rho_w theta > rho_ice I then part of ocean set
             if (rho_water * theta .GT. I * rho_ice) then 
-                oceanf(i_face, i_gll) = 1.0_kreal
-                nodalOF(rgnum_fs(i_gll, i_face)) = 1.0_kreal
+                oceanf(i_elmt, i_gll) = 1.0_kreal
+                nodalOF(rgnum_fs(i_gll, i_elmt)) = 1.0_kreal
             else
-                oceanf(i_face, i_gll) = 0.0_kreal
-                nodalOF(rgnum_fs(i_gll, i_face)) = 0.0_kreal
+                oceanf(i_elmt, i_gll) = 0.0_kreal
+                nodalOF(rgnum_fs(i_gll, i_elmt)) = 0.0_kreal
             endif 
 
         enddo 
