@@ -110,6 +110,7 @@ SET(srcboth
    nonlinearloop.F90
    sea_level.F90
    ice.F90
+   time_loop.F90
    bcs_and_dof.F90
    other_forces.F90
    initialise_arrays.F90

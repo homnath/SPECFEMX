@@ -357,7 +357,4 @@ subroutine calc_ice_load(iceload, nodalice)
 
 end subroutine calc_ice_load    
 
-
-
-
 end module

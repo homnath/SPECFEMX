@@ -66,6 +66,7 @@ use nonlinearloop
 !use bilinear_form
 use sea_level
 use ice
+use time_loop
 use bcs_and_dof
 use initialise_arrays
 
@@ -461,9 +462,6 @@ if(is_SL)then
   endif 
 
   call calculate_SL_A()                                          ! Calc SL area 
-
-  ! Calculate the LHS contributions of the matrix
-  call calc_SL_LHS() 
 endif 
 
 
@@ -482,39 +480,10 @@ log_msg = trim(' Starting time loop!') ;   call write_ifproc0()
 
 
 loop_step: do i_step=istep0,nstep
-  !t=dt*real(i_step,kreal)
   
 
-  ! _______DETERMINE TIME/FREQ STEP AND OUTPUT TO USER__________
-  step=step0+dstep*real(i_step,kreal)
-
-  if(steptype.eq.TIMESTEP)then
-    ! Time step.
-    t=step
-    dt=dstep
-    if(myrank==0)then
-      write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' t: ',t
-      flush(logunit)
-    endif
-
-  
-  elseif(steptype.eq.FREQSTEP)then
-    ! Frequency step.
-    freq=step
-    if(myrank==0)then
-      write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' f: ',freq
-      flush(logunit)
-    endif
-
-    if(devel_nondim)then
-      ang_freq=TWO*freq*DIM_T
-    else
-      ang_freq=TWO*PI*freq
-    endif
-    scale_ang_freq2=ONE/(ang_freq*ang_freq)
-  endif
-  ! ________________________________________________________________________
-  
+  ! determine time (dt) or freq (df) step and current time/freq
+  call calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
 
   
   !  ____________________   INITIALISE VALUES   ______________________
@@ -532,18 +501,21 @@ loop_step: do i_step=istep0,nstep
   !  ___________________  END INITIALISE VALUES   ____________________
 
 
-  ! MOVE THIS TO A SEPARATE FILE 
   ! ____________________________________________________________________
-  !!!!  CALCULATING ELASTIC/ LIENAR VISCOELASIC STIFFNESS MATRIX  
-if(steptype.eq.FREQSTEP)then
-    ! compute elastic stiffness matrix for time = 0
+  !  CALCULATING ELASTIC/ LIENAR VISCOELASIC STIFFNESS MATRIX  
+  if(steptype.eq.FREQSTEP)then
+    ! FREQUENCY STIFFNESS MATRIX 
+
     if(i_step==0)then
       call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
     endif
-    
+      
     ! Set Petsc stiffness matrix
     if(solver_type.eq.petsc_solver)then
       if (ISSL_DOF)then 
+        ! Calculate the LHS contributions of the matrix
+        call calc_SL_LHS() 
+        ! Set stifness in petsc
         call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
         slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,    &
         reuse_pc_bool=.false.,freq_bool=.true.)   
@@ -553,44 +525,45 @@ if(steptype.eq.FREQSTEP)then
       endif 
     endif
 
-else ! TIMESTEPPING not freqstepping 
-  if(i_step==1)then 
-    ! compute elastic stiffness matrix for time = 0
-    call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
-  
-    if(solver_type.eq.petsc_solver)then
-      if (ISSL_DOF)then 
-        call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL, & 
-        slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,     &
-        reuse_pc_bool=.false.,freq_bool=.false.)   
-      else 
-        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-        ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
-      endif 
-    endif
-  
-  elseif(i_step==2)then
-    ! Since we use a uniform dt, following routine has to be called only once 
-    ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
-    ! it has to be called for every time steps or every changing time step.
-    ! This will simply overwrite the storekmat for viscoelastic elements.
-    call compute_stiffness_viscoelastic(nelmt_viscoelas,             &   
-                                        eid_viscoelas, dt, relaxtime,&
-                                        storekmat, errcode, errtag)
-  
-    if(solver_type.eq.petsc_solver)then
-      if (ISSL_DOF)then 
-        call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
-        slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,    &
-        reuse_pc_bool=.true.,freq_bool=.false.)   
-      else 
-        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-        ang_freq, scale_ang_freq2, reuse_pc_bool=.true.,freq_bool=.false.)   
-      endif ! ISDOF
-    endif ! Petsc solver
-  endif ! istep 
-endif ! if(steptype.eq.FREQSTEP)
-! ____________  FINISHED CALC. STIFFNESS MATRIX  _________________
+  else ! TIMESTEPPING
+    if(i_step==1)then 
+      call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+    
+      if(solver_type.eq.petsc_solver)then
+        if (ISSL_DOF)then 
+          call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL, & 
+          slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,     &
+          reuse_pc_bool=.false.,freq_bool=.false.)   
+        else 
+          call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+          ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
+        endif 
+      endif
+    
+    elseif(i_step==2)then
+      ! Since we use a uniform dt, following routine has to be called only once 
+      ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
+      ! it has to be called for every time steps or every changing time step.
+      ! This will simply overwrite the storekmat for viscoelastic elements.
+      call compute_stiffness_viscoelastic(nelmt_viscoelas,             &   
+                                          eid_viscoelas, dt, relaxtime,&
+                                          storekmat, errcode, errtag)
+    
+      ! If using PETSC solver set stiffness matric                                      
+      if(solver_type.eq.petsc_solver)then
+        ! If running with SL then use this function
+        if (ISSL_DOF)then 
+          call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
+          slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,    &
+          reuse_pc_bool=.true.,freq_bool=.false.)   
+        else 
+          call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+          ang_freq, scale_ang_freq2, reuse_pc_bool=.true.,freq_bool=.false.)   
+        endif ! ISDOF
+      endif ! Petsc solver
+    endif ! istep 
+  endif ! if(steptype.eq.FREQSTEP)
+  ! ____________  FINISHED CALC. STIFFNESS MATRIX  _________________
 
 
 
