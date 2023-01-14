@@ -6,4 +6,11 @@ This form of SPECFEM-X is for the development of SPECFEM-C prior to any integrat
 ## To do list: 
 
 - [ ] Add the final weak form term (ice contibution)
-- [ ] Write ocean function updater using ice and theta comparison 
+- [x] Write ocean function updater using ice and theta comparison 
+
+
+### Time looping
+- [ ] Stiffness matrix needs to be updated at each timestep...not just the first 1 (elastic) or 2 (viscoelastic)
+- [ ] Need to store ```nodalu```, ```nodalphi```, ```nodalsl``` etc at each timestep (not to be overwritten) 
+- [ ] Incorporate ice load into the RHS 
+- [ ] Add in time-marching scheme to estimate  ${\phi_{t+1}}$, $m_{t+1}$,  $u_{t+1}$, and $\theta_{t+1}$,
