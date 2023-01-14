@@ -14,3 +14,10 @@ This form of SPECFEM-X is for the development of SPECFEM-C prior to any integrat
 - [ ] Need to store ```nodalu```, ```nodalphi```, ```nodalsl``` etc at each timestep (not to be overwritten) 
 - [ ] Incorporate ice load into the RHS 
 - [ ] Add in time-marching scheme to estimate  ${\phi_{t+1}}$, $m_{t+1}$,  $u_{t+1}$, and $\theta_{t+1}$,
+
+
+## Clarify with HNG 
+- [ ] ```apply_nonzero_bc``` - double check exactly what is happening here 
+- [ ] Why do we keep setting lots of the loads' first elements to zero. e.g. ```bodyload(0) = ZERO ```
+- [ ] Do we need to split up the memory integral $$\int_{M_s} 2\mu_0\Big[\dot{\mathbf{m}} : \tilde{\mathbf{m}} + \frac{1}{\tau} (\mathbf{d} - \mathbf{m}):(\tilde{\mathbf{d}} - \tilde{\mathbf{m}}) \Big]  dV$$ so that $$\int_{M_s} 2\mu_0\Big[ \frac{1}{\tau} (\mathbf{d} - \mathbf{m}):(\tilde{\mathbf{d}} - \tilde{\mathbf{m}}) \Big]  dV$$ is part of the RHS?
+- [ ] What are the different loads being used? 
