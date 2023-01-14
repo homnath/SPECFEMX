@@ -7,7 +7,7 @@ This form of SPECFEM-X is for the development of SPECFEM-C prior to any integrat
 
 - [ ] Add the final weak form term (ice contibution)
 - [x] Write ocean function updater using ice and theta comparison 
-
+- [x] When calling ```set_petsc_stiffness_SL``` do we need to parse the SL matrices as args? arent they global?
 
 ### Time looping
 - [ ] Stiffness matrix needs to be updated at each timestep...not just the first 1 (elastic) or 2 (viscoelastic)
