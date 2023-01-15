@@ -18,6 +18,7 @@ This form of SPECFEM-X is for the development of SPECFEM-C prior to any integrat
 
 ## Clarify with HNG 
 - [ ] **Do we need to incorporate SL terms into the true Kmat so that it influences the ```bcnodalv``` calculations?**
+- [ ] Why ```resload=load-bodyload```
 - [ ] ```apply_nonzero_bc``` - double check exactly what is happening here 
 - [ ] Why do we keep setting lots of the loads' first elements to zero. e.g. ```bodyload(0) = ZERO ```
 - [ ] Do we need to split up the memory integral $$\int_{M_s} 2\mu_0\Big[\dot{\mathbf{m}} : \tilde{\mathbf{m}} + \frac{1}{\tau} (\mathbf{d} - \mathbf{m}):(\tilde{\mathbf{d}} - \tilde{\mathbf{m}}) \Big]  dV$$ so that $$\int_{M_s} 2\mu_0\Big[ \frac{1}{\tau} (\mathbf{d} - \mathbf{m}):(\tilde{\mathbf{d}} - \tilde{\mathbf{m}}) \Big]  dV$$ is part of the RHS?
