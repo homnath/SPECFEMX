@@ -124,17 +124,21 @@ module matrix_vector
     element_is_infinite,storederiv,storejw,storeinterpf_infinite,devel_nondim, &
     isdxval,isdyval,isdzval,devel_gaminf,infquad, &
     edofu,edofphi,grav0_nodal,dgrav0_elmt,ISGRAV0,&
-    imat_to_imatmag,magnetization_blk,ismagnet_blk
-    use element,only:hex8_gnode,map2exodus_hex8
+    imat_to_imatmag,magnetization_blk,ismagnet_blk, SLlogunit, ISSL_DOF, maxngll2d, NNDOF
+    use element 
     use elastic,only:compute_cmat_elastic
     use math_constants,only:HALF,ONE,ZERO,FOUR,GRAV_CONS,PI
     use math_library,only:determinant,invert,issymmetric
     use weakform
     use shape_library
+    !use sea_level
     use gll_library
     use integration,only:dshape_hex8,lagrange_gll,dlagrange_gll,gll_weights,       &
     prepare_integration
     use infinite_element
+    use free_surface, only: nelmt_fs, iface_fs, id_elem_fs
+
+
     !use ieee_arithmetic
     implicit none
     real(kind=kreal),intent(out) :: storekmat(:,:,:)
@@ -185,12 +189,42 @@ module matrix_vector
     logical :: isinf ! flag to check if the element if on the infinite domain
     logical :: isfaces(6)
     
+    ! Sea level variables: 
+    real(kind=kreal) :: kmatSL(nedof,nedof)!  SL contribution to kmat
+    integer :: i_elmtfs
+
     errtag="ERROR: unknown!"
     errcode=-1
     errsrc=trim(myfname)//' => compute_stiffness_elastic'
     
     storekmat=zero
     rhoload=zero
+    
+
+    ! Sea level free surface contributions to stiffness matrix:
+    if (ISSL_DOF) then
+      ! Update logfile 
+      write(SLlogunit,*)
+      write(SLlogunit,*)'Calculating sea level stiffness matrix'
+      
+      ! Initialise
+      kmatSL = ZERO 
+      
+      ! Loop for each FS element
+      do i_elmtfs = 1, nelmt_fs
+
+        ! Calculate the kmat_fs contribution for this element (face)
+        call calc_SL_stiffness(i_elmtfs, kmatSL)
+
+        ! Store SL contribution in storekmat
+        storekmat(:,:,id_elem_fs(i_elmtfs)) = kmatSL
+      enddo ! loop FS elements  
+    endif ! if IS_SLDOF 
+    
+    
+    
+    
+    
     ! Purely elastic elements
     ! Viscoelastic elements are elastic at time = 0
     ! Following loops through nelmt_elas+nelmt_viscoelas
@@ -219,19 +253,26 @@ module matrix_vector
           enddo
         endif
       endif
+
+
+
       !H=dgrav0_elmt(:,:,ielmt)
-      eg0=transpose(grav0_nodal(:,num))
+      eg0=transpose(grav0_nodal(:,num)) ! element background grav. 
     
       egdof=gdof_elmt(:,i_elmt)
         
       kmat=zero
       eload=zero
-      do i=1,nip
+      do i=1,nip ! nip = ngll
+        
+        ! Comput cmat 
         if(ISDISP_DOF)then
+          ! Calculate Cijkl for specific GLL point and store in cmat
           call compute_cmat_elastic(bulkmod_elmt(i,ielmt),shearmod_elmt(i,ielmt),  &
           cmat)
         endif
     
+        ! Interpolation function varies for inf/finite elements
         if(isinf)then
           ! infinite element
           interpf=storeinterpf_infinite(i,:,ielmt_infinite) !lagrange_gl(i,:)
@@ -274,7 +315,7 @@ module matrix_vector
               kmat(edofu,edofu)=kmat(edofu,edofu)+HALF*(matmul(wmat_term3,rmat_term3)+ &
               matmul(wmat_term4,rmat_term4))*jacw
             endif
-            if(ISPOT_DOF)then
+            if(ISPOT_DOF)then ! WE Coupling of displacement and phi? 
               ! w.rho*grad(phi)
               call compute_wmat_gradphi(interpf,wmat_gradphi)
               call compute_rmat_gradphi(massdens_elmt(i,ielmt),deriv,rmat_gradphi)          
@@ -289,6 +330,8 @@ module matrix_vector
           endif
         endif
     
+
+
         if(ISPOT_DOF)then
           kmat(edofphi,edofphi)=kmat(edofphi,edofphi)+matmul(transpose(deriv),deriv)*jacw
           if(.not.ISDISP_DOF)then
@@ -311,6 +354,13 @@ module matrix_vector
         endif
     
       enddo !nip
+
+
+
+
+      
+
+
       ! kmat terms for grad(w).rho*s
       !kmat(edofphi,edofu)=transpose(kmat(edofu,edofphi))
       if(ISDISP_DOF.and.ISPOT_DOF)then
@@ -321,21 +371,18 @@ module matrix_vector
           kmat(edofphi,edofphi)=FOUR_PI_G_INV*kmat(edofphi,edofphi)
         endif
       endif
+
+      ! Check symmetry
       if(.not.issymmetric(kmat))then
         write(*,*)'ERROR: matrix is unsymmetric!'
         stop
       endif
-      !do i=1,nedof
-      !  do j=1,nedof
-      !    xval=kmat(i,j)                                                  
-      !    if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
-      !      write(*,*)'ERROR: stiffness matrix has nonfinite value/s!',myrank,ielmt,isinf,&
-      !      mat_id(ielmt),xval,minval(abs(kmat)),maxval(abs(kmat))         
-      !      stop                                                                     
-      !    endif     
-      !  enddo
-      !enddo
-      storekmat(:,:,ielmt)=kmat
+      
+      ! Store kmat into storekmat 
+      storekmat(:,:,ielmt) = storekmat(:,:,ielmt)  + kmat
+
+
+      ! Calculate rho load 
       if(.not.ISDISP_DOF .and. ISPOT_DOF)then
         rhoload(egdof)=rhoload(egdof)+eload
       endif
@@ -434,6 +481,7 @@ module matrix_vector
     
       read(11,*) ! skip this line, we do not need
       read(11,*)nface
+
       do i_face=1,nface
         read(11,*)ielmt,iface
         if(iface==1 .or. iface==3)then
@@ -470,11 +518,17 @@ module matrix_vector
         call set_face_vecdof(nfgll,3,1,imapuf) !ndofphi=1
         call set_face_scaldof(nfgll,4,0,imapphif) !idofphi=4
       
+        print*,'******************************* '
+        print*,'Element, face: ', ielmt,iface
+        print*,'nfdof:',nfdof
+        print*,'nfdofu:',nfdofu
+        print*,'nfdofphi:',nfdofphi
         print*,'imapuf:',imapuf
         print*,'imapphif:',imapphif
         print*,'iface:',iface
         print*,'edof:',hexface(iface)%edof
-    
+        print*,' '
+
         edof=hexface(iface)%edof
         num=g_num(:,ielmt)
         coord=g_coord(:,num(hexface(iface)%gnode))
@@ -1636,6 +1690,247 @@ module matrix_vector
     end subroutine compute_stiffness_elasticOLD
     !===============================================================================
     
+
+
+
+! ####################### FUNCS FOR GETTING FS DETAILS #########################
+subroutine get_fs_details(i_elmt, iface, nfgll, gw, dsq4)
+  use global 
+  use set_precision
+  use integration 
+  use free_surface
+  implicit none 
+
+  ! IO variables: 
+  integer           :: i_elmt, nfgll ,iface 
+  real(kind=kreal)  :: gw(:), dsq4(:,:,:)
+
+
+  ! Face number (ie between 1 and 6) and get related properties
+  iface = iface_fs(i_elmt)    
+  if(iface==1 .or. iface==3)then
+      nfgll             = ngllzx
+      gw(1:nfgll)       = gll_weights_zx
+      dsq4(:,:,1:nfgll) = dshape_quad4_zx
+
+    elseif(iface==2 .or. iface==4)then
+      nfgll             = ngllyz
+      gw(1:nfgll)       = gll_weights_yz
+      dsq4(:,:,1:nfgll) = dshape_quad4_yz
+
+    elseif(iface==5 .or. iface==6)then
+      nfgll             = ngllzx
+      gw(1:nfgll)       = gll_weights_xy
+      dsq4(:,:,1:nfgll) = dshape_quad4_xy
+    else
+      !write(errtag,'(a)')'ERROR: wrong face ID for traction!'
+      return
+  endif
+end subroutine get_fs_details
+
+
+
+
+
+
+    subroutine calc_SL_stiffness(i_elmtfs,kmatSL)
+      ! Uses 
+      use global
+      use set_precision
+      use element
+      use free_surface
+      use integration
+      use math_constants
+      implicit none 
+  
+      ! The Q matrix is literally just the test function multiplied
+      ! by the Jac 2D 
+      
+      ! IO 
+      integer                        :: i_elmtfs        ! loops
+      real(kind=kreal)               :: kmatSL(nedof,nedof)
+
+
+
+      ! Local
+      real(kind=kreal)               :: detjac2d        ! 2d jacobian
+      integer                        :: iface           ! face ID for elmt 
+      integer                        :: i_elmt          ! face ID for elmt 
+      integer                        :: nfgll           ! ngll on 2D face
+      real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
+      real(kind=kreal), allocatable  :: dshape4(:,:,:)
+      real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
+                                      dx_dxi(NDIM), dx_deta(NDIM)
+      integer :: num4(4), gid, phi_ind, u_ind, j,k, abg, xyg, gid_abg, gid_xyg, i_dim
+      real(kind=kreal) :: theta_tf, pi_2d_abg, pi_2d_xyg, area_inv, &
+                          ival, iival, rho_over_g, phi_tf, u_tf(NDIM)
+  
+      real(kind=kreal) :: g0abg, grav_abgj, Cabg, utfj, g0xyg, Cxyg, v1,rho_Ag
+  
+  
+      integer :: abgdof(5), xygdof(5)
+      integer ::  face_dofs(NNDOF, maxngll2d)
+
+
+
+
+      ! Code
+      allocate(gw(maxngll2d))
+      allocate(dshape4(2,4,maxngll2d))
+  
+
+  
+      ! Test functions. 
+      theta_tf = ONE
+      u_tf = ONE
+      phi_tf = ONE
+
+      ! Inverse area
+      area_inv = ONE/SLarea
+
+  
+      ! Get details of element's face that lies on free surface
+      call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
+      num4   = gnum4_fs(:, i_elmtfs)
+      coord  = g_coord(:,num4)
+
+
+      
+      ! GETTING DOF INDEXES WITHIN THE ELEMENT: 
+      ! Get the DOF index for the face as (5, NGLL2D)
+      ! Ranges between 1 and NEDOF 
+      ! for a given face
+      !if (iface.GT.6)then 
+      !  write(SLlogunit,*)'IFACE GREATER THAN 6!!!: '
+      !endif 
+
+      face_dofs = reshape(hexface(iface)%edof,(/5, maxngll2d/))   
+
+
+
+      do abg = 1, nfgll ! ABG
+          gid_abg = gnum_fs(abg, i_elmtfs) ! Global ID of node ABG
+
+          ! Get Jacobian_2d x weights for ABG 
+          dx_dxi  = matmul(coord,dshape4(1,:,abg))
+          dx_deta = matmul(coord,dshape4(2,:,abg))
+          face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
+          face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+          face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+          pi_2d_abg   =  gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
+
+          
+          ! Get the values here because they are repeated lots 
+          g0abg      = g0_nodal(gid_abg)      ! g0 abg 
+          Cabg       = oceanf(i_elmtfs, abg)  ! Ocean func abg
+
+          ! Elemental DOFs for this node:
+          ! eleents 1-5 are ux,uy,uz,phi,theta  
+          abgdof = face_dofs(:, abg)
+
+
+          ! Non-coupling Kmat terms (ie SL integral)
+          kmatSL(abgdof(5),abgdof(5)) = kmatSL(abgdof(5),abgdof(5)) - (theta_tf * pi_2d_abg * g0abg * rho_water)
+
+
+          ! Factor of rho/g outside of integral 
+          rho_over_g =  (-rho_water/g0abg)       ! -rho/g
+          rho_Ag     =  (rho_over_g / SLarea)    ! -rho/(g*Area)
+
+
+          ! UPDATE THE ABG-ABG INDICES: 
+          ! Phi_dot theta_tilde
+          kmatSL(abgdof(5),abgdof(4)) = kmatSL(abgdof(5),abgdof(4)) + (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
+          ! Phi_dot phi_tilde
+          kmatSL(abgdof(4),abgdof(4)) = kmatSL(abgdof(4),abgdof(4)) + (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
+          
+
+          do j=1,NDIM
+              grav_abgj = grav0_nodal(j, gid_abg)
+
+              ! Phi_dot u_tilde
+              kmatSL(abgdof(j),abgdof(4)) = kmatSL(abgdof(j),abgdof(4)) + (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g) 
+              
+              ! u_dot theta_tilde
+              kmatSL(abgdof(5),abgdof(j)) = kmatSL(abgdof(5),abgdof(j)) + (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)
+
+              ! u_dot phi_tilde
+              kmatSL(abgdof(4),abgdof(j)) = kmatSL(abgdof(4),abgdof(j)) + (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
+
+              do k=1,NDIM
+                  ! u_dot u_phi 
+                kmatSL(abgdof(k),abgdof(j)) = kmatSL(abgdof(k),abgdof(j)) + (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
+                enddo !k
+          enddo  ! j 
+
+
+
+          ! Diagonal+non-diagonal components of Kmat coupling SL 
+          do xyg = 1, nfgll !XYG
+              gid_xyg = gnum_fs(xyg, i_elmtfs) ! Global ID of node XYG
+
+              ! Get Jacobian_2d x weights for XYG 
+              dx_dxi  = matmul(coord,dshape4(1,:,xyg))
+              dx_deta = matmul(coord,dshape4(2,:,xyg))
+              face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
+              face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+              face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+
+              
+              pi_2d_xyg  =  gw(xyg)*sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
+              g0xyg      =  g0_nodal(gid_xyg)      ! g0 abg 
+              Cxyg       =  oceanf(i_elmtfs, xyg)  ! Ocean func abg
+
+
+              ! Element-level DOF indexing array for xyg node (5 values for node, ux,uy,uz,phi,theta)
+              ! Values range between 1 and NEDOF
+              xygdof = face_dofs(:, abg)
+
+
+              ! Note here that ABG is the index of the variable
+              ! and XYG is the test function so when we assemble the 
+              ! matrix, ABG should be the column index 
+
+              ! Phi_dot, SL_tilde  coupling 
+              kmatSL(xygdof(5),abgdof(4)) = kmatSL(xygdof(5),abgdof(4)) - (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg *rho_Ag )
+
+              !Phi_dot, Phi_tilde coupling 
+              kmatSL(xygdof(4),abgdof(4)) = kmatSL(xygdof(4),abgdof(4)) - (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
+
+
+              do j=1,NDIM
+                  v1 = pi_2d_abg * Cabg * grav0_nodal(j, gid_abg) * pi_2d_xyg 
+
+                  ! Phi_dot, U_tilde   coupling  
+                  kmatSL(xygdof(j),abgdof(4)) = kmatSL(xygdof(j),abgdof(4)) - (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  grav0_nodal(j, gid_xyg) * rho_Ag )
+
+                  ! U_dot,   SL_tilde  coupling
+                  kmatSL(xygdof(5),abgdof(j)) = kmatSL(xygdof(5),abgdof(j)) - (v1 * g0xyg * theta_tf * rho_Ag) 
+
+                  ! U_dot,   Phi_tilde coupling  
+                  kmatSL(xygdof(4),abgdof(j)) = kmatSL(xygdof(4),abgdof(j)) - (v1 * Cxyg * phi_tf * rho_Ag)
+
+                  do k = 1, NDIM 
+                    ! U_dot,   U_tilde coupling  
+                    kmatSL(xygdof(k),abgdof(j)) = kmatSL(xygdof(k),abgdof(j))  - (v1 * Cxyg * u_tf(k) *  grav0_nodal(k, gid_xyg) * rho_Ag)
+                  enddo ! k 
+
+              enddo ! j
+          enddo! xyg
+      enddo! abg
+    
+      deallocate(gw)
+      deallocate(dshape4)
+  end subroutine calc_SL_stiffness
+  
+  
+
+
+
+
+
+
+
     end module matrix_vector
     !===============================================================================
     

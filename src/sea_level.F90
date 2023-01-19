@@ -214,11 +214,18 @@ subroutine write_SL0_to_ensight()
     use global 
     use postprocess
     use free_surface
+#if(USE_MPI)
+use math_library_mpi
+#else
+use math_library_serial
+#endif
+
+
     implicit none 
 
     write(SLlogunit,*)'Saving the original SL values'
-    write(SLlogunit,*)'  --> Min sea level: ', minval(nodalsl0)
-    write(SLlogunit,*)'  --> Max sea level: ', maxval(nodalsl0)
+    write(SLlogunit,*)'  --> Min sea level: ', minscal(minval(nodalsl0))
+    write(SLlogunit,*)'  --> Max sea level: ', maxscal(maxval(nodalsl0))
     
 
     ! On the free surface
@@ -320,26 +327,26 @@ subroutine prepare_sea_level(nodalsl)
         !   slc_pt  - Phi_dot, SL_tilde  coupling  
         !   slc_up  - U_dot,   Phi_tilde coupling  
         !   
-        allocate(QSL(maxngll2d, nelmt_fs),                          &
-                 slc_uu(NDIM, maxngll2d, NDIM, maxngll2d, nelmt_fs),&
-                 slc_pu(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
-                 slc_ut(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
-                 slc_up(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
-                 slc_pp(maxngll2d, maxngll2d, nelmt_fs),            &
-                 slc_pt(maxngll2d, maxngll2d, nelmt_fs),            &
-                 stat=istattemp) 
+        !allocate(QSL(maxngll2d, nelmt_fs),                          &
+        !         slc_uu(NDIM, maxngll2d, NDIM, maxngll2d, nelmt_fs),&
+        !         slc_pu(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
+        !         slc_ut(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
+        !         slc_up(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
+        !         slc_pp(maxngll2d, maxngll2d, nelmt_fs),            &
+        !         slc_pt(maxngll2d, maxngll2d, nelmt_fs),            &
+        !         stat=istattemp) 
 
         ! Update error alloc status
-        istat=istat+istattemp
+        !istat=istat+istattemp
                  
         ! Initialise LHS arrays
-        QSL     = ZERO
-        slc_uu  = ZERO
-        slc_pu  = ZERO
-        slc_ut  = ZERO
-        slc_pp  = ZERO
-        slc_pt  = ZERO
-        slc_up  = ZERO
+        !QSL     = ZERO
+        !slc_uu  = ZERO
+        !slc_pu  = ZERO
+        !slc_ut  = ZERO
+        !slc_pp  = ZERO
+        !slc_pt  = ZERO
+        !slc_up  = ZERO
 
         ! Allocate nodal sea level 
         allocate(nodalsl(nnode_fs), stat=istattemp)
@@ -354,16 +361,15 @@ subroutine prepare_sea_level(nodalsl)
     else 
         nodalsl = ZERO
         ! Output confirmation to log. 
-        write(SLlogunit, *)'  --> Created QSL matrix'
-        write(SLlogunit, *)'  --> Created slc_uu matrix (U_dot, U_tilde)'
-        write(SLlogunit, *)'  --> Created slc_pu matrix (Φ_dot, U_tilde)'
-        write(SLlogunit, *)'  --> Created slc_ut matrix (U_dot, θ_tilde)'
-        write(SLlogunit, *)'  --> Created slc_pp matrix (Φ_dot, Φ_tilde)'
-        write(SLlogunit, *)'  --> Created slc_pt matrix (Φ_dot, θ_tilde)'
-        write(SLlogunit, *)'  --> Created slc_up matrix (U_dot, Φ_tilde)'
-        write(SLlogunit, *)'  --> Created sea level (nodalsl) vector'
+        !write(SLlogunit, *)'  --> Created QSL matrix'
+        !write(SLlogunit, *)'  --> Created slc_uu matrix (U_dot, U_tilde)'
+        !write(SLlogunit, *)'  --> Created slc_pu matrix (Φ_dot, U_tilde)'
+        !write(SLlogunit, *)'  --> Created slc_ut matrix (U_dot, θ_tilde)'
+        !write(SLlogunit, *)'  --> Created slc_pp matrix (Φ_dot, Φ_tilde)'
+        !write(SLlogunit, *)'  --> Created slc_pt matrix (Φ_dot, θ_tilde)'
+        !write(SLlogunit, *)'  --> Created slc_up matrix (U_dot, Φ_tilde)'
+        !write(SLlogunit, *)'  --> Created sea level (nodalsl) vector'
     endif
-
 
 
     write(SLlogunit,*)'  ✓ Prepared sea level. '
@@ -575,167 +581,6 @@ subroutine calculate_SL_A()
     deallocate(dshape4)
     
 end subroutine calculate_SL_A
-
-
-
-
-
-subroutine calc_SL_LHS()
-    ! Uses 
-    use global
-    use element
-    use free_surface
-    use integration
-    use math_constants
-    implicit none 
-
-    ! The Q matrix is literally just the test function multiplied
-    ! by the Jac 2D 
-
-    integer                        :: i_elmtfs        ! loops
-    real(kind=kreal)               :: detjac2d        ! 2d jacobian
-    integer                        :: iface           ! face ID for elmt 
-    integer                        :: i_elmt          ! face ID for elmt 
-    integer                        :: nfgll           ! ngll on 2D face
-    real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
-    real(kind=kreal), allocatable  :: dshape4(:,:,:)
-    real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
-                                    dx_dxi(NDIM), dx_deta(NDIM)
-    integer :: num4(4), gid, phi_ind, u_ind, j,k, abg, xyg, gid_abg, gid_xyg, i_dim
-    real(kind=kreal) :: theta_tf, pi_2d_abg, pi_2d_xyg, area_inv, &
-                        ival, iival, rho_over_g, phi_tf, u_tf(NDIM)
-
-    real(kind=kreal) :: g0abg, grav_abgj, Cabg, utfj, g0xyg, Cxyg, v1,rho_Ag
-
-
-    ! Code
-    allocate(gw(maxngll2d))
-    allocate(dshape4(2,4,maxngll2d))
-
-    write(SLlogunit,*)
-    write(SLlogunit,*)'Calculating LHS matrices'
-
-    ! Test functions. 
-    theta_tf = ONE
-    u_tf = ONE
-    phi_tf = ONE
-    ! Inverse area
-    area_inv = ONE/SLarea
-
-    ! Loop through each element on the free surface 
-    do i_elmtfs = 1, nelmt_fs
-        ! Get details of face
-        call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
-        num4   = gnum4_fs(:, i_elmtfs)
-        coord  = g_coord(:,num4)
-
-       
-        do abg = 1, nfgll ! ABG
-            gid_abg = gnum_fs(abg, i_elmtfs) ! Global ID of node ABG
-
-            ! Get Jacobian_2d x weights for ABG 
-            dx_dxi  = matmul(coord,dshape4(1,:,abg))
-            dx_deta = matmul(coord,dshape4(2,:,abg))
-            face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
-            face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
-            face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-            pi_2d_abg   =  gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
-
-            
-            ! Get the values here because they are repeated lots 
-            g0abg      = g0_nodal(gid_abg)      ! g0 abg 
-            Cabg       = oceanf(i_elmtfs, abg)  ! Ocean func abg
-
-
-            ! Non-coupling Kmat terms (ie SL integral)
-            QSL(abg, i_elmtfs) = QSL(abg, i_elmtfs) - (theta_tf * pi_2d_abg * g0abg * rho_water)
-
-
-            ! Factor of rho/g outside of integral 
-            rho_over_g =  (-rho_water/g0abg)       ! -rho/g
-            rho_Ag     =  (rho_over_g / SLarea)    ! -rho/(g*Area)
-
-
-            ! UPDATE THE ABG-ABG INDICES: 
-            ! Phi_dot theta_tilde
-            slc_pt(abg, abg, i_elmtfs) = slc_pt(abg, abg, i_elmtfs) + (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
-            ! Phi_dot phi_tilde
-            slc_pp(abg, abg, i_elmtfs) = slc_pp(abg, abg, i_elmtfs) + (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
-            
-
-            do j=1,NDIM
-                grav_abgj = grav0_nodal(j, gid_abg)
-
-                ! Phi_dot u_tilde
-                slc_pu(j, abg, abg, i_elmtfs) = slc_pu(j, abg, abg, i_elmtfs) + (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g) 
-
-                ! u_dot theta_tilde
-                slc_ut(j, abg, abg, i_elmtfs) = slc_ut(j, abg, abg, i_elmtfs) + (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)
-
-                ! u_dot phi_tilde
-                slc_up(j, abg, abg, i_elmtfs) = slc_up(j, abg, abg, i_elmtfs) + (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
-
-                do k=1,NDIM
-                    ! u_dot u_phi 
-                    slc_uu(j, abg, k, abg, i_elmtfs) = slc_uu(j, abg, k, abg, i_elmtfs) + (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
-                enddo !k
-            enddo  ! j 
-
-
-
-
-
-            ! Diagonal+non-diagonal components of Kmat coupling SL 
-            do xyg = 1, nfgll !XYG
-                gid_xyg = gnum_fs(xyg, i_elmtfs) ! Global ID of node XYG
-
-                ! Get Jacobian_2d x weights for XYG 
-                dx_dxi  = matmul(coord,dshape4(1,:,xyg))
-                dx_deta = matmul(coord,dshape4(2,:,xyg))
-                face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
-                face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
-                face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-
-                
-                pi_2d_xyg  =  gw(xyg)*sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
-                g0xyg      =  g0_nodal(gid_xyg)      ! g0 abg 
-                Cxyg       =  oceanf(i_elmtfs, xyg)  ! Ocean func abg
-
-
-
-                ! Note here that ABG is the index of the variable
-                ! and XYG is the test function so when we assemble the 
-                ! matrix, ABG should be the column index 
-
-                slc_pt(abg, xyg, i_elmtfs) = slc_pt(abg, xyg, i_elmtfs) - (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg *rho_Ag )
-
-                slc_pp(abg, xyg, i_elmtfs) = slc_pp(abg, xyg, i_elmtfs) - (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
-
-
-                do j=1,NDIM
-                    v1 = pi_2d_abg * Cabg * grav0_nodal(j, gid_abg) * pi_2d_xyg 
-
-                    slc_pu(j, abg, xyg, i_elmtfs) = slc_pu(j, abg, xyg, i_elmtfs) - (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  grav0_nodal(j, gid_xyg) * rho_Ag )
-
-                    slc_ut(j, abg, xyg, i_elmtfs) = slc_ut(j, abg, xyg, i_elmtfs) - (v1 * g0xyg * theta_tf * rho_Ag) 
-
-                    slc_up(j, abg, xyg, i_elmtfs) = slc_up(j, abg, xyg, i_elmtfs) - (v1 * Cxyg * phi_tf * rho_Ag)
-
-                    do k = 1, NDIM 
-                        slc_uu(j, abg, k, xyg, i_elmtfs) = slc_uu(j, abg, k, xyg, i_elmtfs)  - (v1 * Cxyg * u_tf(k) *  grav0_nodal(k, gid_xyg) * rho_Ag)
-                    enddo ! k 
-                enddo ! j
-
-            enddo! xyg
-            
-        enddo! abg
-    enddo! i_elmtfs
-
-    write(SLlogunit,*)'  ✓ Calculated LHS'
-
-    deallocate(gw)
-    deallocate(dshape4)
-end subroutine calc_SL_LHS
 
 
 

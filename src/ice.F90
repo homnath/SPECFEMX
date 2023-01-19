@@ -117,8 +117,9 @@ subroutine prepare_ice(nodalice)
 
    
     if(IS_ICE)then 
-        allocate(nodalice0(nnode_fs), stat=istattemp)
+        allocate(nodalice0(nnode_fs), nodalice(nnode_fs), stat=istattemp)
         nodalice0 = ZERO
+        nodalice  = ZERO
         istat=istat+istattemp
     endif
 
@@ -221,7 +222,6 @@ subroutine add_ice_cylinder(params)
     write(ICElogunit,*)'      ->  height      : ', h
     write(ICElogunit,*)'      ->  radius      : ', r
     write(ICElogunit,*)'NEED TO CHECK DIMENSIONS (NONDIM) of cylinder coords.'
-    write(ICElogunit,*)
 
     
     ! Searches for nodes on FS that are within the radius of cylinder
@@ -259,11 +259,17 @@ end subroutine add_ice_cylinder
 
 
 subroutine calc_ice_load(iceload, nodalice)
-    ! Uses 
-    use global 
-    use set_precision 
-    use free_surface
-    use math_constants
+! Uses 
+use global 
+use set_precision 
+use free_surface
+use math_constants
+#if(USE_MPI)
+use math_library_mpi
+#else
+use math_library_serial
+#endif
+
     ! IO vars
     real(kind=kreal) iceload(:), nodalice(:)
 
@@ -274,8 +280,10 @@ subroutine calc_ice_load(iceload, nodalice)
     real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
 
-
     ! Code: 
+    allocate(gw(maxngll2d))
+    allocate(dshape4(2,4,maxngll2d))
+
     
     ! Test functions 
     theta_tf = ONE
@@ -331,7 +339,7 @@ subroutine calc_ice_load(iceload, nodalice)
             face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
             face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
             face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-            pi_2d_abg   =  gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
+            pi_2d_abg     = gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
 
 
 
@@ -341,11 +349,18 @@ subroutine calc_ice_load(iceload, nodalice)
                 utf_dot_bkgrav = utf_dot_bkgrav + (u_tf(j) * grav0_nodal(j, gid_abg))
             enddo 
 
-
             
             iceload(gid_abg) = iceload(gid_abg) + ( (1 -  oceanf(i_elmt, abg)) * nodalice(rgnum_fs(abg, i_elmt)) * pi_2d_abg * & 
                                (phi_tf + utf_dot_bkgrav - area_inv * xyg_sum) ) 
         enddo ! abg
+
+
+
+        ! Print some stats about iceload: 
+        write(ICElogunit,*)' --------------------------------------------- '
+        write(ICElogunit,*)' Calculated ice load: '
+        write(ICElogunit,*)' Min value          : ', minscal(minval(iceload))
+        write(ICElogunit,*)' Max value          : ', maxscal(maxval(iceload))
 
 
     enddo !nelmt_fs 

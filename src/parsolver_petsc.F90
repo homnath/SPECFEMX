@@ -1113,6 +1113,12 @@ use output_to_user
 
 ! CODE: 
     if (freq_bool)then 
+
+        if(ISSL_DOF)then
+          write(*,*)'ERROR: TRYING TO USE FREQ SOLVER WITH SEA LEVEL'
+          stop
+        endif 
+
         call petsc_set_stiffness_matrix_freq(storekmat,storemmat,        &
                                              ang_freq, scale_ang_freq2,  & 
                                              isscale_ang_freq)
@@ -1134,44 +1140,6 @@ end subroutine set_petsc_stiffness
 
 
 
-subroutine set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL, slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, &
-  ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)
-
-! USES 
-use set_precision
-use output_to_user 
-
- implicit none 
- real(kind=kreal), allocatable :: QSL(:,:), slc_uu(:,:,:,:,:),       &
-                                  slc_pu(:,:,:,:), slc_ut(:,:,:,:),  &
-                                  slc_pp(:,:,:),   slc_pt(:,:,:),    & 
-                                  slc_up(:,:,:,:)
- real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:)
- real(kind=kreal) :: ang_freq, scale_ang_freq2
-
- logical reuse_pc_bool, freq_bool, isscale_ang_freq
-
-
-
-
-! CODE: 
-   if (freq_bool)then 
-       call petsc_set_stiffness_matrix_freq(storekmat,storemmat,        &
-                                            ang_freq, scale_ang_freq2,  & 
-                                            isscale_ang_freq)
-       log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;  
-       call write_ifproc0()
-       call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
-   else 
-       call petsc_set_stiffness_matrix_SL(storekmat, QSL, slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt)
-       log_msg = trim(' petsc_set_stiffness_matrix with SEA LEVEL: SUCCESS!') ;   
-       call write_ifproc0()
-       write(SLlogunit,*)'petsc_set_stiffness_matrix with SEA LEVEL: SUCCESS!'
-       call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
-       call petsc_set_solver()
-   endif 
-
-end subroutine set_petsc_stiffness_SL
 
 
 
@@ -1406,17 +1374,13 @@ subroutine petsc_create_vector_SL()
 
 
 
-  subroutine petsc_set_stiffness_matrix_SL(storekmat, QSL, slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt)
+  subroutine petsc_set_stiffness_matrix_SL(storekmat)
   use math_library_mpi,only:sumscal
   use ieee_arithmetic
   use free_surface
   implicit none
   
-  real(kind=kreal),intent(in) :: storekmat(:,:,:)                                  
-  real(kind=kreal),intent(in) :: QSL(:,:), slc_uu(:,:,:,:,:),       &
-                                 slc_pu(:,:,:,:), slc_ut(:,:,:,:),  &
-                                 slc_pp(:,:,:),   slc_pt(:,:,:),    & 
-                                 slc_up(:,:,:,:)      
+  real(kind=kreal),intent(in) :: storekmat(:,:,:)                                       
                                  
   integer :: i, i_elmt, ielmt, j, n, k,l, ndzero , i_elmtfs, ctr, ictr, & 
              i_ctr, j_ctr, idof, i_dim, idof_abg, idof_stn, abg, stn , j_cycles, i_cycles                          
@@ -1514,80 +1478,82 @@ subroutine petsc_create_vector_SL()
   enddo  ! ielmt   
     
     
+
+  
   ! Add sea level FS values to LHS matrix 
-  do i_elmtfs = 1, nelmt_fs
+  !do i_elmtfs = 1, nelmt_fs
 
     ! Get the index of the DOFs for this element 
-    ggdof_elmt_fs = reshape(ggdof(:,gnum_fs(:, i_elmtfs)),(/5, maxngll2d/))                         
-    ggdof_elmt_fs = ggdof_elmt_fs - 1      ! indexing from 0                   
+  !  ggdof_elmt_fs = reshape(ggdof(:,gnum_fs(:, i_elmtfs)),(/5, maxngll2d/))                         
+  !  ggdof_elmt_fs = ggdof_elmt_fs - 1      ! indexing from 0                   
 
   
     ! Loop through alpha,beta,gamma and then sigma,tau,nu GLL index
-    do abg = 1, maxngll2d
-      dofs_abg = ggdof_elmt_fs(:, abg) ! DOF ids for abg node
+  !  do abg = 1, maxngll2d
+  !    dofs_abg = ggdof_elmt_fs(:, abg) ! DOF ids for abg node
 
 
       ! SET THETA ELEMENTS OF MATRIX  ( QSL matrix)
-      if(dofs_abg(5).ge.0)then    
-        call MatSetValues(Amat, 1, dofs_abg(5), 1, dofs_abg(5), QSL(abg, i_elmtfs), ADD_VALUES, ierr)                                      
-        CHKERRA(ierr)   
-      endif 
+  !    if(dofs_abg(5).ge.0)then    
+  !      call MatSetValues(Amat, 1, dofs_abg(5), 1, dofs_abg(5), QSL(abg, i_elmtfs), ADD_VALUES, ierr)                                      
+  !      CHKERRA(ierr)   
+  !    endif 
 
 
       ! Loop through STN 
-      do stn = 1, maxngll2d
-        dofs_stn = ggdof_elmt_fs(:, stn) ! DOF ids for stn node
+  !   do stn = 1, maxngll2d
+  !      dofs_stn = ggdof_elmt_fs(:, stn) ! DOF ids for stn node
 
 
         ! Phi_dot Phi_tilde coupling 
-        if(dofs_abg(4).ge.0.and.dofs_stn(4).ge.0)then    
-          call MatSetValues(Amat, 1, dofs_stn(4), 1, dofs_abg(4), slc_pp(abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-          CHKERRA(ierr)   
-        endif 
+  !      if(dofs_abg(4).ge.0.and.dofs_stn(4).ge.0)then    
+  !        call MatSetValues(Amat, 1, dofs_stn(4), 1, dofs_abg(4), slc_pp(abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+  !        CHKERRA(ierr)   
+  !      endif 
 
 
         ! Phi_dot Theta_tilde 
-        if(dofs_abg(4).ge.0.and.dofs_stn(5).ge.0)then    
-          call MatSetValues(Amat, 1, dofs_stn(5), 1, dofs_abg(4), slc_pt(abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-          CHKERRA(ierr)   
-        endif
+  !      if(dofs_abg(4).ge.0.and.dofs_stn(5).ge.0)then    
+  !        call MatSetValues(Amat, 1, dofs_stn(5), 1, dofs_abg(4), slc_pt(abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+  !        CHKERRA(ierr)   
+  !      endif
 
 
-        do k=1,NDIM
+  !      do k=1,NDIM
 
           ! Phi_dot U_tilde 
-          if(dofs_abg(4).ge.0.and.dofs_stn(k).ge.0)then    
-            call MatSetValues(Amat, 1, dofs_stn(k), 1, dofs_abg(4), slc_pu(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-            CHKERRA(ierr)   
-          endif
+  !        if(dofs_abg(4).ge.0.and.dofs_stn(k).ge.0)then    
+  !          call MatSetValues(Amat, 1, dofs_stn(k), 1, dofs_abg(4), slc_pu(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+  !          CHKERRA(ierr)   
+  !        endif
 
           ! U_dot Theta_tilde 
-          if(dofs_abg(k).ge.0.and.dofs_stn(5).ge.0)then    
-            call MatSetValues(Amat, 1, dofs_stn(5), 1, dofs_abg(k), slc_ut(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-            CHKERRA(ierr)   
-          endif
+  !        if(dofs_abg(k).ge.0.and.dofs_stn(5).ge.0)then    
+  !          call MatSetValues(Amat, 1, dofs_stn(5), 1, dofs_abg(k), slc_ut(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+  !          CHKERRA(ierr)   
+  !        endif
 
 
           ! U_dot Phi_tilde
-          if(dofs_abg(k).ge.0.and.dofs_stn(4).ge.0)then    
-            call MatSetValues(Amat, 1, dofs_stn(4), 1, dofs_abg(k), slc_up(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-            CHKERRA(ierr)   
-          endif
+  !        if(dofs_abg(k).ge.0.and.dofs_stn(4).ge.0)then    
+  !          call MatSetValues(Amat, 1, dofs_stn(4), 1, dofs_abg(k), slc_up(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+  !          CHKERRA(ierr)   
+  !        endif
           
 
-          do l=1,NDIM
-            ! U_dot U_tilde 
-            if(dofs_abg(k).ge.0.and.dofs_stn(l).ge.0)then    
-              call MatSetValues(Amat, 1, dofs_stn(l), 1, dofs_abg(k), slc_uu(k, abg, l, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-              CHKERRA(ierr)   
-            endif
-          enddo !l
+  !        do l=1,NDIM
+  !          ! U_dot U_tilde 
+  !          if(dofs_abg(k).ge.0.and.dofs_stn(l).ge.0)then    
+  !            call MatSetValues(Amat, 1, dofs_stn(l), 1, dofs_abg(k), slc_uu(k, abg, l, stn, i_elmtfs), ADD_VALUES, ierr)                                      
+  !            CHKERRA(ierr)   
+  !          endif
+  !        enddo !l
 
-        enddo !k
+  !      enddo !k
 
-      enddo! stn
-    enddo! abg
-  enddo   ! i_elmtfs
+  !    enddo! stn
+  !  enddo! abg
+  !enddo   ! i_elmtfs
   
   
     

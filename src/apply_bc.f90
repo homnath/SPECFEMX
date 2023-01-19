@@ -336,9 +336,11 @@ subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload, noda
   ! Local 
   integer :: i_elmt, i,  ielmt, iedof, j_node, i_dof, j_dof, idof
 
-! Modify RHS vector for prescribed displacements
+  ! Modify RHS vector for prescribed displacements
   ! i.e. if boundary dispalcements are not equal to zero
   ! WARNING: need to check for nedofu
+  ! MAKES ubcload = ubcload - K * U 
+  ! i.e. before we had KU = F where F = the ubcload bit. 
   do i_elmt=1,nelmt
     ielmt=i_elmt ! all elements
     num=g_num(:,ielmt)
@@ -357,19 +359,22 @@ subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload, noda
   enddo ! i_elmt
 
 
-
-  ! Set non-zero BC values in nodalu 
-  ! set BC nodal displacements to nodalu array
+  ! Copies the non-zero values of bcnodalv to the nodalu vector
+  ! For displacement only. 
   if(ISDISP_DOF)then
-    do i_dof=1,nndofu
+    do i_dof=1,nndofu !WE e.g. 3 for a 3D disp vector?
       idof=idofu(i_dof)
       do j_dof=1,nnode
-        if(bcnodalv(idof,j_dof)/=ZERO)nodalu(i_dof,j_dof)=bcnodalv(idof,j_dof)
+        if(bcnodalv(idof,j_dof)/=ZERO)then 
+            nodalu(i_dof,j_dof)=bcnodalv(idof,j_dof)
+        endif 
       enddo
     enddo
   endif
 
+
   ! set BC nodal potential to nodalphi array
+  ! DOESNT DO ANYTHING TO THE A 'LOAD' vector (e.g. ubcload above) - user cant set phi BC? 
   if(ISPOT_DOF)then
     do i_dof=1,nndofphi
       idof=idofphi(i_dof)
@@ -378,7 +383,6 @@ subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload, noda
       enddo
     enddo
   endif
-
 
 
 end subroutine apply_nonzero_bc

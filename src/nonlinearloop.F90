@@ -70,9 +70,6 @@ use solver_petsc
     integer :: ksp_iter, errcode, ksp_convreason
     character(len=250) :: errtag 
     logical :: isscale_ang_freq
-   
-    ! Local
-
 
 
     ! Code: 
@@ -105,7 +102,6 @@ use solver_petsc
         !call petsc_print_vector()
         !call petsc_print_matrix()
 
-
         call petsc_solve(du(1:), ksp_iter, ksp_convreason)
         log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0()
   
@@ -113,7 +109,6 @@ use solver_petsc
 
       endif
 end subroutine run_solver
-
 !#######################################################################
 
 subroutine check_convergence(uerr, maxu, maxdu, u, & 
@@ -180,16 +175,7 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
 
   ! Code: 
   ! update total nodal solution vector
-    ! time steps are not incremental!!
-    ! therefore, NOT u(t+1)=u(t)+du
-    ! u contains both diaplacement and/or gravity
-    ! displacement
 
-
-  !write(*,*)' ____________________ GDOF ____________________'
-  !do i=1,nnode
-  !  write(*,*)gdof(:,i)
-  !enddo 
   
   if(ISDISP_DOF)then
     do i_dof=1,nndofu
@@ -220,8 +206,6 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
   if(ISSL_DOF)then
     do i_elmt=1,nelmt_fs
       num = gnum_fs(:,i_elmt)
-
-
       do i_gll=1,maxngll2d
         i_node = num(i_gll)
 
@@ -229,11 +213,14 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
           nodalsl(rgnum_fs(i_gll, i_elmt)) = u(gdof(5,i_node))
         endif
       enddo !i_gll 
-
     enddo
+
+    if(myrank.eq.0)then
+      write(SLlogunit,*)
+      write(SLlogunit,*)'Max nodal Sea Level value: ', maxval(nodalsl)
+    endif 
   endif
 
-  
 
 
 

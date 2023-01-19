@@ -235,8 +235,6 @@ errtag=""; errcode=-1
 
 ! ______________________________________________________________________
 ! ______________________________________________________________________
-
-
 ! Calculate relaxation time for viscoelastic/plastic models
 allocate(relaxtime(nmaxwell,nmatblk_viscoelas),muratio(nmaxwell),tratio(nmaxwell))
 call calc_relaxation_time(relaxtime, tunitfac, muratio, tratio, min_relaxtime, max_relaxtime)
@@ -282,8 +280,6 @@ call sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv, &
                        eld, eload, bload, vload, rhoload, resload, &
                        jac, bmat, nodalu, nodalg, nodalphi, nodalB,& 
                        tot_neq, max_neq, min_neq)
-
-
 
 
 
@@ -395,27 +391,20 @@ endif
 
 
 
-! Note that the stepping starts from 
+! Set initial timestep and output to user: 
 !   1 for time domain.
 !   0 for frequency domain.
 istep0=1
 if(steptype.eq.FREQSTEP)then
   istep0=0
-endif
-
-
-! Angular frequency
-if(steptype.eq.FREQSTEP)then
   if(myrank.eq.0)then
     print*,'Step type: FREQUENCY'
     print*,'f0, f1, df (Hz):',step0,step1,dstep
   endif
 endif
 
-
 ! Compute ELASTIC mass matrix once and for all 
 call compute_mass_elastic(storemmat,errcode,errtag)
-
 
 if(isplastic)then
   ! Compute minimum pseudo-time step for viscoplasticity
@@ -430,12 +419,16 @@ if(isbodyload)then
 endif 
 
 
+
 ! Initialise ice: 
 if(is_ICE)then
   ! Prepare the ice stuff and set the user-inputted initial condition
   call prepare_ice(nodalice)
   call set_original_ice_level()
   
+  ! Copy to nodalice 
+  nodalice = nodalice0
+
   ! Save original ice to Ensight
   if(savedata%ice0)then 
     call write_ICE0_to_ensight()
@@ -453,125 +446,59 @@ if(is_SL)then
     call write_SL0_to_ensight()
   endif 
 
-
-  ! Calc ocean func and output if desired
+  ! Calc ocean func using initial SL and output if desired
   call update_ocean_function(u, errcode, errtag, use_orig=.true.)  
-
   if(savedata%oceanf)then
     call write_OF_to_ensight()
-  endif 
-
-  call calculate_SL_A()                                          ! Calc SL area 
+  endif                                    
 endif 
 
 
-write(*,*)'FINISHED'
-call close_process()
 
+! TO DO: 
+! 1) Allocate extra nodalu_curr, nodalphi_curr, nodalsl_curr
+! 2) Move the SL KMAT contributions to the kmat array
 
 
 
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
-
-! Starting time/frequency loop.
-! For elastic only one timestep 
+! For elastic simulations there is only one timestep. 
 log_msg = trim(' Starting time loop!') ;   call write_ifproc0()
 
 
 loop_step: do i_step=istep0,nstep
-  
-
   ! determine time (dt) or freq (df) step and current time/freq
   call calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
-
   
-  !  ____________________   INITIALISE VALUES   ______________________
-  nodalu=ZERO
+  ! initialise some values
+  nodalu  = ZERO
+  ubcload = ZERO
+  rhoload = ZERO
+
   if(ISPOT_DOF)then
     nodalphi=ZERO
   endif
 
   if(ISSL_DOF)then
-    nodalsl = ZERO 
+    ! Use ocean function to calculate area of ocean     
+    call calculate_SL_A()  
   endif
 
-  ubcload=ZERO
-  rhoload=ZERO
-  !  ___________________  END INITIALISE VALUES   ____________________
+ 
+  ! Set the stiffness matrix
+  call set_elasto_visco_stiffness_matrix(i_step, dt, storekmat, storemmat,& 
+                                         rhoload, isscale_ang_freq, & 
+                                         ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
+                                         eid_viscoelas, relaxtime)
 
 
-  ! ____________________________________________________________________
-  !  CALCULATING ELASTIC/ LIENAR VISCOELASIC STIFFNESS MATRIX  
-  if(steptype.eq.FREQSTEP)then
-    ! FREQUENCY STIFFNESS MATRIX 
+                                         
 
-    if(i_step==0)then
-      call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
-    endif
-      
-    ! Set Petsc stiffness matrix
-    if(solver_type.eq.petsc_solver)then
-      if (ISSL_DOF)then 
-        ! Calculate the LHS contributions of the matrix
-        call calc_SL_LHS() 
-        ! Set stifness in petsc
-        call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
-        slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,    &
-        reuse_pc_bool=.false.,freq_bool=.true.)   
-      else 
-        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-        ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.true.)   
-      endif 
-    endif
-
-  else ! TIMESTEPPING
-    if(i_step==1)then 
-      call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
-    
-      if(solver_type.eq.petsc_solver)then
-        if (ISSL_DOF)then 
-          call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL, & 
-          slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,     &
-          reuse_pc_bool=.false.,freq_bool=.false.)   
-        else 
-          call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-          ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
-        endif 
-      endif
-    
-    elseif(i_step==2)then
-      ! Since we use a uniform dt, following routine has to be called only once 
-      ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
-      ! it has to be called for every time steps or every changing time step.
-      ! This will simply overwrite the storekmat for viscoelastic elements.
-      call compute_stiffness_viscoelastic(nelmt_viscoelas,             &   
-                                          eid_viscoelas, dt, relaxtime,&
-                                          storekmat, errcode, errtag)
-    
-      ! If using PETSC solver set stiffness matric                                      
-      if(solver_type.eq.petsc_solver)then
-        ! If running with SL then use this function
-        if (ISSL_DOF)then 
-          call set_petsc_stiffness_SL(isscale_ang_freq, storekmat, QSL,& 
-          slc_uu, slc_pu, slc_ut, slc_up, slc_pp, slc_pt, storemmat, ang_freq, scale_ang_freq2,    &
-          reuse_pc_bool=.true.,freq_bool=.false.)   
-        else 
-          call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-          ang_freq, scale_ang_freq2, reuse_pc_bool=.true.,freq_bool=.false.)   
-        endif ! ISDOF
-      endif ! Petsc solver
-    endif ! istep 
-  endif ! if(steptype.eq.FREQSTEP)
-  ! ____________  FINISHED CALC. STIFFNESS MATRIX  _________________
-
-
-
-  ! apply traction boundary conditions
-  ! WARNING: i_step==1 is ONLY for rod example
+  ! apply traction boundary conditions for first timestep
+  !WE Reads and adds the traction to the extload variable
   if((istraction.or.isfstraction).and.i_step==1)then
     log_msg = trim('applying traction...') ;   call write_ifproc0()
-    !WE Reads and adds the traction to the extload variable
     call apply_traction(extload,errcode,errtag)
     call control_error(errcode,errtag,stdout,myrank)
     if(myrank==0)then
@@ -579,7 +506,6 @@ loop_step: do i_step=istep0,nstep
       flush(logunit)
     endif
   endif
-
 
   ! Other types of forces: 
   if(trim(devel_example).eq.'axial_rod')then
@@ -597,9 +523,16 @@ loop_step: do i_step=istep0,nstep
   endif 
 
 
+  ! Calculate ice load: 
+  if (is_ICE)then 
+    call calc_ice_load(iceload, nodalice)
+  endif 
+
   ! Apply non-zero boundary conditions to the bcnodalv array 
+  ! Note this is NOT applying the loading terms (e.g. extload)
   call apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload,&
                         nodalu, nodalphi)
+
 
 
   ! PREPARE BUILT IN SOLVER
@@ -614,33 +547,35 @@ loop_step: do i_step=istep0,nstep
   ksp_tot=0; nl_iter=0
 
 
+  ! Some resetting of the loads 
   extload(0)=ZERO
   ! only for fault
-  load=selfload+extload+ubcload+rhoload
-  
+  load=selfload+extload+ubcload+rhoload 
   load(0)     = ZERO
   bodyload(0) = ZERO
-  du          = ZERO
-  u           = ZERO
+  iceload(0)  = ZERO
   
-
   if(isplastic)then
     evpt     = ZERO
     olddu    = ZERO
     bodyload = ZERO
   endif
 
+  ! RESETTING OF U AND DU 
+  du          = ZERO
+  u           = ZERO
 
-
-
+  ! ADD THE ICE LOAD 
+  load = load + iceload 
+ 
 
   ! ===================== RUN NON LINEAR ITERATIONS ====================
   !bodyload=ZERO; bodyload(0)=ZERO
   ! nonlinear iteration loop
-nonlinear: do i_nliter=1,NL_MAXITER
+  nonlinear: do i_nliter=1,NL_MAXITER
     fmax=0 ! failure indicator for plastic simulation.
     nl_iter=nl_iter+1
-   
+  
     if(isplastic)then
       resload=load+bodyload
     else
@@ -661,7 +596,9 @@ nonlinear: do i_nliter=1,NL_MAXITER
     ! starting timer
     call cpu_time(cpu_tstart)
 
-    ! Run solver for this timestep 
+    ! Run NL solver for this timestep 
+    ! For our purpose all this does is sets the RHS vector to be resload 
+    ! And then calls the 'run' command from petsc
     call run_solver(resload, dprecon, ndscale, storekmat, du, &
                     scale_ang_freq2, ksp_iter, errcode, ksp_convreason,&
                     errtag, isscale_ang_freq)
@@ -677,6 +614,10 @@ nonlinear: do i_nliter=1,NL_MAXITER
     call log_ksp_iteration(maxdu, ksp_iter, ksp_convreason)
 
     ! Update the u array with du 
+    ! time steps are not incremental!!
+    ! therefore, NOT u(t+1)=u(t)+du
+    ! u contains both diaplacement and/or gravity
+    ! displacement
     if(isplastic)then
       u=du
     else
@@ -687,18 +628,15 @@ nonlinear: do i_nliter=1,NL_MAXITER
     maxu=maxscal(maxval(abs(u)))
 
     ! check convergence
-    call check_convergence(uerr, maxu, maxdu, u, & 
-    olddu, resload, nl_isconv, i_nliter)
+    call check_convergence(uerr, maxu, maxdu, u, olddu,& 
+                           resload, nl_isconv, i_nliter)
 
     ! Update nodal vectors following inversion step 
     call sync_process()
+
+    ! Copy values from u --> nodalu, nodalphi etc... 
     call update_nodal_u_vector(u, nodalu, nodalphi, nodalsl)
 
-
-    if(myrank.eq.0.and.ISSL_DOF)then
-      write(SLlogunit,*)
-      write(SLlogunit,*)'Max value: ', maxval(nodalsl)
-    endif 
 
 
     ! Reset bodyload to ZERO for Viscoelastic iteration.
@@ -706,7 +644,6 @@ nonlinear: do i_nliter=1,NL_MAXITER
     if(.not.isplastic)bodyload=ZERO; !viscoload=ZERO
 
 
-    ! WE MOVE THIS INTO A SEPARATE FUNCTION 
     ! Calculate the stress and strain for elastic/viscoelastic elements
     if(ISDISP_DOF)then
       log_msg = trim('computing elemental stress'); call write_ifproc0() 
@@ -719,14 +656,14 @@ nonlinear: do i_nliter=1,NL_MAXITER
 
       ! Calculate elastic/plastic stress & strain  
       call calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
-                             m1, m2, m3, nelmt_elas, nl_isconv, num,   &
-                             eld, eload, bload, nodalu, erate,eid_elas,&
-                             cmat, estrain, bodyload, sigma, effsigma, &
-                             bmat, deriv, jacw, strain_elmt, evpt ,    &
-                             stress_elmt, dq1, dq2, dq3, dsbar, f,     &
-                             fmax,lode_theta,sigm)
-
+                            m1, m2, m3, nelmt_elas, nl_isconv, num,   &
+                            eld, eload, bload, nodalu, erate,eid_elas,&
+                            cmat, estrain, bodyload, sigma, effsigma, &
+                            bmat, deriv, jacw, strain_elmt, evpt ,    &
+                            stress_elmt, dq1, dq2, dq3, dsbar, f,     &
+                            fmax,lode_theta,sigm)
       bodyload(0)=ZERO
+
 
       fmax=maxscal(fmax)                                                           
       if(myrank==0)then                                                            
@@ -737,7 +674,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
       endif
 
 
-      ! If all elastic then leave non-linear loop.
+      ! If all elastic then leave non-linear loop because only one timestep 
       if(allelastic)exit nonlinear
 
       ! Calculate stress and strain for viscoelastic elements
@@ -755,14 +692,14 @@ nonlinear: do i_nliter=1,NL_MAXITER
     endif !(ISDISP_DOF)
 
 
-    
+
     ! time step 0  and i_nliter 0 is entirely elastic
     ! write data for tiem step 0
     if(i_step==1.and.i_nliter==1)then
       if(ISDISP_DOF)then
         call save_displacement_variables(strain_elmt, strain_nodal, &
-                                         stress_elmt, stress_nodal, & 
-                                         nodalu, node_valency, i_step=0)
+                                        stress_elmt, stress_nodal, & 
+                                        nodalu, node_valency, i_step=0)
 
         ! Benchmark calculation for elastic result
         if(benchmark_okada .and. ISDISP_DOF)then
@@ -771,8 +708,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
       endif
 
       if(ISPOT_DOF)then
-        call save_pot_variables(nodalphi, nodalg, nodalB, node_valency,&
-                                i_step=0)
+        call save_pot_variables(nodalphi, nodalg, nodalB, node_valency,i_step=0)
       endif
       
       if(ISSL_DOF)then 
@@ -792,12 +728,12 @@ nonlinear: do i_nliter=1,NL_MAXITER
         endif
       endif 
 
-
-
+      ! If only allowed on NL iteration and only 1 timestep then exit whole loop
       if(nstep.le.1.and.NL_MAXITER.le.1)then
         exit loop_step 
       endif
-    endif ! i_step==1.and.i_nliter==NL_MAXITER
+
+    endif ! i_step==1.and.i_nliter==1
 
 
     ! Exit nonlinear loop if converged
@@ -810,7 +746,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
 
 
 
-! Update and save things before the next time step starts
+  ! Update and save things before the next time step starts
   ! Print warning if not converging
   if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
     if(myrank==0)then
@@ -851,8 +787,11 @@ enddo loop_step ! i_step time/frequency stepping loop
 ! ++++++++++++++++ END OF TIME LOOPING CODE ++++++++++++++++++++++++
 
 
+
+
 write(*,*)'Completed timesteps. Cleaning up... '
 write(SLlogunit,*)'Completed timesteps. Cleaning up... '
+
 
 ! ----------------------------- CLEANUP --------------------------------
 if(savedata%strain)then

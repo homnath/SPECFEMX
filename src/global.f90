@@ -548,10 +548,10 @@ real(kind=kreal)     :: SLarea            ! Area of water
 
 ! Matrices for SL 
 !   only needs to be a vector bc diagonal 
-real(kind=kreal), allocatable :: QSL(:,:),        slc_uu(:,:,:,:,:),  &
-                                 slc_pu(:,:,:,:), slc_ut(:,:,:,:),  &
-                                 slc_pp(:,:,:),   slc_pt(:,:,:),    & 
-                                 slc_up(:,:,:,:)
+!real(kind=kreal), allocatable :: QSL(:,:),        slc_uu(:,:,:,:,:),  &
+!                                 slc_pu(:,:,:,:), slc_ut(:,:,:,:),  &
+!                                 slc_pp(:,:,:),   slc_pt(:,:,:),    & 
+!                                 slc_up(:,:,:,:)
 
 
 
