@@ -483,6 +483,7 @@ type savedata_options
   logical :: ice0 ! initial ice level
   logical :: oceanf ! ocean function 
   logical :: ice  ! current ice level
+  logical :: icerate
   ! Free surface plot. If this option is .TRUE., and the free surface file is
   ! given, the result will be plotted on the free surface.
   logical :: fsplot,fsplot_plane 
@@ -496,9 +497,9 @@ character(len=1),parameter :: CR=achar(13) ! carriage return to overwrite
 ! format string for time step
 character(len=20) :: tstep_sformat
 ! Log file all information
-character(len=250) :: log_file, SL_log_file, ICE_log_file
+character(len=250) :: log_file, SL_log_file, ICE_log_file, kmat_log_file
 ! file unit ID for log file
-integer :: logunit=7, SLlogunit=57, ICElogunit=67
+integer :: logunit=7, SLlogunit=57, ICElogunit=67, kmatunit=77
 integer :: stdout=6
 
 character(len=250) :: log_msg
@@ -506,7 +507,7 @@ character(len=250) :: log_msg
 
 
 ! _________________________ ICE PARAMETERS _________________________
-character(len=250) :: icefile                ! Input file name 
+character(len=250) :: icefile,iceratefile                ! Input file name 
 logical :: is_ICE
 real(kind=kreal), allocatable  :: iceobjs(:,:) !  list of ice objects read in, 
 integer ::  nice_obj            !num of ice objs.
@@ -532,7 +533,7 @@ real(kind=kreal)::  rho_water
 real(kind=kreal), allocatable     :: oceanf(:,:), nodalOF(:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
 real(kind=kreal)                  :: SL0_constant  ! Constant initial SL value 
 real(kind=kreal), allocatable     :: icnodalSL(:,:)  ! Initial condition for SL (gll pt on face, element on Free Surf.)
-real(kind=kreal), allocatable     :: nodalsl0(:)   ! Store of nodal initial SL 
+real(kind=kreal), allocatable     :: nodalsl0(:),  nodalsldisp(:)   ! Store of nodal initial SL 
 real(kind=kreal), allocatable     :: nodalice0(:)   ! Store of nodal initial ice 
 
 
@@ -545,15 +546,12 @@ integer :: nedofsl    ! number of elemental degrees of freedom for sea level
 integer,allocatable :: edofsl(:) !IDs for SL degrees of freedom per element
 real(kind=kreal)     :: SLarea            ! Area of water 
 
+real(kind=kreal) icerateval ! constant value of ice change 
 
-! Matrices for SL 
-!   only needs to be a vector bc diagonal 
-!real(kind=kreal), allocatable :: QSL(:,:),        slc_uu(:,:,:,:,:),  &
-!                                 slc_pu(:,:,:,:), slc_ut(:,:,:,:),  &
-!                                 slc_pp(:,:,:),   slc_pt(:,:,:),    & 
-!                                 slc_up(:,:,:,:)
-
-
+! Sea level contribution test functions: 
+real(kind=kreal) :: theta_tf    = ONE
+real(kind=kreal) :: u_tf(3)     = ONE
+real(kind=kreal) :: phi_tf      = ONE
 
 
 

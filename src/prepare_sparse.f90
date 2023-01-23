@@ -39,6 +39,9 @@ errsrc=trim(myfname)//' => prepare_sparse'
 
 if(myrank==0) then
   write(logunit,*) 'preparing sparse matrix...'
+  write(SLlogunit,*) '++++++++++++++++++++++++++++++++++++++++'
+  write(SLlogunit,*) '       preparing sparse matrix...'
+
 endif
 
 nmax=nelmt*(NEDOF*NEDOF)

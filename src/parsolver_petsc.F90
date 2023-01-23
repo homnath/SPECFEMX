@@ -806,14 +806,17 @@ end subroutine petsc_set_ksp_operator
 !===============================================================================
 
 subroutine petsc_set_stiffness_matrix(storekmat)
+  ! WHERE WE ACTUALLY SET THE STIFFNESS MATRIX
 use math_library_mpi,only:sumscal
 use ieee_arithmetic
 implicit none
 
 real(kind=kreal),intent(in) :: storekmat(:,:,:)                                  
-integer :: i,i_elmt,ielmt,j,n,ndzero                                             
-integer :: ggdof_elmt(NEDOF)                                                     
-                                                                                 
+integer :: i,i_elmt,ielmt,j,n,ndzero ,igll, ictr   , iloop                                         
+integer :: ggdof_elmt(NNDOF, ngll)                                                     
+
+integer :: finaldof(NEDOF), nuphi_dof, theta_dof
+
 PetscInt irow,jcol                                                               
 Vec   vdiag                                                                      
 PetscScalar rval                                                                 
@@ -831,26 +834,41 @@ call sync_process
 rval=1.0
 
 ! entirely in solid                                                              
-do i_elmt=1,nelmt                                                                
-  ielmt=i_elmt                                                                   
-  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
-  ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0   
+do i_elmt=1,nelmt       
   
-  !write(logunit,*) 
-  !write(logunit,*) 
-  !write(logunit,*) 'ielmt     : ', i_elmt
-  !write(logunit,*) 'ggdof_elmt: '
-  !write(logunit,*) ggdof_elmt
+  ! Get global DOF indices for this element
+  ielmt=i_elmt                                                                   
+  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))                          
+ 
+  ! Reorders the u and phi DOFs into a 1D array
+  nuphi_dof = nndofu+nndofphi
+  finaldof = 0 
+  finaldof(1:(nuphi_dof)*ngll) = reshape(ggdof_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
 
+  ! Now add the theta DOF starting from end of u, phi stuff: 
+  ictr = 1 
+  do igll = 1, ngll 
+    theta_dof = ggdof_elmt(nuphi_dof+1, igll)
+    if (theta_dof.ne.0) then 
+      finaldof((nuphi_dof)*ngll + ictr) = theta_dof
+      ictr=ictr+1
+    endif 
+  enddo 
+
+  ! print results: 
+  !write(logunit,*) 
+  !write(logunit, *) ' FINALDOF: ', finaldof
+
+  ! petsc index starts from 0   
+  finaldof=finaldof-1 
 
 
   do i=1,NEDOF                                                                   
     do j=1,NEDOF                                                                 
     irow=i; jcol=j 
 
-
     
-    if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
+    if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                      
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
       if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
@@ -859,18 +877,15 @@ do i_elmt=1,nelmt
         flush(logunit)
         stop                                                                     
       endif                                                                     
-      call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &  
+      call MatSetValues(Amat,1,finaldof(irow),1,finaldof(jcol),           &  
       storekmat(i,j,ielmt),ADD_VALUES,ierr)
-      
-
-          
-
-      !write(logunit,*)'  ',ggdof_elmt(irow), ggdof_elmt(jcol), storekmat(i,j,ielmt)
-      
+      !write(logunit,*)'  ',finaldof(irow), finaldof(jcol), storekmat(i,j,ielmt)
       CHKERRA(ierr)                                                              
-    endif                                                                        
+    endif 
+    
+    
     enddo                                                                        
-  enddo                                                                          
+  enddo   
 enddo    
 
 
@@ -1052,6 +1067,7 @@ call VecDestroy(vdiag,ierr)
 end subroutine petsc_set_stiffness_matrix_freq
 !===============================================================================
 
+
 subroutine petsc_print_vector()
   use global
   integer :: ierr
@@ -1080,15 +1096,12 @@ subroutine petsc_print_matrix()
   PetscInt m 
   PetscInt n
 
-
   call MatView(Amat, PETSC_VIEWER_STDOUT_WORLD, ierr)
 
   !call MatGetSize(Amat, m, n )
   !write(outputString,*) 'Matrix dimensions: ', m, '  ', n, '\n'
 
   !call PetscPrintf(PETSC_COMM_WORLD, outputString, ierr) 
-
-
 end subroutine petsc_print_matrix
 
 
@@ -1126,10 +1139,20 @@ use output_to_user
         call write_ifproc0()
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
     else 
+
+        if (ISSL_DOF)then 
+            log_msg = trim(' petsc_set_stiffness_matrix WITH SEA LEVEL: SUCCESS!') ;
+           !symmetric_solver =.false.
+        else 
+            log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   
+        endif 
+
         call petsc_set_stiffness_matrix(storekmat)
 
-        log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   
+
+
         call write_ifproc0()
+        write(SLlogunit,*)log_msg
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
         call petsc_set_solver()
 
@@ -1333,6 +1356,7 @@ end subroutine petsc_finalize
 !===============================================================================
 
 subroutine petsc_create_vector_SL()
+  !NOT IN USE
   use global 
   use free_surface
   implicit none
@@ -1374,18 +1398,26 @@ subroutine petsc_create_vector_SL()
 
 
 
-  subroutine petsc_set_stiffness_matrix_SL(storekmat)
+subroutine petsc_set_stiffness_matrix_SL(storekmat)
   use math_library_mpi,only:sumscal
+  use global
   use ieee_arithmetic
   use free_surface
+  use element
+  !use sea_level
   implicit none
   
   real(kind=kreal),intent(in) :: storekmat(:,:,:)                                       
                                  
-  integer :: i, i_elmt, ielmt, j, n, k,l, ndzero , i_elmtfs, ctr, ictr, & 
+  integer :: i, i_elmt, ielmt, j, n, k,l, ndzero , i_elmtfs, ctr, ictr, iloop, & 
              i_ctr, j_ctr, idof, i_dim, idof_abg, idof_stn, abg, stn , j_cycles, i_cycles                          
-  integer :: ggdof_elmt(NEDOF), ggdof_elmt_fs(5,maxngll2d), dofs_abg(5),  dofs_stn(5)  
-  
+  integer :: ggdof_elmt(NEDOF), dofs_abg(5),  dofs_stn(5)  
+  integer :: gid_elem , iface, nfgll, iface2
+  integer ::  face_nodes(maxngll2d),  ggdof_elmt_fs(5,maxngll2d), dof_u(NDIM, maxngll2d), dof_u_tmp(NDIM,ngll), dof_phi(maxngll2d)
+  real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
+  real(kind=kreal), allocatable  :: dshape4(:,:,:)
+  integer :: num4(4),  gidloc(maxngll2d)
+  real(kind=kreal)               :: coord(ndim,4)
                                                                                     
   PetscInt irow,jcol                                                               
   Vec   vdiag                                                                      
@@ -1459,152 +1491,126 @@ subroutine petsc_create_vector_SL()
                 flush(logunit)
                 stop                                                                     
               endif 
-
                                                                     
               call MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),           &  
               storekmat(i-i_cycles,j-j_cycles,ielmt),ADD_VALUES,ierr)                                      
               CHKERRA(ierr)      
-              
-
-
-              !write(logunit,*) ggdof_elmt(irow), ggdof_elmt(jcol), storekmat(i-i_cycles,j-j_cycles,ielmt)
-              
-
+            
+             ! write(logunit,*) ggdof_elmt(irow), ggdof_elmt(jcol), storekmat(i-i_cycles,j-j_cycles,ielmt)
             endif !if ggdof != 0       
           endif !jctr=5                                                           
         enddo   ! j   
       endif ! if ictr = 5 
     enddo    ! i                                                                       
   enddo  ! ielmt   
-    
-    
+
+
+
+  allocate(gw(maxngll2d))
+  allocate(dshape4(2,4,maxngll2d))
+
+
+  ! ADD IN SEA LEVEL COUPLING TERMS:                                                         
+  do i_elmtfs = 1, nelmt_fs  
+  
+      ! Get details of element's face that lies on free surface
+
+
+    iface = iface_fs(i_elmtfs) 
+
+
+    ! Node values within the element (1-27) - returns 9 points
+    face_nodes = hexface(iface)%node
+
+    ! The global IDs of the nodes? 
+    gidloc =  gnum_fs(:, i_elmtfs)
+
+    ! The GLOBAL DOFs values of the element 
+    ggdof_elmt_fs(:,:) = ggdof(:, gnum_fs(:,i_elmtfs))
+
+    ! Get the global elemnt ID: 
+    gid_elem = id_elem_fs(i_elmtfs)
+
+    !write(kmatunit,*)"Element ID         :  ", i_elmtfs
+    !write(kmatunit,*)"Global Element ID  :  ", gid_elem
+    !write(kmatunit,*)"Face number        :  ", iface
+    !write(kmatunit,*)"Face DOFS          :  "
+    !write(kmatunit,*)'  ', face_nodes(:)
+    !write(kmatunit,*)
+    !write(kmatunit,*) "GID for GLL points:  "
+    !write(kmatunit,*) gidloc(:)
+    !write(kmatunit,*)
+    !write(kmatunit,*)"GGDOF_FS           :  "
+    !do iloop = 1, maxngll2d
+    !  write(kmatunit,*)'  *  ', ggdof_elmt_fs(:,iloop)
+    !enddo 
+    !write(kmatunit,*)
+
+
+    do i = 1, nedof
+      do j = 1, nedof
+
+
+
+
+
+
+      enddo !j
+    enddo !i 
+  enddo  ! i_elmtfs  
+
+
+
 
   
-  ! Add sea level FS values to LHS matrix 
-  !do i_elmtfs = 1, nelmt_fs
-
-    ! Get the index of the DOFs for this element 
-  !  ggdof_elmt_fs = reshape(ggdof(:,gnum_fs(:, i_elmtfs)),(/5, maxngll2d/))                         
-  !  ggdof_elmt_fs = ggdof_elmt_fs - 1      ! indexing from 0                   
-
   
-    ! Loop through alpha,beta,gamma and then sigma,tau,nu GLL index
-  !  do abg = 1, maxngll2d
-  !    dofs_abg = ggdof_elmt_fs(:, abg) ! DOF ids for abg node
-
-
-      ! SET THETA ELEMENTS OF MATRIX  ( QSL matrix)
-  !    if(dofs_abg(5).ge.0)then    
-  !      call MatSetValues(Amat, 1, dofs_abg(5), 1, dofs_abg(5), QSL(abg, i_elmtfs), ADD_VALUES, ierr)                                      
-  !      CHKERRA(ierr)   
-  !    endif 
-
-
-      ! Loop through STN 
-  !   do stn = 1, maxngll2d
-  !      dofs_stn = ggdof_elmt_fs(:, stn) ! DOF ids for stn node
-
-
-        ! Phi_dot Phi_tilde coupling 
-  !      if(dofs_abg(4).ge.0.and.dofs_stn(4).ge.0)then    
-  !        call MatSetValues(Amat, 1, dofs_stn(4), 1, dofs_abg(4), slc_pp(abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-  !        CHKERRA(ierr)   
-  !      endif 
-
-
-        ! Phi_dot Theta_tilde 
-  !      if(dofs_abg(4).ge.0.and.dofs_stn(5).ge.0)then    
-  !        call MatSetValues(Amat, 1, dofs_stn(5), 1, dofs_abg(4), slc_pt(abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-  !        CHKERRA(ierr)   
-  !      endif
-
-
-  !      do k=1,NDIM
-
-          ! Phi_dot U_tilde 
-  !        if(dofs_abg(4).ge.0.and.dofs_stn(k).ge.0)then    
-  !          call MatSetValues(Amat, 1, dofs_stn(k), 1, dofs_abg(4), slc_pu(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-  !          CHKERRA(ierr)   
-  !        endif
-
-          ! U_dot Theta_tilde 
-  !        if(dofs_abg(k).ge.0.and.dofs_stn(5).ge.0)then    
-  !          call MatSetValues(Amat, 1, dofs_stn(5), 1, dofs_abg(k), slc_ut(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-  !          CHKERRA(ierr)   
-  !        endif
-
-
-          ! U_dot Phi_tilde
-  !        if(dofs_abg(k).ge.0.and.dofs_stn(4).ge.0)then    
-  !          call MatSetValues(Amat, 1, dofs_stn(4), 1, dofs_abg(k), slc_up(k, abg, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-  !          CHKERRA(ierr)   
-  !        endif
-          
-
-  !        do l=1,NDIM
-  !          ! U_dot U_tilde 
-  !          if(dofs_abg(k).ge.0.and.dofs_stn(l).ge.0)then    
-  !            call MatSetValues(Amat, 1, dofs_stn(l), 1, dofs_abg(k), slc_uu(k, abg, l, stn, i_elmtfs), ADD_VALUES, ierr)                                      
-  !            CHKERRA(ierr)   
-  !          endif
-  !        enddo !l
-
-  !      enddo !k
-
-  !    enddo! stn
-  !  enddo! abg
-  !enddo   ! i_elmtfs
+  ! Final assembly
+  call MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
+  CHKERRA(ierr)
+  call MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
+  CHKERRA(ierr)
   
+  if(symmetric_solver)then
+    call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_TRUE,ierr)                            
+    CHKERRA(ierr)  
+  else
+    call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_FALSE,ierr)                            
+    CHKERRA(ierr)  
+  endif
   
-    
-    
-    
-    call MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
-    CHKERRA(ierr)
-    call MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
-    CHKERRA(ierr)
-    
-    if(symmetric_solver)then
-      call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_TRUE,ierr)                            
-      CHKERRA(ierr)  
-    else
-      call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_FALSE,ierr)                            
-      CHKERRA(ierr)  
-    endif
-    
-    !! check symmetry                                                                
-    !call MatDuplicate(Amat,MAT_DO_NOT_COPY_VALUES,AmatT,ierr)                        
-    !CHKERRA(ierr)                                                                   
-    !call MatTranspose(Amat,MAT_INITIAL_MATRIX,AmatT,ierr)                            
-    !CHKERRA(ierr)                                                                   
-    !rval=-1.0                                                                       
-    !call MatAXPY(AmatT,rval,Amat,SAME_NONZERO_PATTERN,ierr)                          
-    !call MatNorm(Amat,NORM_FROBENIUS,mnorm,ierr)                                    
-    !if(myrank==0)print*,'Matrix norm:',mnorm                                        
-    !call MatNorm(AmatT,NORM_FROBENIUS,mnorm,ierr)                                    
-    !if(myrank==0)print*,'Symmetry norm:',mnorm                                      
-    !call MatDestroy(AmatT,ierr)                                                      
-    !if(myrank==0)print*,'matrix setting & assembly complete11!'                     
-    !call sync_process                                                               
-                                                                                     
-    call MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr)                               
-    call MatGetDiagonal(Amat,vdiag,ierr)                                             
-    call VecGetLocalSize(vdiag,n,ierr)                                               
-    CHKERRA(ierr)                                                                    
-    call VecGetArrayF90(vdiag,diag_array,ierr)                                       
-    CHKERRA(ierr)                                                                    
-    ndzero=count(diag_array==0.)                                                     
-    if(ndzero.gt.0)then                                                              
-      write(logunit,*)'WARNING: NZEROs in diagonal:',myrank,n, &
-      count(diag_array==0.),minval(abs(diag_array)),maxval(abs(diag_array))                                
-      flush(logunit)
-    endif                                                                            
-    call VecRestoreArrayF90(vdiag,diag_array,ierr)                                   
-    call sync_process                                                                
-    call VecDestroy(vdiag,ierr)
-                                                          
-    end subroutine petsc_set_stiffness_matrix_SL
-    !===============================================================================
+  !! check symmetry                                                                
+  !call MatDuplicate(Amat,MAT_DO_NOT_COPY_VALUES,AmatT,ierr)                        
+  !CHKERRA(ierr)                                                                   
+  !call MatTranspose(Amat,MAT_INITIAL_MATRIX,AmatT,ierr)                            
+  !CHKERRA(ierr)                                                                   
+  !rval=-1.0                                                                       
+  !call MatAXPY(AmatT,rval,Amat,SAME_NONZERO_PATTERN,ierr)                          
+  !call MatNorm(Amat,NORM_FROBENIUS,mnorm,ierr)                                    
+  !if(myrank==0)print*,'Matrix norm:',mnorm                                        
+  !call MatNorm(AmatT,NORM_FROBENIUS,mnorm,ierr)                                    
+  !if(myrank==0)print*,'Symmetry norm:',mnorm                                      
+  !call MatDestroy(AmatT,ierr)                                                      
+  !if(myrank==0)print*,'matrix setting & assembly complete11!'                     
+  !call sync_process                                                               
+                                                                                    
+  call MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr)                               
+  call MatGetDiagonal(Amat,vdiag,ierr)                                             
+  call VecGetLocalSize(vdiag,n,ierr)                                               
+  CHKERRA(ierr)                                                                    
+  call VecGetArrayF90(vdiag,diag_array,ierr)                                       
+  CHKERRA(ierr)                                                                    
+  ndzero=count(diag_array==0.)                                                     
+  if(ndzero.gt.0)then                                                              
+    write(logunit,*)'WARNING: NZEROs in diagonal:',myrank,n, &
+    count(diag_array==0.),minval(abs(diag_array)),maxval(abs(diag_array))                                
+    flush(logunit)
+  endif                                                                            
+  call VecRestoreArrayF90(vdiag,diag_array,ierr)                                   
+  call sync_process                                                                
+  call VecDestroy(vdiag,ierr)
+                                                        
+end subroutine petsc_set_stiffness_matrix_SL
+!===============================================================================
     
 
 

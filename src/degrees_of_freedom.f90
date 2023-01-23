@@ -213,9 +213,12 @@ integer :: ios, ctr
 integer :: i_elmt,imat,mdomain, i_face
 integer :: inodes(ngll)
 integer :: numf(maxngll2d)
-
+integer :: overwrite_ctr, iover 
 errtag="ERROR: unknown!"
 errcode=-1
+
+write(logunit,*)'    Activating DOF'
+
 
 ! Initialize all DOFs to OFF
 gdof=0
@@ -262,6 +265,8 @@ if(ISPOT_DOF)then
   gdof(idofphi,:)=1
 endif
 
+
+overwrite_ctr = 0
 ! Sea Level
 if(ISSL_DOF)then
   ! only for nodes on the free surface
@@ -271,18 +276,32 @@ if(ISSL_DOF)then
     ! Set these nodes for the index idofsl to 1 (activate them) 
     ! Note here that for SL to be solved we need displacement and 
     ! phi to be solved so theta will always be the 5th dof slot 
+
     gdof(5, numf) = 1
   enddo 
+  
+  
+  write(logunit,*)'    Total unique FS nodes:' , nnode_fs
+  write(logunit,*)'    Total FS faces : ', nelmt_fs
+  write(logunit,*)'    Total U   DOF  : ', INT(SUM(gdof(1, :))) + INT(SUM(gdof(2, :))) + INT(SUM(gdof(3, :)))  
+  write(logunit,*)'    Total PHI DOF  : ', INT(SUM(gdof(4, :))) 
+  write(logunit,*)'    Total SL  DOF  : ', INT(SUM(gdof(5, :))) 
+
 endif
 
+write(logunit,*)' ✓  Activated DOF'
+write(logunit,*)
+
 errcode=0
+
+
 
 end subroutine activate_dof
 !===============================================================================
 
 ! This subroutine finalizes the global degrees of freedom IDs.
 subroutine finalize_gdof(errcode,errtag)
-use global, only:gdof,neq,nndof,nnode,g_num,part_path,proc_str,file_head
+use global, only:gdof,neq,nndof,nnode,g_num,part_path,proc_str,file_head, logunit
 use global, only:myrank,nedof, ISSL_DOF, SLlogunit
 use free_surface
 implicit none
@@ -297,8 +316,8 @@ errcode=-1
 neq=0
 neqsl = 0
 
-write(SLlogunit,*)
-write(SLlogunit,*)'Finalising DOFs: '
+write(logunit,*)
+write(logunit,*)'Finalising DOFs: '
 
 if (ISSL_DOF)then 
   ! If SL then we want to run it as original version first by ignoring 
@@ -313,7 +332,8 @@ if (ISSL_DOF)then
     enddo
   enddo
 
-  write(SLlogunit,*)' - Number of eq. for U, Phi: ', neq
+
+  write(logunit,*)'    Number of eq. for U, Phi: ', neq
 
   ! Now index the SL ones 
   do j=1,ubound(gdof,2)
@@ -325,11 +345,10 @@ if (ISSL_DOF)then
   enddo
 
 
-  write(SLlogunit,*)' - Number of eq. for theta : ', neqsl
-  write(SLlogunit,*)'   .......................................'
-  write(SLlogunit,*)' - Total number of eqns    : ', neq
-  write(SLlogunit,*)'   .......................................'
-  write(SLlogunit,*)
+
+  write(logunit,*)'    Number of eq. for SL    : ', neqsl
+  write(logunit,*)'    Total number of eqns    : ', neq
+
 
 else
   ! Original version 
@@ -369,6 +388,10 @@ write(22)nnode
 write(22)g_num
 close(22)
 
+
+
+write(logunit,*)' ✓ Finalised DOFs'
+write(logunit,*)
 ! Compute nodal to global
 errcode=0
 return

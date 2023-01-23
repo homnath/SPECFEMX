@@ -210,32 +210,34 @@ end subroutine summarise_SL_input_cart
 
 
 
-subroutine write_SL0_to_ensight()
+subroutine write_SL0_to_ensight(nodalsl)
     use global 
     use postprocess
+    use set_precision
     use free_surface
 #if(USE_MPI)
 use math_library_mpi
 #else
 use math_library_serial
 #endif
+implicit none 
 
+    real(kind=kreal) :: nodalsl(:)
 
-    implicit none 
 
     write(SLlogunit,*)'Saving the original SL values'
-    write(SLlogunit,*)'  --> Min sea level: ', minscal(minval(nodalsl0))
-    write(SLlogunit,*)'  --> Max sea level: ', maxscal(maxval(nodalsl0))
+    write(SLlogunit,*)'  --> Min sea level: ', minscal(minval(nodalsl))
+    write(SLlogunit,*)'  --> Max sea level: ', maxscal(maxval(nodalsl))
     
 
     ! On the free surface
     if(savedata%fsplot)then
-      call write_scalar_to_file_freesurf(nnode_fs, nodalsl0, &
+      call write_scalar_to_file_freesurf(nnode_fs, nodalsl, &
       ext='sl0',istep=0) 
     endif
     
     if(savedata%fsplot_plane)then
-      call write_scalar_to_file_freesurf(nnode_fs, nodalsl0, &
+      call write_scalar_to_file_freesurf(nnode_fs, nodalsl, &
       ext='sl0', istep=0,plane=.true.) 
     endif
 
@@ -304,50 +306,8 @@ subroutine prepare_sea_level(nodalsl)
         write(SLlogunit, *)'  --> Created ocean function'
     endif 
 
-
-    ! Create store for initial SL 
-    if(IS_SL)then 
-        allocate(nodalsl0(nnode_fs), stat=istattemp)
-        nodalsl0 = ZERO
-        write(SLlogunit, *)'  --> Created initial SL (nodal)'
-        istat=istat+istattemp
-    endif
-
  
     if(ISSL_DOF)then 
-
-        ! Allocate LHS matrices for SL to be assembled into stiffness
-        ! matrix: 
-        !   QSL     - coupling Q matrix (theta, theta integral)
-        !   slc_uu  - U_dot,   U_tilde   coupling  
-        !   slc_pu  - Phi_dot, U_tilde   coupling  
-        !   slc_ut  - U_dot,   SL_tilde  coupling  
-
-        !   slc_pp  - Phi_dot, Phi_tilde coupling  
-        !   slc_pt  - Phi_dot, SL_tilde  coupling  
-        !   slc_up  - U_dot,   Phi_tilde coupling  
-        !   
-        !allocate(QSL(maxngll2d, nelmt_fs),                          &
-        !         slc_uu(NDIM, maxngll2d, NDIM, maxngll2d, nelmt_fs),&
-        !         slc_pu(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
-        !         slc_ut(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
-        !         slc_up(NDIM, maxngll2d, maxngll2d, nelmt_fs),      &
-        !         slc_pp(maxngll2d, maxngll2d, nelmt_fs),            &
-        !         slc_pt(maxngll2d, maxngll2d, nelmt_fs),            &
-        !         stat=istattemp) 
-
-        ! Update error alloc status
-        !istat=istat+istattemp
-                 
-        ! Initialise LHS arrays
-        !QSL     = ZERO
-        !slc_uu  = ZERO
-        !slc_pu  = ZERO
-        !slc_ut  = ZERO
-        !slc_pp  = ZERO
-        !slc_pt  = ZERO
-        !slc_up  = ZERO
-
         ! Allocate nodal sea level 
         allocate(nodalsl(nnode_fs), stat=istattemp)
         istat=istat+istattemp
@@ -360,17 +320,7 @@ subroutine prepare_sea_level(nodalsl)
         stop
     else 
         nodalsl = ZERO
-        ! Output confirmation to log. 
-        !write(SLlogunit, *)'  --> Created QSL matrix'
-        !write(SLlogunit, *)'  --> Created slc_uu matrix (U_dot, U_tilde)'
-        !write(SLlogunit, *)'  --> Created slc_pu matrix (Φ_dot, U_tilde)'
-        !write(SLlogunit, *)'  --> Created slc_ut matrix (U_dot, θ_tilde)'
-        !write(SLlogunit, *)'  --> Created slc_pp matrix (Φ_dot, Φ_tilde)'
-        !write(SLlogunit, *)'  --> Created slc_pt matrix (Φ_dot, θ_tilde)'
-        !write(SLlogunit, *)'  --> Created slc_up matrix (U_dot, Φ_tilde)'
-        !write(SLlogunit, *)'  --> Created sea level (nodalsl) vector'
     endif
-
 
     write(SLlogunit,*)'  ✓ Prepared sea level. '
     write(SLlogunit,*)
@@ -381,7 +331,7 @@ end subroutine prepare_sea_level
 
 
 
-subroutine set_original_sea_level()
+subroutine set_original_sea_level(nodalsl)
     ! Uses
     use set_precision
     use global 
@@ -391,7 +341,7 @@ subroutine set_original_sea_level()
     implicit none 
 
     ! IO variables
-
+    real(kind=kreal) :: nodalsl(:)
     ! Local variables 
     integer          :: i_elmt, iface, nfgll, i_gll 
     real(kind=kreal) :: theta, z_coord
@@ -408,7 +358,7 @@ subroutine set_original_sea_level()
 
 
     ! Code:
-    nodalsl0 = 0.0_kreal
+    nodalsl = 0.0_kreal
 
     ! For cartesian: 
     if(IS_CART_SIM)then
@@ -433,7 +383,7 @@ subroutine set_original_sea_level()
                     theta   = SL0_constant - z_coord 
                     
                     if(theta.gt.0.0_kreal)then
-                        nodalsl0(rgnum_fs(i_gll, i_elmt)) = theta
+                        nodalsl(rgnum_fs(i_gll, i_elmt)) = theta
                     endif 
                 enddo 
             enddo 
@@ -449,7 +399,7 @@ end subroutine set_original_sea_level
 
 
 
-subroutine update_ocean_function(u, errcode, errtag, use_orig)
+subroutine update_ocean_function(nodalice, nodalsl, errcode, errtag, use_orig)
 ! Routine checks each GLL point on the surface to see if it is part of the ocean set
 ! see Crawford et al 2018, eqn 31-32.
 ! Set contains any nodes in which rho_w * theta > rho_i * I 
@@ -463,7 +413,7 @@ implicit none
 ! IO variables
 character(len=250) :: errtag
 integer :: ios, errcode
-real(kind=kreal), allocatable :: u(:)
+real(kind=kreal), allocatable :: nodalice(:), nodalsl(:)
 logical :: use_orig
 
 
@@ -488,8 +438,8 @@ if (use_orig)then
 
         ! Loop through GLL on the surface: 
         do i_gll = 1, nfgll
-            theta =  nodalsl0(rgnum_fs(i_gll, i_elmt))
-            I     = nodalice0(rgnum_fs(i_gll, i_elmt))
+            theta =  nodalsl(rgnum_fs(i_gll, i_elmt))
+            I     =  nodalice(rgnum_fs(i_gll, i_elmt))
 
             ! if rho_w theta > rho_ice I then part of ocean set
             if (rho_water * theta .GT. I * rho_ice) then 
@@ -503,7 +453,7 @@ if (use_orig)then
         enddo 
     enddo
 else
-    write(*, *)'ERROR: UPDATING OCEAN FUNCTION NOT IMPLEMENTED FOR CALCULATIONS YET'
+    write(*,*)'ERROR: UPDATING OCEAN FUNCTION NOT IMPLEMENTED FOR CALCULATIONS YET'
     stop
 endif 
 
@@ -572,8 +522,13 @@ subroutine calculate_SL_A()
 
     ! Escape if no water. 
     if(SLarea.lt.ZERO .or. SLarea.eq.ZERO)then 
-        write(*,*)'ERROR: area of ocean = 0 -- NO WATER!!!' 
-        stop 
+        write(*,*)'WARNING: area of ocean = 0 -- NO WATER!!!' 
+        write(*,*)'USING SEA LEVEL AREA = 1' 
+        write(*,*)'SETTING THETA TF TO  = 0' 
+
+        SLarea = 1 ! cant be zero otherwise divide by zero
+        oceanf   = ZERO
+        theta_tf = 0.0_kreal
     endif 
 
 

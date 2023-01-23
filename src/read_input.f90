@@ -167,10 +167,11 @@ savedata%oceanf = .false.
 
 
 ! Ice defaults: 
-ice_stat      = 0 
-IS_ICE        = .false.
-savedata%ice  = .false. 
-savedata%ice0 = .false. 
+ice_stat          = 0 
+IS_ICE            = .false.
+savedata%ice      = .false. 
+savedata%icerate  = .false. 
+savedata%ice0     = .false. 
 
 
 
@@ -988,10 +989,13 @@ do
 
     ! Means ICE is involved
     call split_string(tag,',',args,narg)
-    icefile   = get_string('icefile',args,narg)
+    icefile       = get_string('icefile',args,narg)
+    iceratefile   = get_string('iceratefile',args,narg)
+
     ice_stat  = 1
     is_ICE    = .true.
     write(*,*)'WILL FETCH INFO FROM ICE FILE: ', trim(icefile)
+    write(*,*)'WILL FETCH ICE RATE INFO FROM: ', trim(iceratefile)
 
     ! Save ice0 
     call seek_integer('saveice0',issave,args,narg,istat)
@@ -999,6 +1003,12 @@ do
       savedata%ice0    = .true.
       savedata%fsplot  = .true.
       write(*,*)' SAVING INITIAL ICE LEVEL'
+    endif 
+
+    call seek_integer('saveicerate',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%icerate    = .true.
+      write(*,*)' SAVING ICE RATE'
     endif 
 
     cycle
@@ -1363,7 +1373,24 @@ if(is_ICE)then
     endif 
 
   enddo 
+
+
+  ! Open the iceratefile file
+  fname= trim(data_path)//trim(iceratefile)//trim(ptail_inp)
+  open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
+  if( ios /= 0 ) then
+    write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
+    return
+  endif
+
+  read(11,*,IOSTAT=read_stat)icerateval 
+  
 endif 
+
+
+
+
+
 
 
 

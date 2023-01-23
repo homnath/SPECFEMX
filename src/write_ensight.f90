@@ -191,6 +191,10 @@ if(savedata%ice)then
   write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','ice',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.ice'
 endif
+if(savedata%icerate)then
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','icerate',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.icerate'
+endif
 if(savedata%sl)then
   write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','sea_level',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.sl'

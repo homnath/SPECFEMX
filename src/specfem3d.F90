@@ -158,13 +158,14 @@ real(kind=kreal),allocatable :: strain_elmt(:,:,:),strain_nodal(:,:),      &
 stress_elmt(:,:,:),stress_nodal(:,:),evpt(:,:,:)
 !bcnodalv: prescribed BC nodal variables
 !nodalu: nodal displacement for all nodes (not just BC)
-real(kind=kreal),allocatable :: bcnodalv(:,:),nodalu(:,:)
+real(kind=kreal),allocatable :: bcnodalv(:,:),nodalu(:,:), currentu(:,:)
 real(kind=kreal),allocatable :: nodalphi(:),nodalg(:,:)
 
 ! Sea level edit - WE 
 real(kind=kreal),allocatable :: nodalsl(:)  ! Nodal theta values
 real(kind=kreal),allocatable :: nodalice(:) ! Nodal I values
 real(kind=kreal),allocatable :: iceload(:)  ! load term due to ice.
+real(kind=kreal),allocatable :: nodalicerate(:) ! Nodal rate of I values
 
 
 
@@ -279,7 +280,7 @@ endif
 call sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv, &
                        eld, eload, bload, vload, rhoload, resload, &
                        jac, bmat, nodalu, nodalg, nodalphi, nodalB,& 
-                       tot_neq, max_neq, min_neq)
+                       tot_neq, max_neq, min_neq, currentu)
 
 
 
@@ -419,46 +420,54 @@ if(isbodyload)then
 endif 
 
 
+! Arrays: 
+! nodalu       - the u at each node, or rate for SL 
+! currentu     - for SL is the actual displacement etc, with nodalu as rate. (SL only)
+! nodalice     - Ice level (SL only)
+! nodalicerate - rate of ice change (SL only)
+
+! nodalsl      - Sea level (SL only)
+! nodalslrate  - rate of sea-level change (SL only)
+
 
 ! Initialise ice: 
 if(is_ICE)then
   ! Prepare the ice stuff and set the user-inputted initial condition
-  call prepare_ice(nodalice)
-  call set_original_ice_level()
-  
-  ! Copy to nodalice 
-  nodalice = nodalice0
+  call prepare_ice(nodalice, nodalicerate)
+  call set_original_ice_level(nodalice)
+
+ 
+  call set_ice_rate(nodalice, nodalicerate)
+
 
   ! Save original ice to Ensight
   if(savedata%ice0)then 
-    call write_ICE0_to_ensight()
+    call write_ICE0_to_ensight(nodalice)
+  endif 
+  
+  if(savedata%icerate)then 
+    call write_icerate_to_ensight(nodalicerate)
   endif 
 endif 
+
 
 
 ! Initialise Sea Level 
 if(is_SL)then 
   call prepare_sea_level(nodalsl)
-  call set_original_sea_level()
+  call set_original_sea_level(nodalsl)
   
   ! Save initial sea level if flagged: 
   if(savedata%sl0)then 
-    call write_SL0_to_ensight()
+    call write_SL0_to_ensight(nodalsl)
   endif 
 
   ! Calc ocean func using initial SL and output if desired
-  call update_ocean_function(u, errcode, errtag, use_orig=.true.)  
+  call update_ocean_function(nodalice, nodalsl, errcode, errtag, use_orig=.true.)  
   if(savedata%oceanf)then
     call write_OF_to_ensight()
   endif                                    
 endif 
-
-
-
-! TO DO: 
-! 1) Allocate extra nodalu_curr, nodalphi_curr, nodalsl_curr
-! 2) Move the SL KMAT contributions to the kmat array
-
 
 
 !----------------------------------------------------------------------
@@ -471,7 +480,8 @@ loop_step: do i_step=istep0,nstep
   ! determine time (dt) or freq (df) step and current time/freq
   call calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
   
-  ! initialise some values
+  ! initialise some values 
+  ! These are the rates for SL 
   nodalu  = ZERO
   ubcload = ZERO
   rhoload = ZERO
@@ -481,6 +491,7 @@ loop_step: do i_step=istep0,nstep
   endif
 
   if(ISSL_DOF)then
+    nodalsl = ZERO 
     ! Use ocean function to calculate area of ocean     
     call calculate_SL_A()  
   endif
@@ -525,7 +536,7 @@ loop_step: do i_step=istep0,nstep
 
   ! Calculate ice load: 
   if (is_ICE)then 
-    call calc_ice_load(iceload, nodalice)
+    call calc_ice_load(iceload, nodalicerate)
   endif 
 
   ! Apply non-zero boundary conditions to the bcnodalv array 
@@ -546,7 +557,6 @@ loop_step: do i_step=istep0,nstep
   ! Reset/initialise the count of ksp and non linear iterations 
   ksp_tot=0; nl_iter=0
 
-
   ! Some resetting of the loads 
   extload(0)=ZERO
   ! only for fault
@@ -565,9 +575,15 @@ loop_step: do i_step=istep0,nstep
   du          = ZERO
   u           = ZERO
 
+
+  write(*,*)'LOAD: ', load
+  write(*,*)'ICELOAD: ', iceload
+
+
   ! ADD THE ICE LOAD 
   load = load + iceload 
- 
+
+  
 
   ! ===================== RUN NON LINEAR ITERATIONS ====================
   !bodyload=ZERO; bodyload(0)=ZERO
@@ -743,9 +759,6 @@ loop_step: do i_step=istep0,nstep
   ! ===================== FINISHED NON-LINEAR ITERATIONS =====================
 
 
-
-
-
   ! Update and save things before the next time step starts
   ! Print warning if not converging
   if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
@@ -759,6 +772,19 @@ loop_step: do i_step=istep0,nstep
   ! Update number of non-linear iterations
   nl_tot=nl_tot+nl_iter
 
+
+  ! Update our vectors with a timestep: 
+  ! For sea level we solve for the time derivatives of the system so then we use
+  ! u(t + dt) = u(t) + dt * f(t) where f is the time derivative
+  ! These time derivatives are stored in nodalu, nodalphi, nodalsl 
+  
+  if (ISSL_DOF)then
+
+    write(SLlogunit,*)'calculating with dt: ', dt
+    nodalu   = dt*nodalu  ! i guess displacement is zero but need to do this properly 
+    nodalphi = dt*nodalphi ! Need to convert to gravity for use...
+    !nodalsl  = nodalsl + dt*(nodalslrate - nodalu(3,:))
+  endif 
 
   ! --------------- Saving/plotting variables to Ensight ---------------
   if(ISDISP_DOF)then

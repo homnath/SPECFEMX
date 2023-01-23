@@ -40,6 +40,7 @@ integer :: dumi
 ! ufs must be real because it is read from the Ensight file
 real,allocatable :: ufs(:,:)
 
+
 errtag="ERROR: unknown!"
 errcode=-1
 ! Set data path
@@ -317,6 +318,9 @@ if(infbc)then
   enddo bcinf
   close(11)
 endif
+
+write(logunit,*)' ✓  Applied boundary conditions'
+write(logunit,*)
 errcode=0
 
 return

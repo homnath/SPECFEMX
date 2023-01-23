@@ -7,6 +7,7 @@ module ice
     contains 
 
 
+    
 
 ! ################### LOG AND OUTPUT FUNCTIONS  #######################
 
@@ -44,6 +45,7 @@ implicit none
     write(ICElogunit,*)'IS_ICE            :  ', IS_ICE
     write(ICElogunit,*)'Save original ice :  ', savedata%ice0
     write(ICElogunit,*)'Save ice          :  ', savedata%ice
+    write(ICElogunit,*)'Save ice_rate     :  ', savedata%icerate
     write(ICElogunit,*)'-----------------------------------------------------'
     write(ICElogunit,*)
     
@@ -70,23 +72,26 @@ end subroutine summarise_ICE_input_cart
 
 
 
-subroutine write_ICE0_to_ensight()
+subroutine write_ICE0_to_ensight(nodalice)
     use global 
     use postprocess
+    use set_precision
     use free_surface
     implicit none 
+
+    real(kind=kreal),allocatable :: nodalice(:)
 
     write(ICElogunit,*)'Saving the original ICE values'
     
 
     ! On the free surface
     if(savedata%fsplot)then
-        call write_scalar_to_file_freesurf(nnode_fs, nodalice0, &
+        call write_scalar_to_file_freesurf(nnode_fs, nodalice, &
         ext='ice0',istep=0) 
     endif
     
     if(savedata%fsplot_plane)then
-        call write_scalar_to_file_freesurf(nnode_fs, nodalice0, &
+        call write_scalar_to_file_freesurf(nnode_fs, nodalice, &
         ext='ice0', istep=0,plane=.true.) 
     endif
 
@@ -94,13 +99,41 @@ subroutine write_ICE0_to_ensight()
     write(ICElogunit,*)
 end subroutine write_ICE0_to_ensight
 
+
+subroutine write_icerate_to_ensight(nodalicerate)
+    use global 
+    use postprocess
+    use free_surface
+    implicit none 
+    real(kind=kreal) :: nodalicerate(:) ! Nodal rate of I values
+
+
+    write(ICElogunit,*)'Saving the icerate values'
+    
+
+    ! On the free surface
+    if(savedata%fsplot)then
+        call write_scalar_to_file_freesurf(nnode_fs, nodalicerate, &
+        ext='icerate',istep=0) 
+    endif
+    
+    if(savedata%fsplot_plane)then
+        call write_scalar_to_file_freesurf(nnode_fs, nodalicerate, &
+        ext='nodalice', istep=0,plane=.true.) 
+    endif
+
+    write(ICElogunit,*)'  ✓ Saved ice rate level '
+    write(ICElogunit,*)
+end subroutine write_icerate_to_ensight
+
+
 ! ################# END  LOG AND OUTPUT FUNCTIONS  ####################
 
 
 
 
 ! #################    INITIAL SETUP FUNCTIONS    #####################
-subroutine prepare_ice(nodalice)
+subroutine prepare_ice(nodalice, nodalicerate)
     use global 
     use free_surface
     use set_precision
@@ -109,7 +142,7 @@ subroutine prepare_ice(nodalice)
     implicit none 
 
     integer :: istattemp, istat
-    real(kind=kreal), allocatable :: nodalice(:)
+    real(kind=kreal), allocatable :: nodalice(:), nodalicerate(:)
 
     write(ICElogunit, *)'Preparing ice variables...'
     
@@ -117,9 +150,9 @@ subroutine prepare_ice(nodalice)
 
    
     if(IS_ICE)then 
-        allocate(nodalice0(nnode_fs), nodalice(nnode_fs), stat=istattemp)
-        nodalice0 = ZERO
-        nodalice  = ZERO
+        allocate(nodalicerate(nnode_fs), nodalice(nnode_fs), stat=istattemp)
+        nodalicerate = ZERO
+        nodalice     = ZERO
         istat=istat+istattemp
     endif
 
@@ -143,7 +176,7 @@ subroutine prepare_ice(nodalice)
 end subroutine prepare_ice
 
 
-subroutine set_original_ice_level()
+subroutine set_original_ice_level(nodalice)
     ! Takes the user inputted ice data read from ice file and sets initial ice values
     ! Uses
     use set_precision
@@ -152,6 +185,8 @@ subroutine set_original_ice_level()
     use free_surface
     use math_constants
 
+    real(kind=kreal) :: nodalice(:)
+    
     ! Local vars: 
     integer :: i_obj ! loop var
     integer :: iceobjtype
@@ -171,7 +206,7 @@ subroutine set_original_ice_level()
         elseif (iceobjtype.eq.2) then 
             ! Cylinder - args: x, y, rad, height
             params = iceobjs(i_obj,2:5)
-            call add_ice_cylinder(params)
+            call add_ice_cylinder(params, nodalice)
         else
             ! Invalid entry
             write(*,*)'ERROR: Unknown ice object type: ', iceobjtype
@@ -184,12 +219,12 @@ subroutine set_original_ice_level()
     write(ICElogunit,*)''
     write(ICElogunit,*)'* Finished setting original ice level '
     write(ICElogunit,*)'  -->  Number of ice objects added : ', nice_obj
-    write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice0)
-    write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice0)
+    write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice)
+    write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice)
 end subroutine set_original_ice_level
 
 
-subroutine add_ice_cylinder(params)
+subroutine add_ice_cylinder(params, nodalice)
     ! Adds a cylinder of ice in the required location
     ! Uses
     use set_precision
@@ -199,10 +234,10 @@ subroutine add_ice_cylinder(params)
     use math_constants
 
     ! IO vars: 
-    real(kind=kreal) :: params(4) ! x, y, rad, height
+    real(kind=kreal) :: params(4), nodalice(:) ! x, y, rad, height
 
     ! Local vars: 
-    integer :: i_obj,i_face,i_gll, iface,nfgll ,node_ctr
+    integer :: i_obj,i_elmtfs,i_gll, iface,nfgll ,node_ctr
     integer :: iceobjtype
     integer :: ios, errcode
 
@@ -227,13 +262,13 @@ subroutine add_ice_cylinder(params)
     ! Searches for nodes on FS that are within the radius of cylinder
     ! Loop through each face on the free surface
     node_ctr = 0
-    do i_face=1, nelmt_fs  
+    do i_elmtfs=1, nelmt_fs  
 
         ! For each GLL point get the coordinates
-        call get_fs_details_noweights(i_face, iface, nfgll)
+        call get_fs_details_noweights(i_elmtfs, iface, nfgll)
         do i_gll = 1, nfgll 
             ! Get X, Y, Z coordinates for the face 
-            coord   = g_coord(:,  gnum_fs(i_gll,i_face))
+            coord   = g_coord(:,  gnum_fs(i_gll,i_elmtfs))
             x_coord = coord(1)
             y_coord = coord(2)
 
@@ -242,7 +277,7 @@ subroutine add_ice_cylinder(params)
 
             if (dis.LE.r)then 
                 ! Add ice height to nodal point: 
-                nodalice0(rgnum_fs(i_gll, i_face)) = h
+                nodalice(rgnum_fs(i_gll, i_elmtfs)) = h
                 node_ctr = node_ctr + 1 
             endif 
         enddo 
@@ -255,6 +290,40 @@ end subroutine add_ice_cylinder
 ! ################### END INITIAL SETUP FUNCTIONS  #####################
 
 
+
+
+
+subroutine set_ice_rate(nodalice, nodalicerate)
+    ! Uses:
+    use set_precision
+    use global 
+    use free_surface
+    use math_constants 
+    ! IO variables: 
+    real(kind=kreal) :: nodalice(:), nodalicerate(:)  
+    ! Local variables: 
+    integer :: iface, nfgll, i_elmtfs, i_gll, gid
+    ! Code
+
+    write(ICElogunit, *)'CAUTION: ONLY IMPLEMENTING FIXED ICE RATE ACROSS REGIONS WITH ICE'
+    write(ICElogunit, *)'Using fixed ice rate value:', icerateval
+
+    ! Loop elements
+    do i_elmtfs = 1, nelmt_fs  
+        ! Get number of GLL 
+        call get_fs_details_noweights(i_elmtfs, iface, nfgll)
+        ! Loop GLL 
+        do i_gll = 1, nfgll 
+            gid = rgnum_fs(i_gll, i_elmtfs)
+            ! Apply constant value to anywhere with ice: 
+            if (nodalice(gid).gt.zero) then 
+                nodalicerate(gid) = icerateval
+            endif 
+        enddo 
+    enddo 
+
+
+end subroutine set_ice_rate
 
 
 
@@ -276,7 +345,7 @@ use math_library_serial
     ! Local vars
     integer          ::  i_elmt, num4(4), gid_abg, gid_xyg, iface, nfgll, abg,xyg, j,k
     real(kind=kreal) :: coord(ndim,4), face_normal(3), dx_dxi(NDIM), dx_deta(NDIM), pi_2d_abg, pi_2d_xyg
-    real(kind=kreal) :: theta_tf, u_tf(NDIM), phi_tf, utf_dot_bkgrav, utf_dot_bkgrav_xyg, area_inv, xyg_sum
+    real(kind=kreal) :: utf_dot_bkgrav, utf_dot_bkgrav_xyg, area_inv, xyg_sum
     real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
 
@@ -284,11 +353,7 @@ use math_library_serial
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
-    
-    ! Test functions 
-    theta_tf = ONE
-    u_tf = ONE
-    phi_tf = ONE
+
     ! Inverse area
     area_inv = ONE/SLarea
 
@@ -340,8 +405,6 @@ use math_library_serial
             face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
             face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
             pi_2d_abg     = gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
-
-
 
             ! Sum over u_tf \cdot background grav @ abg nodes: 
             utf_dot_bkgrav = ZERO 

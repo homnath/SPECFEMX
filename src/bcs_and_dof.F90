@@ -5,7 +5,7 @@ contains
 ! ______________________________________________________________________
 subroutine sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv,&
     eld, eload, bload, vload, rhoload, resload, jac, bmat, nodalu, & 
-    nodalg, nodalphi, nodalB, tot_neq, max_neq, min_neq)
+    nodalg, nodalphi, nodalB, tot_neq, max_neq, min_neq, currentu)
 
     ! This was previously a large part of the specfem3d script. Overall this
     ! section does the following: 
@@ -37,7 +37,7 @@ use dof
 
 implicit none 
 
-real(kind=kreal), allocatable :: bcnodalv(:,:), nodalu(:,:), nodalphi(:),nodalg(:,:), nodalB(:,:)
+real(kind=kreal), allocatable :: bcnodalv(:,:), nodalu(:,:), currentu(:,:), nodalphi(:),nodalg(:,:), nodalB(:,:)
 integer,allocatable::num(:)
 integer,allocatable :: egdof(:),egdofu(:)
 integer :: tot_neq,max_neq,min_neq
@@ -51,6 +51,9 @@ vload(:),rhoload(:),resload(:)
 integer :: istat, errcode, i_elmt
 character(len=250) :: errtag
 
+write(logunit,*)' -------------------------------------------------'
+write(logunit,*)' Sorting GDOFs and BCs   (sort_gdofs_and_bc)'
+write(logunit,*)
 
 ! Initialise boundary conditions
 allocate(bcnodalv(nndof,nnode))
@@ -92,7 +95,7 @@ call control_error(errcode,errtag,stdout,myrank)
 log_msg = 'complete!' ; call write_ifproc0()
 
 call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
-        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB )
+        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB, currentu)
 
 
 ! store elemental global degrees of freedoms from nodal gdof
@@ -122,6 +125,9 @@ if(myrank==0)then
                                   ' max:',max_neq,' min:',min_neq
   flush(logunit)
 endif
+
+write(logunit,*)' ✓  Finished sorting GDOFs with BCs'
+write(logunit,*)
 
 
 end subroutine sort_gdofs_and_bc

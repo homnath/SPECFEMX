@@ -96,7 +96,6 @@ use solver_petsc
   
         call petsc_set_vector(resload)
         log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0()
-  
 
         write(*,*)'About to run solver...iteration:'
         !call petsc_print_vector()
