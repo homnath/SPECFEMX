@@ -521,14 +521,12 @@ subroutine calculate_SL_A()
     write(SLlogunit,*)'  ✓ Calculated sea level area. '
 
     ! Escape if no water. 
-    if(SLarea.lt.ZERO .or. SLarea.eq.ZERO)then 
+    if(SLarea.le.ZERO)then 
         write(*,*)'WARNING: area of ocean = 0 -- NO WATER!!!' 
-        write(*,*)'USING SEA LEVEL AREA = 1' 
-        write(*,*)'SETTING THETA TF TO  = 0' 
+        write(*,*)'STOPPING SIMULATION' 
+        write(*,*)'TRY USING SEA LEVEL AREA = 1???' 
 
-        SLarea = 1 ! cant be zero otherwise divide by zero
-        oceanf   = ZERO
-        theta_tf = 0.0_kreal
+        stop 
     endif 
 
 

@@ -833,17 +833,35 @@ CHKERRA(ierr)
 call sync_process
 rval=1.0
 
+
+
 ! entirely in solid                                                              
-do i_elmt=1,nelmt       
-  
+do i_elmt=1, nelmt       
+  write(kmatunit,*)'ELEMENT: ', i_elmt
+
   ! Get global DOF indices for this element
   ielmt=i_elmt                                                                   
-  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))                          
- 
+  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))    
+  
+  
+  write(kmatunit,*)'   ggdof_elmt: in shape 5 x 27 '
+  do i = 1, ngll
+    write(kmatunit,*)'     * ', ggdof_elmt(:,i) 
+  enddo 
+  write(kmatunit,*)
+
+
+
   ! Reorders the u and phi DOFs into a 1D array
   nuphi_dof = nndofu+nndofphi
   finaldof = 0 
   finaldof(1:(nuphi_dof)*ngll) = reshape(ggdof_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
+
+  !write(kmatunit,*)'   nuphi_dof: ', nuphi_dof
+  !write(kmatunit,*)'   final_dof: in shape 1 x NEDOF ', finaldof
+
+  !write(kmatunit,*)'   now add the theta DOFs...'
+
 
   ! Now add the theta DOF starting from end of u, phi stuff: 
   ictr = 1 
@@ -854,6 +872,9 @@ do i_elmt=1,nelmt
       ictr=ictr+1
     endif 
   enddo 
+
+  !write(kmatunit,*)'   finaldof with theta: ', finaldof
+
 
   ! print results: 
   !write(logunit,*) 
@@ -877,12 +898,10 @@ do i_elmt=1,nelmt
         flush(logunit)
         stop                                                                     
       endif                                                                     
-      call MatSetValues(Amat,1,finaldof(irow),1,finaldof(jcol),           &  
-      storekmat(i,j,ielmt),ADD_VALUES,ierr)
+      call MatSetValues(Amat, 1, finaldof(irow), 1, finaldof(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr)
       !write(logunit,*)'  ',finaldof(irow), finaldof(jcol), storekmat(i,j,ielmt)
       CHKERRA(ierr)                                                              
     endif 
-    
     
     enddo                                                                        
   enddo   
@@ -897,10 +916,12 @@ CHKERRA(ierr)
 
 if(symmetric_solver)then
   call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_TRUE,ierr)                            
-  CHKERRA(ierr)  
+  CHKERRA(ierr)
+  write(kmatunit,*)'Using symmetric PETSC KMAT'  
 else
   call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_FALSE,ierr)                            
   CHKERRA(ierr)  
+  write(kmatunit,*)'Using non-symmetric PETSC KMAT'  
 endif
 
 !! check symmetry                                                                
@@ -1126,7 +1147,7 @@ use output_to_user
 
 ! CODE: 
     if (freq_bool)then 
-
+        ! FREQUENCY SOLVER
         if(ISSL_DOF)then
           write(*,*)'ERROR: TRYING TO USE FREQ SOLVER WITH SEA LEVEL'
           stop
@@ -1139,10 +1160,11 @@ use output_to_user
         call write_ifproc0()
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
     else 
-
+        ! TIMESTEPPING 
         if (ISSL_DOF)then 
             log_msg = trim(' petsc_set_stiffness_matrix WITH SEA LEVEL: SUCCESS!') ;
-           !symmetric_solver =.false.
+            log_msg = trim(' SETTING PETSC SYMMETRIC FLAG TO FALSE') ;
+           symmetric_solver =.false.
         else 
             log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   
         endif 
@@ -1235,7 +1257,9 @@ PetscInt    ireason
 
 
 ! Solve the linear system
+write(*,*)'Running KSPSOLVE...'
 call KSPSolve(ksp,bvec,xvec,ierr)
+write(*,*)'Completed KSPSOLVE...'
 
 
 ! View solver info; we could instead use the option -ksp_view
@@ -1397,7 +1421,7 @@ subroutine petsc_create_vector_SL()
 
 
 
-
+! OLD AND NOT USED
 subroutine petsc_set_stiffness_matrix_SL(storekmat)
   use math_library_mpi,only:sumscal
   use global

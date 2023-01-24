@@ -179,6 +179,9 @@ module matrix_vector
     integer :: nip,nipinf,ielmt_infinite
     logical :: isinf ! flag to check if the element if on the infinite domain
     logical :: isfaces(6)
+    logical :: empty_row 
+
+    integer :: emp, filled 
     
     ! Sea level variables: 
     real(kind=kreal), allocatable :: kSL(:,:)!  SL contribution to kmat
@@ -202,7 +205,6 @@ module matrix_vector
       
       ! Initialise
       allocate(kSL(nedof,nedof))
-      kSL = zero 
       storekmatSL = zero
 
       ! Create stiffness file 
@@ -220,12 +222,24 @@ module matrix_vector
       do i_elmtfs = 1, nelmt_fs
         ! TO DO: At some point get rid of the storekmatSL intermediate array...too much storage!
         ! Can do this by moving this whole IS_SLDOF loop to where it is added to storekmat and add it directly
+
+        kSL = zero 
         call calc_SL_stiffness(i_elmtfs, kSL)
-        storekmatSL(:,:,id_elem_fs(i_elmtfs)) =  kSL
+        call check_KSL(kSL, empty_row, 4*ngll+ 1) ! Start checking at the beginning of the SL stuff only 
+
+        if (empty_row) then 
+         write(*,*) '!!!! EMPTY ROW FOR KSL IN FS ELEMENT ', i_elmtfs, " GLOBAL - ", id_elem_fs(i_elmtfs)
+        endif 
+        
+        storekmatSL(:,:,id_elem_fs(i_elmtfs)) = storekmatSL(:,:,id_elem_fs(i_elmtfs)) +  kSL
+
       enddo ! loop FS elements  
     endif ! if IS_SLDOF 
-
     
+
+
+
+
     !storekmat=zero
     rhoload=zero
     ! Purely elastic elements
@@ -386,23 +400,9 @@ module matrix_vector
 
     ! Combine with the sea level contributions!
     if (ISSL_DOF)then 
+      write(kmatunit,*)'Combined stiffness matrices'
       storekmat = storekmat + storekmatSL
     endif 
-
-
-
-    !write(kmatunit,*) "TOTAL:"
-
-    !do iloop=1,nedof
-    !  write(kmatunit,*) storekmat(:, iloop,ielmt)
-    !enddo 
-    !stop 
-
-
-
-
-
- 
 
 
     ! rhoload is computed if only the ISPOT_DOF is TRUE
@@ -1750,7 +1750,6 @@ end subroutine get_fs_details
 
 
 
-
     subroutine calc_SL_stiffness(i_elmtfs,kmatSL)
       ! Uses 
       use global
@@ -1792,6 +1791,7 @@ end subroutine get_fs_details
       allocate(gw(maxngll2d))
       allocate(dshape4(2,4,maxngll2d))
   
+      
 
       ! Inverse area
       area_inv = ONE/SLarea
@@ -1812,27 +1812,33 @@ end subroutine get_fs_details
       ! The GLOBAL DOFs values of the element 
       ggdof_elmt_fs(:,:) = ggdof(:, gnum_fs(:,i_elmtfs))
 
-      !write(kmatunit,*)"Element ID         :  ", i_elmtfs
-      !write(kmatunit,*)"Global Element ID  :  ", id_elem_fs(i_elmtfs)
-      !write(kmatunit,*)"Face number        :  ", iface
-      !write(kmatunit,*)"Face DOFS          :  "
-      !write(kmatunit,*)'  ', face_nodes(:)
-      !write(kmatunit,*)
-      !write(kmatunit,*) "GID for GLL points:  "
-      !write(kmatunit,*) gidloc(:)
-      !write(kmatunit,*)
-      !write(kmatunit,*)"GGDOF_FS           :  "
-      !do iloop = 1, maxngll2d
-      !  write(kmatunit,*)'  *  ', ggdof_elmt_fs(:,iloop)
-      !enddo 
-      !write(kmatunit,*)
+      write(kmatunit,*)"Element ID         :  ", i_elmtfs
+      write(kmatunit,*)"Global Element ID  :  ", id_elem_fs(i_elmtfs)
+      write(kmatunit,*)"Face number        :  ", iface
+      write(kmatunit,*)"Face DOFS          :  "
+      write(kmatunit,*)'  ', face_nodes(:)
+      write(kmatunit,*)
+      write(kmatunit,*) "GID for GLL points:  "
+      write(kmatunit,*) gidloc(:)
+      write(kmatunit,*)
+      write(kmatunit,*)"GGDOF_FS           :  "
+      do iloop = 1, maxngll2d
+        write(kmatunit,*)'  *  ', ggdof_elmt_fs(:,iloop)
+      enddo 
+      write(kmatunit,*)
 
       ! Get the element-scale degrees of freedom...just use edofsl for SL 
       dof_u_tmp = reshape(edofu, (/NDIM, ngll/)) 
       dof_u     = dof_u_tmp(:,face_nodes)
       dof_phi   = edofphi(face_nodes)
 
-    
+      write(kmatunit,*)'dof_u_tmp :', dof_u_tmp
+      write(kmatunit,*)'dof_u     :', dof_u
+      write(kmatunit,*)'dof_phi   :', dof_phi
+
+
+
+
 
       do abg = 1, nfgll ! ABG
         gid_abg = gidloc(abg)            ! Global ID of node ABG
@@ -1860,6 +1866,14 @@ end subroutine get_fs_details
 
         ! theta_tilde Phi_dot 
         kmatSL(edofsl(abg), dof_phi(abg)) = kmatSL(edofsl(abg), dof_phi(abg)) + (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
+        
+        if ((g0abg * pi_2d_abg * theta_tf  * rho_over_g).eq.zero )then
+          write(*,*)'ERROR :theta_tilde Phi_dot  equal to zero'
+          write(*,*)'g0abg', g0abg
+          write(*,*)'pi_2d_abg', pi_2d_abg
+          write(*,*)'theta_tf', theta_tf
+          write(*,*)'rho_over_g', rho_over_g
+        endif 
 
         ! phi_tilde Phi_dot 
         kmatSL(dof_phi(abg), dof_phi(abg)) = kmatSL(dof_phi(abg), dof_phi(abg)) + (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
@@ -1942,10 +1956,39 @@ end subroutine get_fs_details
   
   
 
+  
+  subroutine check_KSL(ksl, contains_empty, start_index)
+    ! Checks that the local SL stiffness matrix for an element does not have any empty rows 
+    use set_precision
+    use global 
+    ! IO variables: 
+    real(kind=kreal) :: ksl(:,:)
+    real(kind=kreal) :: row(nedof)
+    logical :: contains_empty
+    integer :: start_index
+    ! Local: 
+    integer :: i,j, rowctr
 
 
+    contains_empty = .false. 
+    
+    do i = start_index, 4*ngll + maxngll2d !row loop  
+      rowctr = 0 
 
+      do j= 1, nedof
+        if (ksl(i,j).ne.0) then 
+          rowctr = rowctr + 1 
+        endif 
+      enddo 
 
+      if (rowctr.eq.0)then 
+        !write(*,*)'   EMPTY ROW, ID: ', i
+        contains_empty = .true.
+      endif 
+
+    enddo ! row loop 
+
+  end subroutine check_KSL
 
 
     end module matrix_vector

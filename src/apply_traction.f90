@@ -99,6 +99,7 @@ if(istraction)then
       enddo
       trac_stat=.true.
     elseif(tractype==1)then ! uniform loading
+
       read(11,*)q ! vector
       read(11,*)nface
       do i_face=1,nface

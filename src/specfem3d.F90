@@ -435,10 +435,7 @@ if(is_ICE)then
   ! Prepare the ice stuff and set the user-inputted initial condition
   call prepare_ice(nodalice, nodalicerate)
   call set_original_ice_level(nodalice)
-
- 
   call set_ice_rate(nodalice, nodalicerate)
-
 
   ! Save original ice to Ensight
   if(savedata%ice0)then 
@@ -575,15 +572,8 @@ loop_step: do i_step=istep0,nstep
   du          = ZERO
   u           = ZERO
 
-
-  write(*,*)'LOAD: ', load
-  write(*,*)'ICELOAD: ', iceload
-
-
   ! ADD THE ICE LOAD 
-  load = load + iceload 
-
-  
+  load = load + iceload   
 
   ! ===================== RUN NON LINEAR ITERATIONS ====================
   !bodyload=ZERO; bodyload(0)=ZERO
@@ -608,7 +598,6 @@ loop_step: do i_step=istep0,nstep
       flush(logunit)
     endif
 
-    
     ! starting timer
     call cpu_time(cpu_tstart)
 
