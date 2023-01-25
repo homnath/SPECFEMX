@@ -88,12 +88,15 @@ if(ISSL_DOF)then
   ! Note here we are setting a possible DOF for theta on every GLL in an 
   ! element...of course it can only actually be on the surface but 
   ! for now it is convenient ... may be a memory issue if mesh is huge
-  ! For things like kmat
+  ! For things like kmat 
   nedof = nedof + nenode  
-          
 endif 
 
-
+write(logunit,*)'Initialised degrees of freedom: '
+write(logunit,*)' --> Number of nodal total      -   (nndof)   : ', nndof
+write(logunit,*)' --> Number of elemental total  -   (nedof)   : ', nedof
+write(logunit,*)' --> Number of elemental u      -   (nedofu)  : ', nedofu
+write(logunit,*)' --> Number of elemental phi    -   (nedofphi): ', nedofphi
 
 
 end subroutine initialize_dof
@@ -103,7 +106,7 @@ end subroutine initialize_dof
 
 ! This subroutine sets IDs for the elemental degrees of freedom for
 ! u and \phi which may be used to map the elemental matrices
-subroutine set_element_dof()
+subroutine set_element_dof_uphi()
 use global,only:ISDISP_DOF,ISPOT_DOF,ISSL_DOF, nedofu,nedofphi,ngll,nndofu, &
                 edofu,edofphi,edofsl
 implicit none
@@ -131,7 +134,6 @@ do i=1,NGLL
     nu=nu+1
     edofu(nu)=iu(1)
 
-
     do j=2,NNDOFU
       nu=nu+1
       iu(j)=iu(j-1)+1
@@ -154,9 +156,8 @@ do i=1,NGLL
 
 enddo
 
-
 return
-end subroutine set_element_dof
+end subroutine set_element_dof_uphi
 !===============================================================================
 
 ! compute mapping of u  to face elemental matrices
@@ -270,6 +271,7 @@ overwrite_ctr = 0
 ! Sea Level
 if(ISSL_DOF)then
   ! only for nodes on the free surface
+  ! Loops over each FACE on the free surface
   do i_face = 1, nelmt_fs  
     ! Get g_num values of this face 
     numf  = gnum_fs(:,i_face)
@@ -282,10 +284,10 @@ if(ISSL_DOF)then
   
   
   write(logunit,*)'    Total unique FS nodes:' , nnode_fs
-  write(logunit,*)'    Total FS faces : ', nelmt_fs
-  write(logunit,*)'    Total U   DOF  : ', INT(SUM(gdof(1, :))) + INT(SUM(gdof(2, :))) + INT(SUM(gdof(3, :)))  
-  write(logunit,*)'    Total PHI DOF  : ', INT(SUM(gdof(4, :))) 
-  write(logunit,*)'    Total SL  DOF  : ', INT(SUM(gdof(5, :))) 
+  write(logunit,*)'    Total FS faces       : ', nelmt_fs
+  write(logunit,*)'    Total U   DOF        : ', INT(SUM(gdof(1, :))) + INT(SUM(gdof(2, :))) + INT(SUM(gdof(3, :)))  
+  write(logunit,*)'    Total PHI DOF        : ', INT(SUM(gdof(4, :))) 
+  write(logunit,*)'    Total SL  DOF        : ', INT(SUM(gdof(5, :))) 
 
 endif
 
@@ -317,7 +319,7 @@ neq=0
 neqsl = 0
 
 write(logunit,*)
-write(logunit,*)'Finalising DOFs: '
+write(logunit,*)'Finalising DOF global IDs: '
 
 if (ISSL_DOF)then 
   ! If SL then we want to run it as original version first by ignoring 
@@ -345,10 +347,8 @@ if (ISSL_DOF)then
   enddo
 
 
-
   write(logunit,*)'    Number of eq. for SL    : ', neqsl
   write(logunit,*)'    Total number of eqns    : ', neq
-
 
 else
   ! Original version 
@@ -407,18 +407,21 @@ subroutine sea_level_dof()
 
   integer :: ldof, i 
 
-  allocate(edofsl(maxngll2d))
+  allocate(edofsl(ngll))
+
+
+  nedofsl = nenode
 
   ! Get last degree of freedom from phi + 1: 
   ldof = edofphi(nedofphi) + 1
 
   ! DOFs for SL are sequence starting with ldof since after u and phi
-  do i = 1, maxngll2d
+  do i = 1, ngll
     edofsl(i) = ldof
     ldof = ldof + 1 
   enddo 
 
-
+  write(logunit,*)' --> Number of elemental SL     -   (nedofsl) : ', nedofsl
 end subroutine sea_level_dof
 
 

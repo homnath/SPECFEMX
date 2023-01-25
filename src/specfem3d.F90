@@ -163,10 +163,11 @@ real(kind=kreal),allocatable :: nodalphi(:),nodalg(:,:)
 
 ! Sea level edit - WE 
 real(kind=kreal),allocatable :: nodalsl(:)  ! Nodal theta values
+real(kind=kreal),allocatable :: nodalslrate(:)  ! Nodal theta values
 real(kind=kreal),allocatable :: nodalice(:) ! Nodal I values
-real(kind=kreal),allocatable :: iceload(:)  ! load term due to ice.
 real(kind=kreal),allocatable :: nodalicerate(:) ! Nodal rate of I values
 
+real(kind=kreal),allocatable :: iceload(:)  ! load term due to ice.
 
 
 ! magnetization
@@ -423,6 +424,7 @@ endif
 ! Arrays: 
 ! nodalu       - the u at each node, or rate for SL 
 ! currentu     - for SL is the actual displacement etc, with nodalu as rate. (SL only)
+
 ! nodalice     - Ice level (SL only)
 ! nodalicerate - rate of ice change (SL only)
 
@@ -449,9 +451,10 @@ endif
 
 
 
+
 ! Initialise Sea Level 
 if(is_SL)then 
-  call prepare_sea_level(nodalsl)
+  call prepare_sea_level(nodalsl, nodalslrate)
   call set_original_sea_level(nodalsl)
   
   ! Save initial sea level if flagged: 
@@ -470,7 +473,11 @@ endif
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
 ! For elastic simulations there is only one timestep. 
+log_msg = trim('') ;   call write_ifproc0()
+log_msg = trim('----------------------------------------------') ;   call write_ifproc0()
 log_msg = trim(' Starting time loop!') ;   call write_ifproc0()
+log_msg = trim('') ;   call write_ifproc0()
+log_msg = trim('') ;   call write_ifproc0()
 
 
 loop_step: do i_step=istep0,nstep
@@ -488,7 +495,7 @@ loop_step: do i_step=istep0,nstep
   endif
 
   if(ISSL_DOF)then
-    nodalsl = ZERO 
+    ! nodalsl = ZERO 
     ! Use ocean function to calculate area of ocean     
     call calculate_SL_A()  
   endif
@@ -578,6 +585,9 @@ loop_step: do i_step=istep0,nstep
   ! ===================== RUN NON LINEAR ITERATIONS ====================
   !bodyload=ZERO; bodyload(0)=ZERO
   ! nonlinear iteration loop
+
+  write(logunit,*)'  Beginning the non-linear iterations: '
+
   nonlinear: do i_nliter=1,NL_MAXITER
     fmax=0 ! failure indicator for plastic simulation.
     nl_iter=nl_iter+1
@@ -601,6 +611,8 @@ loop_step: do i_step=istep0,nstep
     ! starting timer
     call cpu_time(cpu_tstart)
 
+ 
+
     ! Run NL solver for this timestep 
     ! For our purpose all this does is sets the RHS vector to be resload 
     ! And then calls the 'run' command from petsc
@@ -617,6 +629,8 @@ loop_step: do i_step=istep0,nstep
     du(0)=ZERO
     maxdu=maxscal(maxval(abs(du)))
     call log_ksp_iteration(maxdu, ksp_iter, ksp_convreason)
+
+
 
     ! Update the u array with du 
     ! time steps are not incremental!!
@@ -640,19 +654,20 @@ loop_step: do i_step=istep0,nstep
     call sync_process()
 
     ! Copy values from u --> nodalu, nodalphi etc... 
-    call update_nodal_u_vector(u, nodalu, nodalphi, nodalsl)
-
-
+    call update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
 
     ! Reset bodyload to ZERO for Viscoelastic iteration.
     ! We need to reconcile platic and viscoelastic iterations.
-    if(.not.isplastic)bodyload=ZERO; !viscoload=ZERO
+    if(.not.isplastic)then
+      write(logunit,*)'  --> set bodyload to 0'
+      bodyload=ZERO; !viscoload=ZERO
+    endif 
 
 
     ! Calculate the stress and strain for elastic/viscoelastic elements
     if(ISDISP_DOF)then
-      log_msg = trim('computing elemental stress'); call write_ifproc0() 
-      
+      log_msg = trim('  --> computing elemental stress'); call write_ifproc0() 
+
       ! Compute stress
       ! Elastic elements
       ! This part is repeated for the first step. We should change this 
@@ -670,17 +685,21 @@ loop_step: do i_step=istep0,nstep
       bodyload(0)=ZERO
 
 
-      fmax=maxscal(fmax)                                                           
-      if(myrank==0)then                                                            
-        write(logunit,'(a,f0.6)') &                           
-        ' f_max:',fmax
-        write(logunit,'(a)')'-------------------------------------------'
-        flush(logunit) 
-      endif
+      !fmax=maxscal(fmax)                                                           
+      !if(myrank==0)then                                                            
+      !  write(logunit,'(a,f0.6)') &                           
+      !  ' f_max:',fmax
+      !  write(logunit,'(a)')'-------------------------------------------'
+      !  flush(logunit) 
+      !endif
 
 
       ! If all elastic then leave non-linear loop because only one timestep 
-      if(allelastic)exit nonlinear
+      if(allelastic) then 
+        write(logunit,*)' ALL ELASTIC --> EXITING NON LINEAR'
+        exit nonlinear
+      endif 
+
 
       ! Calculate stress and strain for viscoelastic elements
       call visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
@@ -691,64 +710,103 @@ loop_step: do i_step=istep0,nstep
                               vload, imatve, nelmt_viscoelas,relaxtime,& 
                               egdofu, eld, nodalu, muratio, tratio,    &
                               eid_viscoelas, dt, num, q0)
-
       bodyload(0)=ZERO
       !viscoload(0)=ZERO
     endif !(ISDISP_DOF)
 
-
-
     ! time step 0  and i_nliter 0 is entirely elastic
     ! write data for tiem step 0
-    if(i_step==1.and.i_nliter==1)then
-      if(ISDISP_DOF)then
-        call save_displacement_variables(strain_elmt, strain_nodal, &
-                                        stress_elmt, stress_nodal, & 
-                                        nodalu, node_valency, i_step=0)
-
-        ! Benchmark calculation for elastic result
-        if(benchmark_okada .and. ISDISP_DOF)then
-          call compute_okada_solution()
-        endif
-      endif
-
-      if(ISPOT_DOF)then
-        call save_pot_variables(nodalphi, nodalg, nodalB, node_valency,i_step=0)
-      endif
-      
-      if(ISSL_DOF)then 
-        write(SLlogunit,*)'Saving SL to free surface'
-        write(SLlogunit,*)'Saving the current SL values'
-        write(SLlogunit,*)'  --> Min sea level: ', minval(DIM_L*nodalsl)
-        write(SLlogunit,*)'  --> Max sea level: ', maxval(DIM_L*nodalsl)
-
-        if(savedata%fsplot)then
-          call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalsl, &
-          ext='sl',istep=0) 
-        endif
-        
-        if(savedata%fsplot_plane)then
-          call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalsl, &
-          ext='sl', istep=0, plane=.true.) 
-        endif
-      endif 
+    !if(i_step==1.and.i_nliter==1)then
+    !write(logunit,*)'istep = 1 and i_nliter = 1'
 
       ! If only allowed on NL iteration and only 1 timestep then exit whole loop
-      if(nstep.le.1.and.NL_MAXITER.le.1)then
-        exit loop_step 
-      endif
-
-    endif ! i_step==1.and.i_nliter==1
+      !if(nstep.le.1.and.NL_MAXITER.le.1)then
+      !  write(logunit,*)'nstep.le.1.and.NL_MAXITER.le.1 - exiting loop step '
+      !  exit loop_step 
+      !endif
+    !endif ! i_step==1.and.i_nliter==1
 
 
     ! Exit nonlinear loop if converged
-    if(nl_isconv)exit nonlinear
+    if(nl_isconv) then 
+      write(logunit,*)'NL is converged...exiting non-linear '
+      exit nonlinear
+    endif 
 
   enddo nonlinear ! i_nliter=1,NL_MAXITER
   ! ===================== FINISHED NON-LINEAR ITERATIONS =====================
 
 
-  ! Update and save things before the next time step starts
+
+
+  ! WE: Update our vectors with a timestep: 
+  ! WE: For sea level we solve for the time derivatives of the system so then we use
+  ! WE: u(t + dt) = u(t) + dt * f(t) where f is the time derivative
+  ! WE: These time derivatives are stored in nodalu, nodalphi, nodalsl 
+  if (ISSL_DOF)then
+    dt = 1.0_kreal
+    write(logunit,*)'calculating update with dt: ', dt
+    nodalu   = dt*nodalu      ! i guess initial displacement is zero but need to do this properly 
+    nodalphi = dt*nodalphi    ! Need to convert to gravity for use...
+
+    nodalsl  = nodalsl  + (dt*nodalslrate)
+    nodalice = nodalice + (dt*nodalicerate)
+  endif 
+
+  if(ISDISP_DOF)then
+    write(logunit,*)'   saving displacement variables'
+
+    call save_displacement_variables(strain_elmt, strain_nodal, &
+                                    stress_elmt, stress_nodal, & 
+                                    nodalu, node_valency, i_step=0)
+
+    ! Benchmark calculation for elastic result
+    !if(benchmark_okada .and. ISDISP_DOF)then
+    !  call compute_okada_solution()
+    !endif
+  endif
+
+  if(ISPOT_DOF)then
+    write(logunit,*)'   saving potential variables'
+    call save_pot_variables(nodalphi, nodalg, nodalB, node_valency,i_step=0)
+  endif
+  
+  if(ISSL_DOF)then 
+    write(SLlogunit,*)'Saving SL to free surface'
+    write(SLlogunit,*)'Saving the current SL values'
+    write(SLlogunit,*)'  --> Min sea level: ', minval(DIM_L*nodalsl)
+    write(SLlogunit,*)'  --> Max sea level: ', maxval(DIM_L*nodalsl)
+
+    ! WATER
+    if(savedata%fsplot)then
+      call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalsl, &
+      ext='sl',istep=0) 
+    endif
+    if(savedata%fsplot_plane)then
+      call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalsl, &
+      ext='sl', istep=0, plane=.true.) 
+    endif
+
+    ! ICE
+    if(savedata%fsplot)then
+      call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalice, &
+      ext='ice',istep=0) 
+    endif
+    if(savedata%fsplot_plane)then
+      call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalice, &
+      ext='ice', istep=0, plane=.true.) 
+    endif
+
+  endif 
+
+
+
+
+
+
+
+
+  
   ! Print warning if not converging
   if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
     if(myrank==0)then
@@ -762,32 +820,22 @@ loop_step: do i_step=istep0,nstep
   nl_tot=nl_tot+nl_iter
 
 
-  ! Update our vectors with a timestep: 
-  ! For sea level we solve for the time derivatives of the system so then we use
-  ! u(t + dt) = u(t) + dt * f(t) where f is the time derivative
-  ! These time derivatives are stored in nodalu, nodalphi, nodalsl 
-  
-  if (ISSL_DOF)then
-
-    write(SLlogunit,*)'calculating with dt: ', dt
-    nodalu   = dt*nodalu  ! i guess displacement is zero but need to do this properly 
-    nodalphi = dt*nodalphi ! Need to convert to gravity for use...
-    !nodalsl  = nodalsl + dt*(nodalslrate - nodalu(3,:))
-  endif 
-
+  ! CURRENTLY NOT BEING USED/ACTIVATED >>> IMPORTANT WITH MORE TIMESTEPS? 
   ! --------------- Saving/plotting variables to Ensight ---------------
-  if(ISDISP_DOF)then
-    call save_displacement_variables(strain_elmt, strain_nodal,    &
-                                     stress_elmt, stress_nodal,    & 
-                                     nodalu, node_valency, i_step)
-  endif
-
-  if(ISPOT_DOF)then
-    ! plot gravity potential
-    call save_pot_variables(nodalphi, nodalg, nodalB, node_valency,&
-                                  i_step)
-  endif
+  !if(ISDISP_DOF)then
+  !  write(*,* )'SAVING displacement istep: ', i_step
+  !  call save_displacement_variables(strain_elmt, strain_nodal,    &
+  !                                   stress_elmt, stress_nodal,    & 
+  !                                   nodalu, node_valency, i_step)
+  !endif
+  !if(ISPOT_DOF)then
+  !  ! plot gravity potential
+  !  write(*,*) 'SAVING potential istep: ', i_step
+  !  call save_pot_variables(nodalphi, nodalg, nodalB, node_valency,&
+  !                                i_step)
+  !endif
   ! ---------- Finished saving/plotting variables to Ensight -----------
+
 
 
   ! Add spacing to log file

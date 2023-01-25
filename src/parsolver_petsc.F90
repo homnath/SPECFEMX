@@ -849,6 +849,7 @@ do i_elmt=1, nelmt
     write(kmatunit,*)'     * ', ggdof_elmt(:,i) 
   enddo 
   write(kmatunit,*)
+  write(kmatunit,*)
 
 
 
@@ -857,28 +858,23 @@ do i_elmt=1, nelmt
   finaldof = 0 
   finaldof(1:(nuphi_dof)*ngll) = reshape(ggdof_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
 
-  !write(kmatunit,*)'   nuphi_dof: ', nuphi_dof
-  !write(kmatunit,*)'   final_dof: in shape 1 x NEDOF ', finaldof
-
-  !write(kmatunit,*)'   now add the theta DOFs...'
-
 
   ! Now add the theta DOF starting from end of u, phi stuff: 
-  ictr = 1 
-  do igll = 1, ngll 
-    theta_dof = ggdof_elmt(nuphi_dof+1, igll)
-    if (theta_dof.ne.0) then 
-      finaldof((nuphi_dof)*ngll + ictr) = theta_dof
-      ictr=ictr+1
-    endif 
-  enddo 
+  !ictr = 1 
+  !do igll = 1, ngll 
+  !  theta_dof = ggdof_elmt(nuphi_dof+1, igll)
+  !  if (theta_dof.ne.0) then 
+  !    finaldof((nuphi_dof)*ngll + ictr) = theta_dof
+  !    ictr=ictr+1
+  !  endif 
+  !enddo 
+!
+  finaldof((nuphi_dof)*ngll + 1:(nndof)*ngll) = ggdof_elmt(nndof, :)
+ 
+  !write(kmatunit,*)'Final DOF: ', finaldof
+  !write(kmatunit,*)
 
-  !write(kmatunit,*)'   finaldof with theta: ', finaldof
 
-
-  ! print results: 
-  !write(logunit,*) 
-  !write(logunit, *) ' FINALDOF: ', finaldof
 
   ! petsc index starts from 0   
   finaldof=finaldof-1 
@@ -1170,7 +1166,6 @@ use output_to_user
         endif 
 
         call petsc_set_stiffness_matrix(storekmat)
-
 
 
         call write_ifproc0()

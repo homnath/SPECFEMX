@@ -181,10 +181,10 @@ write(SLlogunit, *)'Sea level data read from:  ', trim(slfile)
 if(IS_CART_SIM)then
     call summarise_SL_input_cart()
 elseif(IS_GLOB_SIM)then 
-    write(*,*) 'GLOBAL SIMULATIONS NOT IMPLEMETED YET'
+    write(*,*) 'ERROR: GLOBAL SIMULATIONS NOT IMPLEMETED YET'
     stop
 else
-    write(*,*) 'SIMULATION MUST BE GLOBAL OR CARTESIAN'
+    write(*,*) 'ERROR: SIMULATION MUST BE GLOBAL OR CARTESIAN'
     stop
 endif 
 end subroutine start_SL_log
@@ -281,7 +281,7 @@ end subroutine write_OF_to_ensight
 
 
 ! #################    INITIAL SETUP FUNCTIONS    #####################
-subroutine prepare_sea_level(nodalsl)
+subroutine prepare_sea_level(nodalsl, nodalslrate)
     use global 
     use free_surface
     use set_precision
@@ -290,7 +290,7 @@ subroutine prepare_sea_level(nodalsl)
     implicit none 
 
     integer :: istattemp, istat
-    real(kind=kreal), allocatable :: nodalsl(:)
+    real(kind=kreal), allocatable :: nodalsl(:), nodalslrate(:)
 
     write(SLlogunit, *)'Preparing sea level variables...'
     
@@ -309,7 +309,7 @@ subroutine prepare_sea_level(nodalsl)
  
     if(ISSL_DOF)then 
         ! Allocate nodal sea level 
-        allocate(nodalsl(nnode_fs), stat=istattemp)
+        allocate(nodalsl(nnode_fs), nodalslrate(nnode_fs), stat=istattemp)
         istat=istat+istattemp
     endif 
 
@@ -320,6 +320,9 @@ subroutine prepare_sea_level(nodalsl)
         stop
     else 
         nodalsl = ZERO
+        nodalslrate = ZERO
+        write(SLlogunit,*)'   --> Created/zeroed nodalsl '
+        write(SLlogunit,*)'   --> Created/zeroed nodalslrate '
     endif
 
     write(SLlogunit,*)'  ✓ Prepared sea level. '
@@ -423,12 +426,9 @@ integer          :: i_gll
 real(kind=kreal) :: theta, I
 
 
-write(SLlogunit,*)'WARNING: NEED TO ACCURATELY IMPLEMENT OCEAN SET/OCEAN FUNCTION BASED ON ICE CONDITION - see Crawford et al 2018, eqn 31'
-
 ! We may want the ocean function but not running simulation 
-! - in that case we need to use nodalsl0 rather than u 
 if (use_orig)then 
-    ! In this case we can calculate ocean function using nodalsl0 and nodalice0: 
+    ! In this case we can calculate ocean function using nodalsl and nodalice: 
     write(SLlogunit,*)'Calculating ocean function with initial values'
 
     do i_elmt=1, nelmt_fs  
@@ -442,7 +442,7 @@ if (use_orig)then
             I     =  nodalice(rgnum_fs(i_gll, i_elmt))
 
             ! if rho_w theta > rho_ice I then part of ocean set
-            if (rho_water * theta .GT. I * rho_ice) then 
+            if ( (rho_water * theta).GT.(I * rho_ice) ) then 
                 oceanf(i_elmt, i_gll) = 1.0_kreal
                 nodalOF(rgnum_fs(i_gll, i_elmt)) = 1.0_kreal
             else
@@ -458,7 +458,7 @@ else
 endif 
 
 write(SLlogunit,*)'  ✓ Updated ocean function. '
-write(SLlogunit,*)''
+write(SLlogunit,*)
 
 end subroutine update_ocean_function
 

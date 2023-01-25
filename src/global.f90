@@ -219,6 +219,8 @@ integer :: nedofu
 ! number of elemental degrees of freedoms for gravity
 integer :: nedofphi
 
+
+
 ! acceleration due to gravity
 real(kind=kreal),parameter :: agrav=9.80665_kreal
 real(kind=kreal),allocatable :: g_coord(:,:) ! global coordinates

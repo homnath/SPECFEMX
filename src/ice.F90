@@ -54,10 +54,10 @@ implicit none
     if(IS_CART_SIM)then
         call summarise_ICE_input_cart()
     elseif(IS_GLOB_SIM)then 
-        write(*,*) 'GLOBAL SIMULATIONS NOT IMPLEMETED YET'
+        write(*,*) 'ERROR: GLOBAL SIMULATIONS NOT IMPLEMETED YET'
         stop
     else
-        write(*,*) 'SIMULATION MUST BE GLOBAL OR CARTESIAN'
+        write(*,*) 'ERROR: SIMULATION MUST BE GLOBAL OR CARTESIAN'
         stop
     endif 
 end subroutine start_ICE_log
@@ -344,7 +344,7 @@ use math_library_serial
     real(kind=kreal)               :: iceload(:), nodalicerate(:) 
 
     ! Local vars
-    integer                        :: i_elmtfs,dof, nfdof,gid, num4(4), num_FS(maxngll2d), gid_abg, gid_xyg, iface, nfgll, abg,xyg, j,k, i_gll, i
+    integer                        :: i_elmtfs,dof, gid_elmt, num4(4), num_FS(maxngll2d), gid_abg, gid_xyg, iface, nfgll, abg,xyg, j,k, i_gll, i
     real(kind=kreal)               :: coord(ndim,4), face_normal(3), dx_dxi(NDIM), dx_deta(NDIM), pi_2d_abg, pi_2d_xyg
     real(kind=kreal)               :: utf_dot_bkgrav, utf_dot_bkgrav_xyg, area_inv, xyg_sum
     real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
@@ -356,17 +356,17 @@ use math_library_serial
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
+
+    write(ICElogunit,*)'Calculating iceload...'
     iceload = zero
 
     ! First calculate the average ice rate load change (epsilon): 
     epsilon = zero
-    ctr = 0
     do i_elmtfs=1,nelmt_fs
         ! Get details for the element: 
         call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
         num4   = gnum4_fs(:, i_elmtfs)
         coord  = g_coord(:,num4)
-        nfdof  = nfgll*nndof ! max number of DOF on face overall 
 
         ! Loop over GLL nodes of the face
         do i_gll = 1, nfgll 
@@ -387,23 +387,34 @@ use math_library_serial
     write(ICElogunit,*)' --------------------------------------------- '
     write(ICElogunit,*)' ε value            : ', epsilon
 
+
     ! Epsilon/Area
     area_inv = epsilon/SLarea
 
-    ! Now calculate the actual iceload  - there may be a way to combine the two loops
+    ! Now calculate the actual iceload  - TODO there may be a way to combine the two loops
     ! and calculate epsilon, then apply it at the end, which would be more efficient
     ! but leave that til later.  
     do i_elmtfs=1,nelmt_fs
 
         ! GET SOME DETAILS ABOUT THE ELEMENT 
         call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4) ! face number, number of GLL on face, gauss weights, derivative of shape funcs
-        num4   = gnum4_fs(:, i_elmtfs)           ! node IDs for corners 
-        coord  = g_coord(:,num4)                 ! node coordinates
-        gid = id_elem_fs(i_elmtfs)               ! global element ID 
-        num_FS =  gnum_fs(:, i_elmtfs)           ! Global node IDs of the GLL pts on FS 
-        ! DOF IDs for the nodes in matrix (gll pt, property) where property goes from 1 - 5 (ux,uy,uz,phi,theta)
-        fgdof(:, 1:nfgll) = reshape(gdof(:, g_num(hexface(iface)%node, gid)),(/nndof, maxngll2d/))
+        num4     = gnum4_fs(:, i_elmtfs)           ! node IDs for corners 
+        coord    = g_coord(:,num4)                 ! node coordinates
+        gid_elmt = id_elem_fs(i_elmtfs)            ! global element ID 
+        num_FS   = gnum_fs(:, i_elmtfs)            ! Global node IDs of the GLL pts on FS 
         
+        ! DOF IDs for the nodes in matrix (property, gll pt) where property goes from 1 - 5 (ux,uy,uz,phi,theta)
+        fgdof(:, 1:nfgll) = reshape(gdof(:, g_num(hexface(iface)%node, gid_elmt)),(/nndof, maxngll2d/))
+        
+        !write(ICElogunit,*)'  FACE_FS : ', i_elmtfs
+        !do i_gll = 1, maxngll2d 
+        !    write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
+        !enddo 
+        !write(ICElogunit,*) 
+        write(ICElogunit,*) 'min of rgnum_fs: ', minval(rgnum_fs)
+        write(ICElogunit,*) 'max of rgnum_fs: ', maxval(rgnum_fs)
+
+
 
         do i_gll = 1, nfgll 
             ! Calculate the magnitude of the 2D jacobian 
@@ -417,7 +428,7 @@ use math_library_serial
 
             ! Calculate the coefficient for phi and u that is shared
             ! Note that u values also need to be multiplied by background gravity
-            val = ( (1-oceanf(i_elmtfs, i_gll)) * nodalicerate(rgnum_fs(i_gll, i_elmtfs)) ) - area_inv*oceanf(i_elmtfs, i_gll) 
+            val = ( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(rgnum_fs(i_gll, i_elmtfs))) - area_inv*oceanf(i_elmtfs, i_gll) 
             val = val * pi_2d
 
 

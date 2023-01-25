@@ -114,13 +114,13 @@ ismesh_only = .false.
 
 ! Create SL log file  
 if(is_SL)then 
-  write(*,*)' Creating SL log file ... '
+  write(logunit,*)' Creating SL log file ... '
   call start_SL_log(errcode, errtag)
   flush(SLlogunit)
 endif 
 
 if(is_ICE)then 
-  write(*,*)' Creating ICE log file ... '
+  write(logunit,*)' Creating ICE log file ... '
   call start_ICE_log(errcode, errtag)
   flush(ICElogunit)
 endif 
@@ -195,7 +195,7 @@ endif
 
 ! initialize and set element DOFs
 call initialize_dof()
-call set_element_dof()
+call set_element_dof_uphi()
 
 
 ! Write model details to log file for user 
@@ -239,6 +239,8 @@ call control_error(errcode,errtag,stdout,myrank)
 if(ISSL_DOF)then 
   call sea_level_dof()
 endif 
+
+
 
 
 case_file=trim(out_path)//trim(file_head)//trim(ptail)//'.case'
@@ -295,7 +297,7 @@ if(ISSL_DOF)then
   write(*,*)' edofsl:  ', edofsl
 endif 
 
-
+ 
 ! Now, call main routine...
 write(logunit,*)'CALLING SPECFEM3D'
 call specfem3d()

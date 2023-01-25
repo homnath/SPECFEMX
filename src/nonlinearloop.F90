@@ -98,7 +98,7 @@ use solver_petsc
         call petsc_set_vector(resload)
         log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0()
 
-        write(*,*)'About to run solver...iteration:'
+        write(logunit,*)'About to run solver'
         !call petsc_print_vector()
         !write(*,*)'MATRIX:'
         !call petsc_print_matrix()
@@ -160,7 +160,7 @@ end subroutine check_convergence
 
 !#######################################################################
 
-subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
+subroutine update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
   ! USES
   use global
   use free_surface
@@ -169,7 +169,7 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
 
 
   ! IO 
-  real(kind=kreal),allocatable :: nodalu(:,:), u(:), nodalphi(:), nodalsl(:)
+  real(kind=kreal),allocatable :: nodalu(:,:), u(:), nodalphi(:), nodalslrate(:)
   ! local: 
   integer :: i_dof, i_node, idof, i, num(maxngll2d), i_elmt, i_gll 
 
@@ -211,19 +211,20 @@ subroutine update_nodal_u_vector( u, nodalu, nodalphi, nodalsl)
         i_node = num(i_gll)
 
         if(gdof(5, i_node)/=0)then
-          nodalsl(rgnum_fs(i_gll, i_elmt)) = u(gdof(5,i_node))
+          nodalslrate(rgnum_fs(i_gll, i_elmt)) = u(gdof(5,i_node))
         endif
       enddo !i_gll 
     enddo
 
     if(myrank.eq.0)then
       write(SLlogunit,*)
-      write(SLlogunit,*)'Max nodal Sea Level value: ', maxval(nodalsl)
+      write(SLlogunit,*)'Max nodal sea level rate value: ', maxval(nodalslrate)
     endif 
   endif
 
 
 
+  write(logunit,*)'  ✓ Updated nodal u vectors. '
 
 end subroutine update_nodal_u_vector
 
@@ -336,6 +337,8 @@ subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
     if(nl_isconv .or. nl_iter==nl_maxiter)cycle
     bodyload(egdofu)=bodyload(egdofu)+bload
   enddo ! i_elmt
+
+  write(logunit,*)'  ✓ Calculated stress and strain '
 
 
 end subroutine calc_stressstrain
@@ -453,6 +456,7 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
 
   enddo ! i_elmt
 
+  write(logunit,*)'  ✓ Calculated viscoelastic stress and strain '
 
 
 end subroutine visco_stressstrain
