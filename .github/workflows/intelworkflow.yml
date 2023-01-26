@@ -32,8 +32,8 @@ jobs:
       run: |
         source /opt/intel/oneapi/setvars.sh
         printenv >> $GITHUB_ENV
-        ifort fortran_comp_test.f90 -o test_program
-        mpiifort fortran_comp_test.f90 -o mpitest
+        ifort ./tests/fortran_comp_test.f90 -o test_program
+        mpiifort ./tests/fortran_comp_test.f90 -o mpitest
 
 #    - name: "Test the code"
 #      run: |
