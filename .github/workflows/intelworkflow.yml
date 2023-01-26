@@ -2,9 +2,9 @@ name: Intel OneAPI build
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, sea, actions_setup]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, sea, actions_setup]
 jobs:
   build_intel_champ_fparser:
     runs-on: ubuntu-20.04
