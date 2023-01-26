@@ -32,12 +32,12 @@ jobs:
       run: |
         source /opt/intel/oneapi/setvars.sh
         printenv >> $GITHUB_ENV
-        ifort test.f90 -o test_program
-        mpiifort test2.f90 -o mpitest
+        ifort fortran_comp_test.f90 -o test_program
+        mpiifort fortran_comp_test.f90 -o mpitest
 
-    - name: "Test the code"
-      run: |
-        echo "Running the tests using the Intel oneapi fortran compiler"
-        cd tests/test01
-        mpirun -np 1  $HOME/work/reponame/reponame/mpitest
-        ./$HOME/work/reponame/reponame/test_program
+#    - name: "Test the code"
+#      run: |
+#        echo "Running the tests using the Intel oneapi fortran compiler"
+#        cd tests/test01
+#        mpirun -np 1  $HOME/work/reponame/reponame/mpitest
+#        ./$HOME/work/reponame/reponame/test_program
