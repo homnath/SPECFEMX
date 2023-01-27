@@ -26,6 +26,7 @@ jobs:
         sudo apt-get install -y intel-oneapi-compiler-fortran
         sudo apt-get install -y intel-oneapi-mkl
         sudo apt-get install -y intel-oneapi-mpi
+        sudo apt-get install -y intel-hpckit
         sudo apt-get install -y intel-oneapi-mpi-devel
 
     - name: Compile
