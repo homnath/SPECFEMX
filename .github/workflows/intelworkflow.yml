@@ -42,7 +42,7 @@ jobs:
     - name: Extract dependencies 
       run: |
         echo "Extracting dependencies tarballs" && ls && \
-        cd dependencies && ls \
+        cd dependencies && ls && \
         tar -xvf cmake.tar.gz   && mv cmake-3.23.1 cmake && rm cmake.tar.gz && \
         tar -xvf petsc.tar.gz   && mv petsc-3.16.4 petsc && rm petsc.tar.gz && \
         tar -xvf scotch.tar.gz  && mv scotch-v6.1.3 scotch && rm scotch.tar.gz  
