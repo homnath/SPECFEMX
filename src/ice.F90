@@ -198,14 +198,17 @@ subroutine set_original_ice_level(nodalice)
     do i_obj = 1, nice_obj
         
         iceobjtype = iceobjs(i_obj, 1)
+        params = iceobjs(i_obj,2:5)
 
         if (iceobjtype.eq.1) then 
-            ! Single point of ice 
-            write(*,*)'ERROR: Single ice point not implemented yet!'
-            stop
+            ! Single point of ice: args: nodeid, height  
+            write(ICElogunit, *)INT(params(1))
+            write(ICElogunit, *)INT(params(2))
+            write(ICElogunit, *)params(3)
+
+            call add_ice_gll(INT(params(1)), INT(params(2)), params(3), nodalice)
         elseif (iceobjtype.eq.2) then 
             ! Cylinder - args: x, y, rad, height
-            params = iceobjs(i_obj,2:5)
             call add_ice_cylinder(params, nodalice)
         else
             ! Invalid entry
@@ -222,6 +225,43 @@ subroutine set_original_ice_level(nodalice)
     write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice)
     write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice)
 end subroutine set_original_ice_level
+
+
+subroutine add_ice_gll(i_elmtfs, i_gll, height, nodalice)
+    ! Adds a cylinder of ice in the required location
+    ! Uses
+    use set_precision
+    use global 
+    use integration
+    use free_surface
+    use math_constants
+
+    ! IO vars: 
+    real(kind=kreal) :: height, nodalice(:) ! x, y, rad, height
+    integer :: i_elmtfs, i_gll
+
+    ! Local vars: 
+    !integer :: ios, errcode
+
+
+    ! Params should be the faceID, nodeID and the height
+
+    ! Add to log file: 
+    write(ICElogunit,*)
+    write(ICElogunit,*)' --  Adding ice at point '
+    write(ICElogunit,*)'      ->  FS Elmt ID             : ', i_elmtfs
+    write(ICElogunit,*)'      ->  GLL Node (1-maxngll2d) : ', i_gll
+    write(ICElogunit,*)'      ->  height                 : ', height
+
+
+    ! Add ice height to nodal point: 
+    nodalice(rgnum_fs(i_gll, i_elmtfs)) = height
+
+    write(ICElogunit,*)' ✓ Injected at GLL point'
+    flush(ICElogunit)
+end subroutine add_ice_gll
+
+
 
 
 subroutine add_ice_cylinder(params, nodalice)
