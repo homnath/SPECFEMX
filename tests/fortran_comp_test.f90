@@ -1,3 +1,3 @@
 program hello
-    print *, "Hello World!"
+    print *, "Fortran compilation test says hello!"
 end program
