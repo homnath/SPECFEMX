@@ -13,14 +13,16 @@ jobs:
         shell: bash --noprofile --norc {0}
     steps:
     - uses: actions/checkout@v2
-    - name: setup repo
+    - name: setup repo and download intel key
       run: |
         wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
         sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
         rm GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
         sudo echo "deb https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
         sudo apt-get update
-    - name: install
+
+
+    - name: install intel compilers 
       run: |
         sudo apt-get install -y intel-oneapi-common-vars
         sudo apt-get install -y intel-oneapi-compiler-fortran
@@ -29,7 +31,7 @@ jobs:
         sudo apt-get install -y intel-hpckit
         sudo apt-get install -y intel-oneapi-mpi-devel
 
-    - name: Compile
+    - name: Test intel compilers
       run: |
         source /opt/intel/oneapi/setvars.sh 
         printenv >> $GITHUB_ENV
@@ -37,9 +39,22 @@ jobs:
         ifort ./tests/fortran_comp_test.f90 -o f90comptest && ./f90comptest
         mpiifort ./tests/fortran_comp_test.f90 -o mpitest && ./mpitest
   
-#    - name: "Test the code"
-#      run: |
-#        echo "Running the tests using the Intel oneapi fortran compiler"
-#        cd tests/test01
-#        mpirun -np 1  $HOME/work/reponame/reponame/mpitest
-#        ./$HOME/work/reponame/reponame/test_program
+    - name: Extract dependencies 
+      run: |
+        echo "Extracting dependencies tarballs"
+        cd dependencies && \
+        tar -xvf cmake.tar.gz   && mv cmake-3.23.1 cmake && rm cmake.tar.gz && \
+        tar -xvf petsc.tar.gz   && mv petsc-3.16.4 petsc && rm petsc.tar.gz && \
+        tar -xvf scotch.tar.gz  && mv scotch-v6.1.3 scotch && rm scotch.tar.gz  
+
+    - name: Build CMake 
+      run: | 
+        apt install -y make && \
+        apt install -y g++  && \ 
+        apt install -y libssl-dev && \ 
+        cd dependencies/cmake && \
+        ./bootstrap && \
+        make && \ 
+        make install
+
+

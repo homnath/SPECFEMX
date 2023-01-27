@@ -1,5 +1,38 @@
 # REVISION:
 #   HNG, Mar 21,2017; HNG, Sep 06,2011;
+#   WE, Jan 25th 2023; 
+
+# The following may be useful for reference
+# Libraries: 
+#   sem    - core library with SEM source codes, (shared by all exec)
+#   serial - library with codes for serial operation  
+#   parsem - library with codes for parallel operation  
+#   both   - library with codes from 'srcboth' 
+
+# Variables: 
+#   srcsem     - array of source file names for SEM library 
+#   srcserial  - array of source files for serial library
+#   srcparsem  - array of source file names for Parallel (parsem) library 
+#   srcboth    - array of source files required by both serial and parallel builds
+
+# Dependencies: 
+#   serial depends on SEM 
+#   parsem depends on SEM 
+#   If in parallel build, then 'both' library depends on sem and parsem 
+#   If in serial   build, then 'both' library depends on sem and serial 
+
+
+
+cmake_minimum_required(VERSION 3.18)
+
+project(specfemc 
+        VERSION 
+        1.0
+        )
+
+
+message(NOTICE "CMakeLists.txt was last deited on Jan 25th 2023 by WE ")
+message(NOTICE " -->  Some comments added + allows cleanup function call.")
 
 # Source files for sem library
 SET(srcsem
@@ -42,6 +75,7 @@ SET(srcsem
 # Name of library is 'sem' and contains all of the srcsem files? 
 ADD_LIBRARY(sem ${srcsem})
 
+
 # Build parsem library
 IF(ISPARALLEL)
   # Variable name is srcparsem 
@@ -56,26 +90,29 @@ IF(ISPARALLEL)
      prepare_sparse.f90
      parsolver.f90)
      # If using PETSC then add relevant f90 to the list srcparsem
-     IF(USE_PETSC)
-       IF(ISCOMPLEX)
-         LIST(APPEND srcparsem
-            parsolver_petsc_complex.F90)
-       ELSE(ISCOMPLEX)
-         LIST(APPEND srcparsem
-            parsolver_petsc.F90)
-       ENDIF(ISCOMPLEX)
-     ENDIF(USE_PETSC)
+  
+  IF(USE_PETSC)
+    IF(ISCOMPLEX)
+      LIST(APPEND srcparsem
+        parsolver_petsc_complex.F90)
+    ELSE(ISCOMPLEX)
+      LIST(APPEND srcparsem
+        parsolver_petsc.F90)
+    ENDIF(ISCOMPLEX)
+  ENDIF(USE_PETSC)
+
+
   # Add a library called parsem with the files held in srcparsem 
   ADD_LIBRARY(parsem ${srcparsem})
+
   # Add dependencies - Parsem library depends on sem library 
   ADD_DEPENDENCIES(parsem sem)
 
   # If using PETSC then we need to link the directory in which the petsc libraries are, for PARSEM 
   IF(USE_PETSC)
-  TARGET_INCLUDE_DIRECTORIES(parsem PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
-  TARGET_LINK_LIBRARIES(parsem ${PETSC_ARCH}/lib/libpetsc.so) # Links this library to the executable parsem 
+    TARGET_INCLUDE_DIRECTORIES(parsem PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
+    TARGET_LINK_LIBRARIES(parsem ${PETSC_ARCH}/lib/libpetsc.so) # Links this library to the executable parsem 
   ENDIF(USE_PETSC)
-
 
 # Build serial library
 ELSE(ISPARALLEL)
@@ -119,11 +156,12 @@ SET(srcboth
 
 
 # Compiler preprocessor directives
-#ADD_DEFINITIONS(CMAKE_Fortran_FLAGS "-DUSE_MPI")
+# Set the property of the srcboth variable so that it uses MPI??? 
 IF(ISPARALLEL)
   SET_PROPERTY(SOURCE ${srcboth} PROPERTY COMPILE_DEFINITIONS USE_MPI)
   #SET_PROPERTY(SOURCE ${srcboth} PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
 ENDIF(ISPARALLEL)
+
 
 ADD_LIBRARY(both ${srcboth})
 IF(ISPARALLEL)
@@ -132,9 +170,9 @@ ELSE(ISPARALLEL)
   ADD_DEPENDENCIES(both sem serial)
 ENDIF(ISPARALLEL)
 
-IF(ISCOMPLEX)
-ELSE(ISCOMPLEX)
-ENDIF(ISCOMPLEX)
+#IF(ISCOMPLEX)
+#ELSE(ISCOMPLEX)
+#ENDIF(ISCOMPLEX)
 
 
 # Build geotech library
@@ -146,6 +184,10 @@ ENDIF(ISCOMPLEX)
 #IF(BUILD_SLOPE)
 #  LIST(APPEND srcgeotech semslope3d.f90)
 #ENDIF(BUILD_SLOPE)
+
+
+# ------------------------ GEOTECH ------------------------
+
 SET(srcgeotech
    specfem3d.F90)
 # Compiler preprocessor directives
@@ -164,6 +206,7 @@ IF(USE_PETSC)
 ENDIF(USE_PETSC)
 ADD_LIBRARY(geotech ${srcgeotech})
 
+
 # Following PETSC link is necessary due to the PETSC module called in the
 # specfem3d.F90
 IF(USE_PETSC)
@@ -176,12 +219,14 @@ ELSE(ISPARALLEL)
   ADD_DEPENDENCIES(geotech sem serial both)
 ENDIF(ISPARALLEL)
 
+# ------------------------ END GEOTECH ------------------------
 
 
 
 # Build specfemx
 #TARGET_LINK_LIBRARIES(geotech ${semall})
 #SET_TARGET_PROPERTIES(geotech PROPERTIES LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
+
 IF(ISPARALLEL)
   SET_PROPERTY(SOURCE specfemx.F90 PROPERTY COMPILE_DEFINITIONS USE_MPI)
   #SET_PROPERTY(SOURCE specfemx.F90 PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
@@ -196,28 +241,18 @@ ADD_EXECUTABLE(${mainprog}
               specfemx.F90)
 TARGET_LINK_LIBRARIES(${mainprog} ${LIBS})
 
-# WE - ADDED THE FOLLOWING: 
+# This is necessary 
 IF(USE_PETSC)
   SET_PROPERTY(SOURCE specfemx.F90 APPEND PROPERTY COMPILE_DEFINITIONS USE_PETSC)
-  IF(ISCOMPLEX)
-    SET_PROPERTY(SOURCE specfemx.F90 APPEND PROPERTY COMPILE_DEFINITIONS USE_COMPLEX)
-  ENDIF(ISCOMPLEX)
+  #IF(ISCOMPLEX)
+  #  SET_PROPERTY(SOURCE specfemx.F90 APPEND PROPERTY COMPILE_DEFINITIONS USE_COMPLEX)
+  # ENDIF(ISCOMPLEX)
 ENDIF(USE_PETSC)
 IF(USE_PETSC)
   TARGET_INCLUDE_DIRECTORIES(both PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
   TARGET_LINK_LIBRARIES(both ${PETSC_ARCH}/lib/libpetsc.so)
 ENDIF(USE_PETSC)
 
-
-
-
-
-#IF(ISPARALLEL)
-#  SET(semall geotech parsem sem)
-#ELSE(ISPARALLEL)
-#  SET(semall geotech serial sem)
-#ENDIF(ISPARALLEL)
-#TARGET_LINK_LIBRARIES(specfemx ${semall} ${MPI_Fortran_LIBRARIES})
 
 
 
