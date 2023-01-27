@@ -30,11 +30,12 @@ jobs:
 
     - name: Compile
       run: |
-        source /opt/intel/oneapi/setvars.sh
+        source /opt/intel/oneapi/setvars.sh 
         printenv >> $GITHUB_ENV
-        ifort ./tests/fortran_comp_test.f90 -o test_program
-        mpiifort ./tests/fortran_comp_test.f90 -o mpitest
-
+        icc ./tests/icc_compile_test.c -o icc_comptest && ./icc_comptest
+        ifort ./tests/fortran_comp_test.f90 -o f90comptest && ./f90comptest
+        mpiifort ./tests/fortran_comp_test.f90 -o mpitest && ./mpitest
+  
 #    - name: "Test the code"
 #      run: |
 #        echo "Running the tests using the Intel oneapi fortran compiler"
