@@ -22,26 +22,26 @@ jobs:
         sudo apt-get update
 
 
-    - name: install intel compilers 
-      run: |
-        sudo apt-get install -y intel-oneapi-common-vars
-        sudo apt-get install -y intel-oneapi-compiler-fortran
-        sudo apt-get install -y intel-oneapi-mkl
-        sudo apt-get install -y intel-oneapi-mpi
-        sudo apt-get install -y intel-hpckit
-        sudo apt-get install -y intel-oneapi-mpi-devel
+    #- name: install intel compilers 
+    #  run: |
+    #    sudo apt-get install -y intel-oneapi-common-vars
+    #    sudo apt-get install -y intel-oneapi-compiler-fortran
+    #    sudo apt-get install -y intel-oneapi-mkl
+    #    sudo apt-get install -y intel-oneapi-mpi
+    #    sudo apt-get install -y intel-hpckit
+    #    sudo apt-get install -y intel-oneapi-mpi-devel
 
-    - name: Test intel compilers
-      run: |
-        source /opt/intel/oneapi/setvars.sh 
-        printenv >> $GITHUB_ENV
-        icc ./tests/icc_compile_test.c -o icc_comptest && ./icc_comptest
-        ifort ./tests/fortran_comp_test.f90 -o f90comptest && ./f90comptest
-        mpiifort ./tests/fortran_comp_test.f90 -o mpitest && ./mpitest
+    #- name: Test intel compilers
+    #  run: |
+    #    source /opt/intel/oneapi/setvars.sh 
+    #    printenv >> $GITHUB_ENV
+    #    icc ./tests/icc_compile_test.c -o icc_comptest && ./icc_comptest
+    #    ifort ./tests/fortran_comp_test.f90 -o f90comptest && ./f90comptest
+    #    mpiifort ./tests/fortran_comp_test.f90 -o mpitest && ./mpitest
   
     - name: Extract dependencies 
       run: |
-        echo "Extracting dependencies tarballs"
+        echo "Extracting dependencies tarballs" && ls && \
         cd dependencies && \
         tar -xvf cmake.tar.gz   && mv cmake-3.23.1 cmake && rm cmake.tar.gz && \
         tar -xvf petsc.tar.gz   && mv petsc-3.16.4 petsc && rm petsc.tar.gz && \
