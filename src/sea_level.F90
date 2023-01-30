@@ -179,12 +179,12 @@ write(SLlogunit,*)
 
 write(SLlogunit, *)'Sea level data read from:  ', trim(slfile)
 if(IS_CART_SIM)then
-    call summarise_SL_input_cart()
+    write(SLlogunit,*)'Simulation type         :  CARTESIAN'
 elseif(IS_GLOB_SIM)then 
-    write(*,*) 'GLOBAL SIMULATIONS NOT IMPLEMETED YET'
+    write(*,*) 'ERROR: GLOBAL SIMULATIONS NOT IMPLEMETED YET'
     stop
 else
-    write(*,*) 'SIMULATION MUST BE GLOBAL OR CARTESIAN'
+    write(*,*) 'ERROR: SIMULATION MUST BE GLOBAL OR CARTESIAN'
     stop
 endif 
 end subroutine start_SL_log
@@ -192,20 +192,26 @@ end subroutine start_SL_log
 
 
 
-subroutine summarise_SL_input_cart()
+subroutine summarise_SL_input(nodalsl, nsl_obj)
     ! Summarises sea level data for cartesian sims
     use global 
     implicit none 
 
-    write(SLlogunit,*)
-    write(SLlogunit,*)'Model setup          : Cartesian'
+    integer :: nsl_obj
+    real(kind=kreal) :: nodalsl(:)
 
-    if (SL0_is_constant)then 
-        write(SLlogunit,*)'Type of SL input     : Constant Z value'
-        write(SLlogunit,*)'           value     : ', SL0_constant
-        write(SLlogunit,*)
+    write(SLlogunit,*)
+    if(IS_CART_SIM)then 
+        write(SLlogunit,*)'Model setup             :  Cartesian'
+    else 
+        write(SLlogunit,*)'Model setup             :  Global'  
     endif 
-end subroutine summarise_SL_input_cart
+
+    write(SLlogunit,*)'Total SL objects added  :', nsl_obj 
+    write(SLlogunit,*)'Minimum sea level       :', minval(nodalsl)
+    write(SLlogunit,*)'Maximum sea level       :', maxval(nodalsl)
+
+end subroutine summarise_SL_input
 
 
 
@@ -225,6 +231,7 @@ implicit none
     real(kind=kreal) :: nodalsl(:)
 
 
+    write(SLlogunit,*)
     write(SLlogunit,*)'Saving the original SL values'
     write(SLlogunit,*)'  --> Min sea level: ', minscal(minval(nodalsl))
     write(SLlogunit,*)'  --> Max sea level: ', maxscal(maxval(nodalsl))
@@ -281,7 +288,7 @@ end subroutine write_OF_to_ensight
 
 
 ! #################    INITIAL SETUP FUNCTIONS    #####################
-subroutine prepare_sea_level(nodalsl)
+subroutine prepare_sea_level(nodalsl, nodalslrate)
     use global 
     use free_surface
     use set_precision
@@ -290,8 +297,9 @@ subroutine prepare_sea_level(nodalsl)
     implicit none 
 
     integer :: istattemp, istat
-    real(kind=kreal), allocatable :: nodalsl(:)
+    real(kind=kreal), allocatable :: nodalsl(:), nodalslrate(:)
 
+    write(SLlogunit, *)
     write(SLlogunit, *)'Preparing sea level variables...'
     
     istat = 0
@@ -309,7 +317,7 @@ subroutine prepare_sea_level(nodalsl)
  
     if(ISSL_DOF)then 
         ! Allocate nodal sea level 
-        allocate(nodalsl(nnode_fs), stat=istattemp)
+        allocate(nodalsl(nnode_fs), nodalslrate(nnode_fs), stat=istattemp)
         istat=istat+istattemp
     endif 
 
@@ -320,6 +328,9 @@ subroutine prepare_sea_level(nodalsl)
         stop
     else 
         nodalsl = ZERO
+        nodalslrate = ZERO
+        write(SLlogunit,*)'   --> Created/zeroed nodalsl '
+        write(SLlogunit,*)'   --> Created/zeroed nodalslrate '
     endif
 
     write(SLlogunit,*)'  ✓ Prepared sea level. '
@@ -343,55 +354,141 @@ subroutine set_original_sea_level(nodalsl)
     ! IO variables
     real(kind=kreal) :: nodalsl(:)
     ! Local variables 
-    integer          :: i_elmt, iface, nfgll, i_gll 
-    real(kind=kreal) :: theta, z_coord
-   
-    real(kind=kreal),dimension(:,:,:), allocatable :: ds_quad4
-    real(kind=kreal),dimension(:),     allocatable :: gll_weight
-    real(kind=kreal),dimension(:,:),   allocatable :: lag_gll
-    real(kind=kreal),dimension(:,:,:), allocatable :: dlag_gll
-
-
-    allocate(ds_quad4(2,4,maxngll2d))
-    allocate(gll_weight(maxngll2d),lag_gll(maxngll2d,maxngll2d),  &
-    dlag_gll(2,maxngll2d,maxngll2d))
-
+    integer          :: i_elmt, iface, nfgll, i_gll, i_obj
+    integer          :: slobjtype
+    real(kind=kreal) :: params(4)
+    !real(kind=kreal),dimension(:,:,:), allocatable :: ds_quad4
+    !real(kind=kreal),dimension(:),     allocatable :: gll_weight
+    !real(kind=kreal),dimension(:,:),   allocatable :: lag_gll
+    !real(kind=kreal),dimension(:,:,:), allocatable :: dlag_gll
+    !allocate(ds_quad4(2,4,maxngll2d))
+    !allocate(gll_weight(maxngll2d),lag_gll(maxngll2d,maxngll2d),  &
+    !dlag_gll(2,maxngll2d,maxngll2d))
 
     ! Code:
     nodalsl = 0.0_kreal
 
-    ! For cartesian: 
-    if(IS_CART_SIM)then
-        if(SL0_is_constant)then
+    do i_obj = 1, nsl_obj
+        slobjtype = slobjs(i_obj, 1)
+        params = slobjs(i_obj,2:5)
 
-            ! SL0 is the z coordinate of the sea surface. We therefore
-            ! need to calculate the theta value for each point based on the 
-            ! the z coordinate of the face 
+        if (slobjtype.eq.0) then 
+            ! Single point of water - args: nodeid, height          
+            call add_sl_gll(INT(params(1)), INT(params(2)), params(3),  INT(params(4)), nodalsl)
+        
+        elseif (slobjtype.eq.1) then 
+        ! Uniform sea level z coordinate over all nodes
+            if(IS_CART_SIM)then
+                call set_cart_constant_SL0(nodalsl, params(1))
+            else 
+                write(*,*)'ERROR: UNIFORM SL Z ONLY FOR CARTESIAN SETUPS.'
+                stop
+            endif 
+        else
+            ! Invalid entry
+            write(*,*)'ERROR: Unknown sea level object type: ', slobjtype
+            stop
+        endif 
+    enddo 
 
-            ! Loop for each face on the surface: 
-            do i_elmt=1, nelmt_fs  
 
-                ! Now with integration weights, ngll etc for face: 
-                ! needs nfgll at least
-                call get_fs_details(i_elmt, iface, nfgll, gll_weight, ds_quad4)
+    call summarise_SL_input(nodalsl, nsl_obj)
 
 
-                ! For each GLL point calculate and store SL0
-                do i_gll = 1, nfgll 
-                    ! Get Z coordinates for the face and global IDs 
-                    z_coord = g_coord(3,  gnum_fs(i_gll,i_elmt))
-                    theta   = SL0_constant - z_coord 
-                    
-                    if(theta.gt.0.0_kreal)then
-                        nodalsl(rgnum_fs(i_gll, i_elmt)) = theta
-                    endif 
-                enddo 
-            enddo 
-        endif
+end subroutine set_original_sea_level
+
+
+
+
+subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
+    use global
+    use free_surface
+    use set_precision
+    ! IO: 
+    real(kind=kreal) :: nodalsl(:), sl_zcoord
+
+    ! Local: 
+    integer :: i_elmt,i_gll, nfgll, iface
+    real(kind=kreal) :: theta, z_coord
+
+    ! SL0 is the z coordinate of the sea surface. We therefore
+    ! need to calculate the theta value for each point based on the 
+    ! the z coordinate of the face 
+
+    ! Store value: 
+    SL0_constant = sl_zcoord
+
+    do i_elmt=1, nelmt_fs  
+        call get_fs_details_noweights(i_elmt, iface, nfgll)
+
+        do i_gll = 1, nfgll 
+            ! Get Z coordinates for the face and global IDs 
+            z_coord = g_coord(3,  gnum_fs(i_gll,i_elmt))
+            ! SL = value - z_coord on surface
+            theta   = sl_zcoord - z_coord 
+            
+            if(theta.gt.0.0_kreal)then
+                nodalsl(rgnum_fs(i_gll, i_elmt)) = theta
+            endif 
+        enddo 
+    enddo 
+
+    ! Log output
+    write(SLlogunit,*)' -- Added sea level at constant Z value'
+    write(SLlogunit,*)'    --> value     : ', sl_zcoord
+
+end subroutine set_cart_constant_SL0
+
+
+
+
+
+
+subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
+    ! Adds ice in the required location to a single GLL point 
+    ! Uses
+    use set_precision
+    use global 
+    use integration
+    use free_surface
+    use math_constants
+
+    ! IO vars: 
+    real(kind=kreal) :: height, nodalsl(:) 
+    integer :: i_elmtfs, i_gll
+    integer :: overwrite_int
+    logical :: overwrite
+    ! Params should be the faceID ON FS, nodeID, height, overwrite
+
+    ! Process overwrite: 
+    if (overwrite_int.eq.0.or.overwrite_int.eq.1) then 
+        overwrite = overwrite_int
+    else 
+        write(*,*)'ERROR: OVERWRITE FLAG FOR SL GLL POINT MUST BE 1/0. Value given: ', overwrite_int
+        stop 
     endif 
 
-    deallocate(ds_quad4, gll_weight,lag_gll, dlag_gll)
-end subroutine set_original_sea_level
+    ! Add to log file: 
+    write(SLlogunit,*)
+    write(SLlogunit,*)' --  Adding sea level at point '
+    write(SLlogunit,*)'      ->  FS Elmt ID             : ', i_elmtfs
+    write(SLlogunit,*)'      ->  GLL Node (1-maxngll2d) : ', i_gll
+    write(SLlogunit,*)'      ->  height                 : ', height
+    write(SLlogunit,*)'      ->  overwrite              : ', overwrite
+
+
+    ! Add ice height to nodal point: 
+    if (overwrite)then 
+     nodalsl(rgnum_fs(i_gll, i_elmtfs)) = height
+    else
+     nodalsl(rgnum_fs(i_gll, i_elmtfs)) = nodalsl(rgnum_fs(i_gll, i_elmtfs)) + height  
+    endif 
+
+    write(ICElogunit,*)' ✓ Injected at GLL point'
+    flush(ICElogunit)
+
+end subroutine add_sl_gll
+
 ! ################### END INITIAL SETUP FUNCTIONS  #####################
 
 
@@ -423,12 +520,9 @@ integer          :: i_gll
 real(kind=kreal) :: theta, I
 
 
-write(SLlogunit,*)'WARNING: NEED TO ACCURATELY IMPLEMENT OCEAN SET/OCEAN FUNCTION BASED ON ICE CONDITION - see Crawford et al 2018, eqn 31'
-
 ! We may want the ocean function but not running simulation 
-! - in that case we need to use nodalsl0 rather than u 
 if (use_orig)then 
-    ! In this case we can calculate ocean function using nodalsl0 and nodalice0: 
+    ! In this case we can calculate ocean function using nodalsl and nodalice: 
     write(SLlogunit,*)'Calculating ocean function with initial values'
 
     do i_elmt=1, nelmt_fs  
@@ -442,7 +536,7 @@ if (use_orig)then
             I     =  nodalice(rgnum_fs(i_gll, i_elmt))
 
             ! if rho_w theta > rho_ice I then part of ocean set
-            if (rho_water * theta .GT. I * rho_ice) then 
+            if ( (rho_water * theta).GT.(I * rho_ice) ) then 
                 oceanf(i_elmt, i_gll) = 1.0_kreal
                 nodalOF(rgnum_fs(i_gll, i_elmt)) = 1.0_kreal
             else
@@ -458,8 +552,7 @@ else
 endif 
 
 write(SLlogunit,*)'  ✓ Updated ocean function. '
-write(SLlogunit,*)''
-
+write(SLlogunit,*)
 end subroutine update_ocean_function
 
 
@@ -521,14 +614,10 @@ subroutine calculate_SL_A()
     write(SLlogunit,*)'  ✓ Calculated sea level area. '
 
     ! Escape if no water. 
-    if(SLarea.lt.ZERO .or. SLarea.eq.ZERO)then 
-        write(*,*)'WARNING: area of ocean = 0 -- NO WATER!!!' 
-        write(*,*)'USING SEA LEVEL AREA = 1' 
-        write(*,*)'SETTING THETA TF TO  = 0' 
-
-        SLarea = 1 ! cant be zero otherwise divide by zero
-        oceanf   = ZERO
-        theta_tf = 0.0_kreal
+    if(SLarea.le.ZERO)then 
+        write(*,*)'ERROR: Area of ocean = 0 -- NO WATER!!!' 
+        write(*,*)'The assumption is that there is at least some defined ocean basin.' 
+        stop 
     endif 
 
 

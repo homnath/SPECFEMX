@@ -45,7 +45,8 @@ implicit none
     write(ICElogunit,*)'IS_ICE            :  ', IS_ICE
     write(ICElogunit,*)'Save original ice :  ', savedata%ice0
     write(ICElogunit,*)'Save ice          :  ', savedata%ice
-    write(ICElogunit,*)'Save ice_rate     :  ', savedata%icerate
+    write(ICElogunit,*)'Save ice rate     :  ', savedata%icerate
+    write(ICElogunit,*)'Save ice load     :  ', savedata%iceload
     write(ICElogunit,*)'-----------------------------------------------------'
     write(ICElogunit,*)
     
@@ -54,10 +55,10 @@ implicit none
     if(IS_CART_SIM)then
         call summarise_ICE_input_cart()
     elseif(IS_GLOB_SIM)then 
-        write(*,*) 'GLOBAL SIMULATIONS NOT IMPLEMETED YET'
+        write(*,*) 'ERROR: GLOBAL SIMULATIONS NOT IMPLEMETED YET'
         stop
     else
-        write(*,*) 'SIMULATION MUST BE GLOBAL OR CARTESIAN'
+        write(*,*) 'ERROR: SIMULATION MUST BE GLOBAL OR CARTESIAN'
         stop
     endif 
 end subroutine start_ICE_log
@@ -81,9 +82,9 @@ subroutine write_ICE0_to_ensight(nodalice)
 
     real(kind=kreal),allocatable :: nodalice(:)
 
+    write(ICElogunit, *)
     write(ICElogunit,*)'Saving the original ICE values'
     
-
     ! On the free surface
     if(savedata%fsplot)then
         call write_scalar_to_file_freesurf(nnode_fs, nodalice, &
@@ -171,7 +172,6 @@ subroutine prepare_ice(nodalice, nodalicerate)
 
     write(ICElogunit,*)'  ✓ Prepared ice '
     write(ICElogunit,*)
-
     return 
 end subroutine prepare_ice
 
@@ -202,10 +202,6 @@ subroutine set_original_ice_level(nodalice)
 
         if (iceobjtype.eq.1) then 
             ! Single point of ice: args: nodeid, height  
-            write(ICElogunit, *)INT(params(1))
-            write(ICElogunit, *)INT(params(2))
-            write(ICElogunit, *)params(3)
-
             call add_ice_gll(INT(params(1)), INT(params(2)), params(3), nodalice)
         elseif (iceobjtype.eq.2) then 
             ! Cylinder - args: x, y, rad, height
@@ -217,7 +213,6 @@ subroutine set_original_ice_level(nodalice)
         endif 
     enddo 
 
-
     ! update log file with results: 
     write(ICElogunit,*)''
     write(ICElogunit,*)'* Finished setting original ice level '
@@ -228,7 +223,7 @@ end subroutine set_original_ice_level
 
 
 subroutine add_ice_gll(i_elmtfs, i_gll, height, nodalice)
-    ! Adds a cylinder of ice in the required location
+    ! Adds ice in the required location to a single GLL point 
     ! Uses
     use set_precision
     use global 
@@ -237,15 +232,10 @@ subroutine add_ice_gll(i_elmtfs, i_gll, height, nodalice)
     use math_constants
 
     ! IO vars: 
-    real(kind=kreal) :: height, nodalice(:) ! x, y, rad, height
+    real(kind=kreal) :: height, nodalice(:) 
     integer :: i_elmtfs, i_gll
 
-    ! Local vars: 
-    !integer :: ios, errcode
-
-
     ! Params should be the faceID, nodeID and the height
-
     ! Add to log file: 
     write(ICElogunit,*)
     write(ICElogunit,*)' --  Adding ice at point '
@@ -345,6 +335,7 @@ subroutine set_ice_rate(nodalice, nodalicerate)
     integer :: iface, nfgll, i_elmtfs, i_gll, gid
     ! Code
 
+    write(ICElogunit, *)
     write(ICElogunit, *)'CAUTION: ONLY IMPLEMENTING FIXED ICE RATE ACROSS REGIONS WITH ICE'
     write(ICElogunit, *)'Using fixed ice rate value:', icerateval
 
@@ -367,12 +358,15 @@ end subroutine set_ice_rate
 
 
 
-subroutine calc_ice_load(iceload, nodalice)
+subroutine calc_ice_load(iceload, nodalicerate,nodalu, i_step)
 ! Uses 
 use global 
+use postprocess
+use element
 use set_precision 
 use free_surface
 use math_constants
+
 #if(USE_MPI)
 use math_library_mpi
 #else
@@ -380,99 +374,258 @@ use math_library_serial
 #endif
 
     ! IO vars
-    real(kind=kreal) iceload(:), nodalice(:)
-
+    real(kind=kreal),intent(inout) :: iceload(:)
+    real(kind=kreal)               :: nodalicerate(:), nodalu(:,:)
+    integer :: i_step
     ! Local vars
-    integer          ::  i_elmt, num4(4), gid_abg, gid_xyg, iface, nfgll, abg,xyg, j,k
-    real(kind=kreal) :: coord(ndim,4), face_normal(3), dx_dxi(NDIM), dx_deta(NDIM), pi_2d_abg, pi_2d_xyg
-    real(kind=kreal) :: utf_dot_bkgrav, utf_dot_bkgrav_xyg, area_inv, xyg_sum
+    integer                        :: i_elmtfs,nodeid,dof, gid_elmt, num4(4), num_FS(maxngll2d), gid_abg, gid_xyg, iface, nfgll, abg,xyg, j,k, i_gll, i
+    real(kind=kreal)               :: coord(ndim,4), face_normal(3), dx_dxi(NDIM), dx_deta(NDIM), pi_2d_abg, pi_2d_xyg
+    real(kind=kreal)               :: utf_dot_bkgrav, utf_dot_bkgrav_xyg, area_inv, xyg_sum
     real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
+    real(kind=kreal)               :: epsilon, pi_2d, ctr, val
+    integer                        :: fgdof(nndof, maxngll2d) ! face global degrees of freedom
+
+    real(kind=kreal), allocatable  :: nodal_iceload_u(:,:), nodal_iceload_phi(:), nodal_iceload_sl(:) ! dim nnode_fs
 
     ! Code: 
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
 
-    ! Inverse area
-    area_inv = ONE/SLarea
-
-    ! Loop for each FS element
-    do i_elmt = 1, nelmt_fs
-
-        ! Get details for the free surface element (e.g. which face etc)
-        call get_fs_details(i_elmt, iface, nfgll, gw, dshape4)
-        num4   = gnum4_fs(:, i_elmt)
-        coord  = g_coord(:,num4)
+    write(ICElogunit,*)'Calculating iceload...'
+    iceload = zero
 
 
-        ! CALCULATE XYG SUM THAT IS USED FOR EACH ABG, but doesnt depend on ABG: 
-        ! I think this can sit outside the ABG loop
-        xyg_sum = ZERO  
-        do xyg = 1, nfgll 
-            gid_xyg = gnum_fs(xyg, i_elmt)
+    if (savedata%iceload)then 
+        write(ICElogunit,*) ' Saving nodal_icelog values.'
+        allocate(nodal_iceload_u(ndim, nnode_fs), nodal_iceload_phi(nnode_fs), nodal_iceload_sl(nnode_fs))
+        nodal_iceload_u   = zero
+        nodal_iceload_phi = zero
+        nodal_iceload_sl  = zero
+    endif 
 
-            ! Get Jacobian_2d x weights for XYG 
-            dx_dxi  = matmul(coord,dshape4(1,:,xyg))
-            dx_deta = matmul(coord,dshape4(2,:,xyg))
-            face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
-            face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
-            face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-            pi_2d_xyg     =gw(xyg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
 
-            ! Sum of u_tf dot grad Phi at XYG
-            utf_dot_bkgrav_xyg = ZERO 
-            do k = 1, NDIM 
-                utf_dot_bkgrav_xyg = utf_dot_bkgrav_xyg + (u_tf(k) * grav0_nodal(k, gid_xyg))
-            enddo 
+    call calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, nodalicerate)
 
-            ! Sum up! 
-            xyg_sum = xyg_sum + pi_2d_xyg * (g0_nodal(gid_xyg) * theta_tf  + & 
-                                            oceanf(i_elmt, xyg) * (phi_tf + utf_dot_bkgrav_xyg))
+    ! Epsilon/Area
+    area_inv = epsilon/SLarea
+
+    ! Now calculate the actual iceload  - TODO there may be a way to combine the two loops
+    ! and calculate epsilon, then apply it at the end, which would be more efficient
+    ! but leave that til later.  
+    do i_elmtfs=1,nelmt_fs
+
+        ! GET SOME DETAILS ABOUT THE ELEMENT 
+        call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4) ! face number, number of GLL on face, gauss weights, derivative of shape funcs
+        num4     = gnum4_fs(:, i_elmtfs)           ! node IDs for corners 
+        coord    = g_coord(:,num4)                 ! node coordinates
+        gid_elmt = id_elem_fs(i_elmtfs)            ! global element ID 
+        num_FS   = gnum_fs(:, i_elmtfs)            ! Global node IDs of the GLL pts on FS 
+
+        ! DOF IDs for the nodes in matrix (property, gll pt) where property goes from 1 - 5 (ux,uy,uz,phi,theta)
+        fgdof(:, 1:nfgll) = reshape(gdof(:, g_num(hexface(iface)%node, gid_elmt)),(/nndof, maxngll2d/))
+        
+        !write(ICElogunit,*)'  FACE_FS : ', i_elmtfs
+        !do i_gll = 1, maxngll2d 
+        !    write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
+        !enddo 
+        !write(ICElogunit,*) 
+
+
+        write(ICElogunit,*)' gid_elmt : ', gid_elmt
+        write(ICElogunit,*)' face     : ', iface
+        write(ICElogunit,*)'  fgdof : '
+        do i_gll = 1, maxngll2d 
+            write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
         enddo 
 
 
+        do i_gll = 1, nfgll 
 
-        ! Loop through each GLL on the face 
-        do abg = 1, nfgll 
-            gid_abg = gnum_fs(abg, i_elmt)
+            nodeid = rgnum_fs(i_gll, i_elmtfs)
 
+            ! Calculate the magnitude of the 2D jacobian 
+            dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
+            dx_deta = matmul(coord,dshape4(2,:,i_gll))
+            ! Calc normal and therefore jac dec (2D) on the fly
+            face_normal(1) = dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
+            face_normal(2) = dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+            face_normal(3) = dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+            pi_2d          = gw(i_gll) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jac
 
-            ! Get Jacobian_2d x weights for ABG 
-            dx_dxi  = matmul(coord,dshape4(1,:,abg))
-            dx_deta = matmul(coord,dshape4(2,:,abg))
-            face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
-            face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
-            face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-            pi_2d_abg     = gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
-
-            ! Sum over u_tf \cdot background grav @ abg nodes: 
-            utf_dot_bkgrav = ZERO 
-            do j = 1, NDIM 
-                utf_dot_bkgrav = utf_dot_bkgrav + (u_tf(j) * grav0_nodal(j, gid_abg))
-            enddo 
-
-            
-            iceload(gid_abg) = iceload(gid_abg) + ( (1 -  oceanf(i_elmt, abg)) * nodalice(rgnum_fs(abg, i_elmt)) * pi_2d_abg * & 
-                               (phi_tf + utf_dot_bkgrav - area_inv * xyg_sum) ) 
-        enddo ! abg
+            ! Calculate the coefficient for phi and u that is shared
+            ! Note that u values also need to be multiplied by background gravity
+            val = ( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - area_inv*oceanf(i_elmtfs, i_gll) 
+            val = val * pi_2d
 
 
+            ! Displacement for direction j: + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi * \nabla\Phi_j
+            do j = 1, NDIM    
+                dof = fgdof(j, i_gll) +1  
+                if (dof.gt.0)then 
+                    iceload(dof) = iceload(dof) + ( val *  grav0_nodal(j, num_FS(i_gll)) )
 
-        ! Print some stats about iceload: 
-        write(ICElogunit,*)' --------------------------------------------- '
-        write(ICElogunit,*)' Calculated ice load: '
-        write(ICElogunit,*)' Min value          : ', minscal(minval(iceload))
-        write(ICElogunit,*)' Max value          : ', maxscal(maxval(iceload))
+                    if (savedata%iceload)then 
+                        nodal_iceload_u(j,nodeid) = nodal_iceload_u(j, nodeid) + (val *  grav0_nodal(j, num_FS(i_gll)) )
+                    endif 
+                endif  
+            enddo
+
+            ! Phi:  + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi
+            dof = fgdof(4, i_gll) + 1
+            if (dof.gt.0)then 
+                iceload(dof) = iceload(dof) + val 
+
+                if (savedata%iceload)then 
+                    nodal_iceload_phi(nodeid) = nodal_iceload_phi(nodeid) + val
+                endif 
+            endif 
+
+            ! Theta: - epsilon/A * g * pi2d
+            dof = fgdof(5, i_gll) + 1
+            if (dof.gt.0)then 
+                iceload(dof) = iceload(dof) - (area_inv * pi_2d * g0_nodal(num_FS(i_gll)))
+
+                if (savedata%iceload)then 
+                    nodal_iceload_sl(nodeid) = nodal_iceload_sl(nodeid) - (area_inv * pi_2d * g0_nodal(num_FS(i_gll)))
+                endif 
+            endif
 
 
-    enddo !nelmt_fs 
+        enddo  ! i_gll 
+    enddo  ! i_elmtfs
 
 
+    ! Multiply whole of the vector by - rho_i 
+    iceload = - (rho_ice * iceload)
+
+    ! Save iceload to file: 
+    if (savedata%iceload)then 
+        nodal_iceload_u   =  - nodal_iceload_u   * rho_ice
+        nodal_iceload_phi =  - nodal_iceload_phi * rho_ice
+        nodal_iceload_sl  =  - nodal_iceload_sl  * rho_ice
+
+        call write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step=0)
+      
+        write(ICElogunit,*)' Min value of nodal_iceload_u: ', minval(nodal_iceload_u)
+        write(ICElogunit,*)' Max value of nodal_iceload_u: ', maxval(nodal_iceload_u)
+        write(ICElogunit,*)
+        write(ICElogunit,*)' Min value of nodal_iceload_phi: ', minval(nodal_iceload_phi)
+        write(ICElogunit,*)' Max value of nodal_iceload_phi: ', maxval(nodal_iceload_phi)
+        write(ICElogunit,*)
+        write(ICElogunit,*)' Min value of nodal_iceload_sl: ', minval(nodal_iceload_sl)
+        write(ICElogunit,*)' Max value of nodal_iceload_sl: ', maxval(nodal_iceload_sl)
+        write(ICElogunit,*)'--------------------------------------------------------'
+    endif
+    write(ICElogunit,*)' Min value of nodalicerate: ', minval(nodalicerate)
+    write(ICElogunit,*)' Max value of nodalicerate: ', maxval(nodalicerate)
+    write(ICElogunit,*)
+    write(ICElogunit,*)' Calculated ice load '
+    write(ICElogunit,*)'  -->  Min value of iceload     : ', minscal(minval(iceload))
+    write(ICElogunit,*)'  -->  Max value of iceload     : ', maxscal(maxval(iceload))
 
     deallocate(gw)
     deallocate(dshape4)
 
 end subroutine calc_ice_load    
+
+
+
+
+
+
+subroutine write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step)
+    use global
+    use postprocess
+    use free_surface
+    use set_precision
+
+    real(kind=kreal) :: nodal_iceload_sl(:), nodal_iceload_phi(:), nodal_iceload_u(:,:)
+    real(kind=kreal) :: nodalu(:,:)
+    integer :: i_step
+
+        ! Save sea level iceload
+    if(savedata%fsplot)then
+        write(ICElogunit,*)'Saving iceload_sl'
+      call write_scalar_to_file_freesurf(nnode_fs, nodal_iceload_sl,&
+      ext='iceload_sl',istep=i_step) 
+    endif
+    if(savedata%fsplot_plane)then
+      call write_scalar_to_file_freesurf(nnode_fs, nodal_iceload_sl,&
+      ext='iceload_sl',istep=i_step,plane=.true.) 
+    endif
+
+    ! Save phi iceload
+    if(savedata%fsplot)then
+        call write_scalar_to_file_freesurf(nnode_fs, nodal_iceload_phi,&
+        ext='iceload_phi',istep=i_step) 
+      endif
+    if(savedata%fsplot_plane)then
+        call write_scalar_to_file_freesurf(nnode_fs, nodal_iceload_phi,&
+        ext='iceload_phi',istep=i_step,plane=.true.) 
+    endif
+
+    ! Displacement
+    write(ICElogunit,*)'Saving iceload_u - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
+    call write_vector_to_file(nnode,nodalu,ext='iceload_u',istep=i_step) 
+    ! On the free surface
+    if(savedata%fsplot)then
+      call write_vector_to_file_freesurf(nnode_fs,nodal_iceload_u,&
+      ext='iceload_u',istep=i_step)
+    endif
+    if(savedata%fsplot_plane)then
+      call write_vector_to_file_freesurf(nnode_fs,nodal_iceload_u,&
+      ext='iceload_u',istep=i_step,plane=.true.)
+    endif
+end subroutine write_iceload_to_ensight
+
+
+subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, nodalicerate)
+    use free_surface
+    use global
+    use set_precision
+    use math_constants
+    ! IO: 
+    integer                        :: num4(4)
+    real(kind=kreal)               :: gw(:), nodalicerate(:)        
+    real(kind=kreal)               :: dshape4(:,:,:)
+    real(kind=kreal)               :: coord(ndim,4), face_normal(3), epsilon
+
+    ! local vars: 
+    integer :: i_elmtfs, iface, nfgll, i_gll
+    real(kind=kreal) :: dx_dxi(NDIM), dx_deta(NDIM), pi_2d, val 
+
+    ! First calculate the average ice rate load change (epsilon): 
+    epsilon = zero
+    do i_elmtfs=1,nelmt_fs
+        ! Get details for the element: 
+        call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
+        num4   = gnum4_fs(:, i_elmtfs)
+        coord  = g_coord(:,num4)
+
+        ! Loop over GLL nodes of the face
+        do i_gll = 1, nfgll 
+            ! Calculate the magnitude of the 2D jacobian 
+            dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
+            dx_deta = matmul(coord,dshape4(2,:,i_gll))
+
+            ! Calc normal and therefore jac dec (2D) on the fly
+            face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
+            face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+            face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+            pi_2d         = gw(i_gll) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jac
+
+            val = (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(rgnum_fs(i_gll, i_elmtfs)) * pi_2d
+            epsilon = epsilon + val 
+        enddo 
+    enddo 
+    write(ICElogunit,*)' --------------------------------------------- '
+    write(ICElogunit,*)' ε value            : ', epsilon
+    write(ICElogunit,*)' --------------------------------------------- '
+end subroutine calc_iceload_epsilon
+
+
+
 
 end module

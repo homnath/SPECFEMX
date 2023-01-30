@@ -38,17 +38,16 @@ character(len=500) :: errsrc
 errsrc=trim(myfname)//' => prepare_sparse'
 
 if(myrank==0) then
-  write(logunit,*) 'preparing sparse matrix...'
-  write(SLlogunit,*) '++++++++++++++++++++++++++++++++++++++++'
-  write(SLlogunit,*) '       preparing sparse matrix...'
+  write(logunit,*) '++++++++++++++++++++++++++++++++++++++++'
+  write(logunit,*) '       preparing sparse matrix...'
 
 endif
 
 nmax=nelmt*(NEDOF*NEDOF)
 
-write(SLlogunit,*)'NEDOF : ', NEDOF
-write(SLlogunit,*)'nelmt : ', nelmt
-write(SLlogunit,*)'nmax  : ', nmax
+write(logunit,*)'NEDOF : ', NEDOF
+write(logunit,*)'nelmt : ', nelmt
+write(logunit,*)'nmax  : ', nmax
 
 allocate(col0(nmax),row0(nmax),gcol0(nmax),grow0(nmax),stat=ierr)
 call check_allocate(ierr,errsrc)
@@ -112,7 +111,6 @@ ngdof=maxscal(maxval(ggdof))
 
 if(myrank==0)then
   write(logunit,'(a,i0)')'Total global degrees of freedom: ',ngdof
-  write(SLlogunit,'(a,i0)')'Total global degrees of freedom: ',ngdof
   flush(logunit)
 endif
 

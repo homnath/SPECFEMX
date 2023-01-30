@@ -8,21 +8,25 @@ contains
 ! This routine reads and applies the traction specified in the traction file.
 ! REVISION
 !   HNG, Jul 12,2011; HNG, Apr 09,2010; HNG, Dec 08,2010
-subroutine apply_traction(load,errcode,errtag)
+subroutine apply_traction(load,errcode,errtag, nodalu, i_step)
 use global
 use math_constants
+use postprocess
 use element,only:hexface,hexface_sign,hex8_gnode
 use integration,only:dshape_quad4_xy,dshape_quad4_yz,dshape_quad4_zx,          &
                      gll_weights_xy,gll_weights_yz,gll_weights_zx,             &
                      lagrange_gll_xy,lagrange_gll_yz,lagrange_gll_zx
 use math_library,only : angle
-use free_surface,only:nelmt_fs,nnode_fs,gnode_fs,gnum_fs,rgnum_fs,iface_fs!, normal_fs, jac2d_fs
+use free_surface,only:nelmt_fs,nnode_fs,gnode_fs,gnum_fs,rgnum_fs,iface_fs, id_elem_fs, fs_elem_id!, normal_fs, jac2d_fs
 implicit none
 real(kind=kreal),intent(inout) :: load(0:neq)
 integer,intent(out) :: errcode
+integer :: i_step ! IO
+real(kind=kreal),allocatable :: nodalu(:,:) ! only used as dummy for helping to plot traction fs
+
 character(len=250),intent(out) :: errtag
 integer :: lngdof(ndim)
-integer :: i_face,i_gll,ios,iaxis
+integer :: i_face,i_gll,ios,iaxis, igll
 integer :: i_node,i_dof,ignode,igdof
 integer :: ielmt,iface,nface,inode,ifnode
 integer :: igdofu(NDIM)
@@ -30,10 +34,10 @@ integer :: num(nenode)
 integer,allocatable :: numf(:)
 integer :: nfdof,nfgll !face nodal dof, face gll pts
 integer,allocatable :: fgdof(:) ! face global degrees of freedom
-integer :: tractype,count_trac
+integer :: tractype,count_trac, i, nodalids(maxngll2d)
 logical :: trac_stat
 
-real(kind=kreal) :: coord(ndim,4)
+real(kind=kreal) :: coord(ndim,4), fttractload_vec(NDIM, maxngll2d)
 real(kind=kreal) :: x,x1,x2,detjac
 real(kind=kreal),dimension(ndim) :: face_normal,dx_dxi,dx_deta,dq_dx,q,q1,q2
 real(kind=kreal),allocatable :: ftracload(:) ! face traction load
@@ -44,6 +48,7 @@ real(kind=kreal),dimension(:,:,:),allocatable :: dshape_quad4
 real(kind=kreal),dimension(:),allocatable :: gll_weights
 real(kind=kreal),dimension(:,:),allocatable :: lagrange_gll
 real(kind=kreal),dimension(:,:,:),allocatable :: dlagrange_gll
+real(kind=kreal),dimension(:,:),allocatable :: nodaltraction
 
 real(kind=kreal) :: r0,r_cyl,y,z,z_cyl,theta_cyl,Tq,Jt,sigma_thetaz,G,theta_comp
 
@@ -71,6 +76,13 @@ allocate(gll_weights(maxngll2d),lagrange_gll(maxngll2d,maxngll2d),             &
 dlagrange_gll(2,maxngll2d,maxngll2d))
 
 
+! for outputting traction on FS: 
+if (savedata%traction) then 
+  allocate(nodaltraction(NDIM, nnode_fs))
+  nodaltraction = zero
+endif 
+
+
 trac_stat=.true. ! Necessary for empty trfile
 if(istraction)then
   fname=trim(data_path)//trim(trfile)//trim(ptail_inp)
@@ -93,12 +105,33 @@ if(istraction)then
       read(11,*)nface ! number of points
       do i_face=1,nface
 
-        read(11,*)ielmt,inode
-        lngdof=gdof(idofu,g_num(hex8_gnode(inode),ielmt))
+        ! I am assuming it is on the free surface. 
+        read(11,*)ielmt,iface,igll 
+        !lngdof=gdof(idofu,g_num(hex8_gnode(inode),ielmt))
+
+        lngdof=gdof(idofu,gnum_fs(igll, fs_elem_id( ielmt))) 
         load(lngdof)=load(lngdof)+q
+
+        write(logunit,*)'Added traction at gnum: ', gnum_fs(igll, fs_elem_id( ielmt))
+        write(logunit,*)'                  gdof: ', lngdof
+
+
+        
+
+        nodalids = rgnum_fs(igll, fs_elem_id(ielmt))
+        nodaltraction(:,nodalids(1)) = nodaltraction(:,nodalids(1)) + q
+
+        write(logunit,*)'Added nodaltraction at gnum: ', nodalids(1)
+
+
+        
       enddo
       trac_stat=.true.
     elseif(tractype==1)then ! uniform loading
+      write(logunit,*)
+      write(logunit,*)'Traction applied: uniform loading'
+      write(logunit,*)
+
       read(11,*)q ! vector
       read(11,*)nface
       do i_face=1,nface
@@ -126,7 +159,8 @@ if(istraction)then
 
         num=g_num(:,ielmt)
         coord=g_coord(:,num(hexface(iface)%gnode))
-        fgdof(1:nfdof)=reshape(gdof(idofu,g_num(hexface(iface)%node,ielmt)),(/nfdof/))
+
+        fgdof(1:nfdof)=reshape(gdof(idofu,g_num(hexface(iface)%node,ielmt)), (/nfdof/))
 
         ftracload=zero
         ! compute numerical integration
@@ -153,9 +187,25 @@ if(istraction)then
           q(3)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) ! *face_normal(3) !only in Z direction
           
         enddo
+
+        write(kmatunit,*)' element : ', ielmt
+        write(kmatunit,*)' face    : ', iface
+        write(kmatunit,*)' fgdof   : ', fgdof
+
+
+        ! Add traction contribution to load
         load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
+
+
+        ! reshape the traction addition vector into a (NDIM x MAXNGLL2D)
+        fttractload_vec = reshape( ftracload(1:nfdof), (/NDIM, maxngll2d/)  ) 
+        ! Add Nodal FS traction vector for traction FS elmt
+        nodalids = rgnum_fs(:, fs_elem_id(ielmt))
+        nodaltraction(:,nodalids) = nodaltraction(:,nodalids) + fttractload_vec
+
       enddo
       trac_stat=.true.
+
     elseif(tractype==2)then ! linearly distributed loading
       read(11,*)iaxis,x1,x2,q1,q2 ! q1 and q2 are vectors, x1 and x2 can be any coordinates
       dq_dx=(q2-q1)/(x2-x1)
@@ -587,6 +637,29 @@ endif !(isfstraction)
 !  deallocate(ufs)
 !
 !endif !(isfstraction)
+
+
+      ! Save the traction: 
+if (savedata%traction)then
+  write(logunit,*)' min Traction extload: ', minval(load)
+  write(logunit,*)' max Traction extload: ', maxval(load)
+  write(logunit,*)' min nodaltraction : ',   minval(nodaltraction)
+  write(logunit,*)' max nodaltraction : ',   maxval(nodaltraction)
+
+  write(logunit,*)'Saving traction - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
+  call write_vector_to_file(nnode,nodalu,ext='traction',istep=0) 
+  ! On the free surface
+  if(savedata%fsplot)then
+    call write_vector_to_file_freesurf(nnode_fs,nodaltraction,&
+    ext='traction',istep=0)
+  endif
+  if(savedata%fsplot_plane)then
+    call write_vector_to_file_freesurf(nnode_fs,nodaltraction,&
+    ext='traction',istep=0,plane=.true.)
+  endif
+endif 
+
+
 
 deallocate(numf)
 deallocate(fgdof,ftracload)

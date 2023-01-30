@@ -9,6 +9,13 @@ This form of SPECFEM-X is for the development of SPECFEM-C prior to any integrat
 - [x] Write ocean function updater using ice and theta comparison 
 - [ ] When calling ```set_petsc_stiffness_SL``` do we need to parse the SL matrices as args? arent they global?
 
+
+### Manual updates: 
+- [ ] Re-write SL input file to be consistent with ice file format 
+- [ ] Important rewrite of format for traction input at single GLL point - now ielmt, iface, gll on face (this assumes that traction is on a surface face)
+- [ ] ```icerate``` file 
+
+
 ### Time looping
 - [ ] Stiffness matrix needs to be updated at each timestep...not just the first 1 (elastic) or 2 (viscoelastic)
 - [ ] Need to store ```nodalu```, ```nodalphi```, ```nodalsl``` etc at each timestep (not to be overwritten) 
