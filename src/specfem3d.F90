@@ -225,6 +225,10 @@ real(kind=kreal) :: trace_vsigma0,trace_strain
 real(kind=kreal) :: esigma0_dev(nst),esigma_dev(nst)
 real(kind=kreal) :: maxresload,maxbodyload
 
+
+  
+
+
 integer :: geq,inum,nequ
 logical,allocatable :: iseq(:)
 integer,allocatable :: gdofu(:) 
@@ -514,7 +518,7 @@ loop_step: do i_step=istep0,nstep
   !WE Reads and adds the traction to the extload variable
   if((istraction.or.isfstraction).and.i_step==1)then
     log_msg = trim('applying traction...') ;   call write_ifproc0()
-    call apply_traction(extload,errcode,errtag)
+    call  apply_traction(extload,errcode,errtag, nodalu, i_step)
     call control_error(errcode,errtag,stdout,myrank)
     if(myrank==0)then
       write(logunit,*)'complete!',maxval(abs(extload))
@@ -540,8 +544,9 @@ loop_step: do i_step=istep0,nstep
 
   ! Calculate ice load: 
   if (is_ICE)then 
-    call calc_ice_load(iceload, nodalicerate)
+    call calc_ice_load(iceload, nodalicerate, nodalu, i_step=0)
   endif 
+
 
   ! Apply non-zero boundary conditions to the bcnodalv array 
   ! Note this is NOT applying the loading terms (e.g. extload)
@@ -563,11 +568,12 @@ loop_step: do i_step=istep0,nstep
 
   ! Some resetting of the loads 
   extload(0)=ZERO
+  iceload(0)=ZERO
+
   ! only for fault
-  load=selfload+extload+ubcload+rhoload 
+  load        = selfload + extload + ubcload + rhoload + iceload
   load(0)     = ZERO
   bodyload(0) = ZERO
-  iceload(0)  = ZERO
   
   if(isplastic)then
     evpt     = ZERO
@@ -578,9 +584,6 @@ loop_step: do i_step=istep0,nstep
   ! RESETTING OF U AND DU 
   du          = ZERO
   u           = ZERO
-
-  ! ADD THE ICE LOAD 
-  load = load + iceload   
 
   ! ===================== RUN NON LINEAR ITERATIONS ====================
   !bodyload=ZERO; bodyload(0)=ZERO

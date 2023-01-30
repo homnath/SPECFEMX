@@ -471,18 +471,20 @@ integer,parameter :: petsc_solver=2  ! select PETSC solver
 integer :: solver_type=smart_solver !builtin_solver !petsc_solver !smart_solver 
 ! By default solver is symmetric but it may be changed later depending on the
 ! conditions.
-logical :: symmetric_solver=.true.
+logical :: symmetric_solver=.false.
 ! save options
 type savedata_options
   logical :: model,disp,stress,porep,psigma,maxtau,nsigma,scf,vmeps
   logical :: model_cell
   logical :: strain
+  logical :: traction
   logical :: gpot,agrav
   logical :: mpot,magb
   logical :: infinite
   logical :: sl0 ! initial sea level
   logical :: sl  ! current sea level
   logical :: ice0 ! initial ice level
+  logical :: iceload ! initial ice level
   logical :: oceanf ! ocean function 
   logical :: ice  ! current ice level
   logical :: icerate
@@ -524,6 +526,8 @@ real(kind=kreal)::  rho_ice                              !may be nondimensionali
 ! Flag for cartesian or global simulation 
 logical :: IS_CART_SIM, IS_GLOB_SIM , is_SL, SL0_is_constant
 character(len=250) :: slfile                ! Input file name 
+integer ::  nsl_obj            !num of ice objs.
+real(kind=kreal), allocatable  :: slobjs(:,:) !  list of ice objects read in, 
 
 
 ! Constants: 

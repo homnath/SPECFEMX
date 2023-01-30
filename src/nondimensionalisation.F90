@@ -193,7 +193,6 @@ subroutine calc_nondimensionalisation_vals
     endif
 
     if(IS_SL)then
-      SL0_constant = SL0_constant*NONDIM_L
       rho_water    = rho_water_dim*NONDIM_DENSITY
     endif 
 

@@ -171,6 +171,7 @@ ice_stat          = 0
 IS_ICE            = .false.
 savedata%ice      = .false. 
 savedata%icerate  = .false. 
+savedata%iceload  = .false. 
 savedata%ice0     = .false. 
 
 
@@ -667,6 +668,7 @@ do
         return
       endif
     endif
+    savedata%traction = .true.
     traction_stat=1
     !istraction=.true.
     !print*,trfile
@@ -1011,6 +1013,13 @@ do
       write(*,*)' SAVING ICE RATE'
     endif 
 
+
+    call seek_integer('saveiceload',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%iceload    = .true.
+      write(*,*)' SAVING ICE LOAD'
+    endif 
+
     cycle
   endif 
 
@@ -1256,43 +1265,59 @@ if(is_SL)then
 
   do 
     read(11,*,IOSTAT=read_stat) line 
-
     if (read_stat==0)then 
       ! Line read and needs processing 
       if (isblank(line) .or. iscomment(line,'#'))then
         cycle 
-      else 
-        ! Not a comment - we want this value: 
-        sl_read_ctr = sl_read_ctr + 1 
+      else ! not blank 
         
-        SELECT CASE (sl_read_ctr)
-        CASE (1)
-          ! First line says global or cartesian 
-          if (str2int(trim(line)) .eq. 1)then
+        if(sl_read_ctr.eq.0)then 
+          ! Get cartesian/global simulation
+          if (str2int(trim(line)).eq.0) then 
+            write(*,*)'ERROR: GLOBAL SL NOT IMPLIMENTED'
+            stop 
+          elseif (str2int(trim(line)).eq.1)then 
             IS_CART_SIM = .true.
-          elseif(str2int(trim(line)) .eq. 2)then 
-            IS_GLOB_SIM = .true.
-          else
-            write(*,*)'Wrong specification for glob/cart sim'
+          else 
+            write(*,*)'ERROR: SL SIM_TYPE must be GLOBAL (0) or CARTESIAN (1)'
+            stop 
           endif 
+          sl_read_ctr = sl_read_ctr + 1 
+        else
+          ! PROCESS MAIN DATA IN FILE
+          ! Line isnt a comment so process it: 
+          ! First line must be the number of ice objects 
+          nsl_obj = str2int(trim(line))
+          sl_read_ctr = sl_read_ctr + 1 
 
-        CASE (2)
-          if (str2int(trim(line)).eq.0)then 
-            ! constant z value: 
-            SL0_is_constant = .true. 
-            read(11,*) line 
-            SL0_constant    = str2real(trim(line)) 
-            sl_read_ctr     = sl_read_ctr + 1 
-          else
-            write(*,*)'ONLY CONSTANT CARTESIAN SL CURRENTLY IMPLEMENTED'
-            stop
-          endif             
-        CASE DEFAULT
-          write(*,*)'Read in the following line but it isnt being used:'
-          write(*,*)trim(line)
+          ! Allocate the iceobj array - stores details read in
+          ! max params to describe object is currently 5....
+          allocate(slobjs(nsl_obj, 5))
+          slobjs = -1.0
 
-        END SELECT
-      endif 
+          ! Reading an object: 
+          do nline = 1, nsl_obj
+            read(11,'(A)',IOSTAT=read_stat)line   
+            ! progress string line delimited by space: 
+            
+            kold = 0
+            k    = 250
+            i    = 1
+            do 
+              k = INDEX(trim(line(kold+1:250)), ' ')
+              if (k.eq.0) then
+                ! Either empty or no spaces left.
+                slobjs(nline, i) = str2real(trim(line(kold+1:)))
+                exit 
+              endif 
+              slobjs(nline, i) = str2real(line(kold+1:kold+ k-1))
+              kold = k + kold
+              i = i + 1
+            enddo 
+          enddo 
+
+        endif ! sl_read_ctr
+      endif ! is/isnt blank/comment
 
     elseif(read_stat==-1)then 
       ! End of File: 
@@ -1309,7 +1334,6 @@ endif
 
 
 ! Read ICE file: 
-! Read Sea Level file: 
 ice_read_ctr = 0 
 if(is_ICE)then 
 

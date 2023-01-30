@@ -131,7 +131,6 @@ call check_allocate(ierr,errsrc)
 
 nzeros=0;
 
-write(SLlogunit,*)' nsparse: ', nsparse
 
 do i=1,nsparse
   nzeros(krow_sparse(i))=nzeros(krow_sparse(i))+1
@@ -837,19 +836,11 @@ rval=1.0
 
 ! entirely in solid                                                              
 do i_elmt=1, nelmt       
-  write(kmatunit,*)'ELEMENT: ', i_elmt
 
   ! Get global DOF indices for this element
   ielmt=i_elmt                                                                   
   ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))    
   
-  
-  write(kmatunit,*)'   ggdof_elmt: in shape 5 x 27 '
-  do i = 1, ngll
-    write(kmatunit,*)'     * ', ggdof_elmt(:,i) 
-  enddo 
-  write(kmatunit,*)
-  write(kmatunit,*)
 
 
 
