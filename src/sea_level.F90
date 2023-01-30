@@ -604,8 +604,14 @@ subroutine calculate_SL_A()
             face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
             face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
             face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-            detjac2d=sqrt(dot_product(face_normal,face_normal))
 
+
+            ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
+            ! UNSURE ABOUT THIS??? 
+            face_normal(1) = zero
+            face_normal(2) = zero
+
+            detjac2d=sqrt(dot_product(face_normal,face_normal))       
             SLarea = SLarea + oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d
         enddo ! i_gll
     enddo   ! i_elmtfs
