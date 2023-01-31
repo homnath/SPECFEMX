@@ -391,9 +391,7 @@ subroutine set_original_sea_level(nodalsl)
         endif 
     enddo 
 
-
     call summarise_SL_input(nodalsl, nsl_obj)
-
 
 end subroutine set_original_sea_level
 
@@ -427,16 +425,15 @@ subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
             ! SL = value - z_coord on surface
             theta   = sl_zcoord - z_coord 
             
-            if(theta.gt.0.0_kreal)then
-                nodalsl(rgnum_fs(i_gll, i_elmt)) = theta
-            endif 
+            !if(theta.gt.0.0_kreal)then
+            nodalsl(rgnum_fs(i_gll, i_elmt)) = theta    ! Now storing negative values too. 
+            !endif 
         enddo 
     enddo 
 
     ! Log output
-    write(SLlogunit,*)' -- Added sea level at constant Z value'
+    write(SLlogunit,*)' -- Added water at constant Z value'
     write(SLlogunit,*)'    --> value     : ', sl_zcoord
-
 end subroutine set_cart_constant_SL0
 
 
@@ -496,13 +493,11 @@ end subroutine add_sl_gll
 
 
 
-subroutine update_ocean_function(nodalice, nodalsl, errcode, errtag, use_orig)
+subroutine update_ocean_function(nodalice, nodalsl, errcode, errtag)
 ! Routine checks each GLL point on the surface to see if it is part of the ocean set
 ! see Crawford et al 2018, eqn 31-32.
-! Set contains any nodes in which rho_w * theta > rho_i * I 
-! If use_orig then will use nodalsl0 and nodalice0 instead of nodalsl and nodalice 
+! Set contains any nodes in which rho_w * SL > rho_i * I 
 
-! Bit of an issue here because we need the values of theta, I not their rates (time derivs)
 use global 
 use free_surface
 implicit none 
@@ -511,45 +506,39 @@ implicit none
 character(len=250) :: errtag
 integer :: ios, errcode
 real(kind=kreal), allocatable :: nodalice(:), nodalsl(:)
-logical :: use_orig
 
 
 ! Local variables 
 integer          :: i_elmt, iface, numf(maxngll2d), i_numf, i_node, nfgll
 integer          :: i_gll 
-real(kind=kreal) :: theta, I
+real(kind=kreal) :: SL, I
 
 
-! We may want the ocean function but not running simulation 
-if (use_orig)then 
-    ! In this case we can calculate ocean function using nodalsl and nodalice: 
-    write(SLlogunit,*)'Calculating ocean function with initial values'
+! In this case we can calculate ocean function using nodalsl and nodalice: 
+write(SLlogunit,*)'Calculating ocean function...'
 
-    do i_elmt=1, nelmt_fs  
+do i_elmt=1, nelmt_fs  
 
-        ! Face number (ie between 1 and 6) and get related properties
-        call get_fs_details_noweights(i_elmt, iface, nfgll)
+    ! Face number (ie between 1 and 6) and get related properties
+    call get_fs_details_noweights(i_elmt, iface, nfgll)
 
-        ! Loop through GLL on the surface: 
-        do i_gll = 1, nfgll
-            theta =  nodalsl(rgnum_fs(i_gll, i_elmt))
-            I     =  nodalice(rgnum_fs(i_gll, i_elmt))
+    ! Loop through GLL on the surface: 
+    do i_gll = 1, nfgll
+        SL =  nodalsl(rgnum_fs(i_gll, i_elmt))
+        I     =  nodalice(rgnum_fs(i_gll, i_elmt))
 
-            ! if rho_w theta > rho_ice I then part of ocean set
-            if ( (rho_water * theta).GT.(I * rho_ice) ) then 
-                oceanf(i_elmt, i_gll) = 1.0_kreal
-                nodalOF(rgnum_fs(i_gll, i_elmt)) = 1.0_kreal
-            else
-                oceanf(i_elmt, i_gll) = 0.0_kreal
-                nodalOF(rgnum_fs(i_gll, i_elmt)) = 0.0_kreal
-            endif 
+        ! if rho_w SL > rho_ice I then part of ocean set
+        if ( (rho_water * SL).GT.(I * rho_ice) ) then 
+            oceanf(i_elmt, i_gll) = 1.0_kreal
+            nodalOF(rgnum_fs(i_gll, i_elmt)) = 1.0_kreal
+        else
+            oceanf(i_elmt, i_gll) = 0.0_kreal
+            nodalOF(rgnum_fs(i_gll, i_elmt)) = 0.0_kreal
+        endif 
 
-        enddo 
-    enddo
-else
-    write(*,*)'ERROR: UPDATING OCEAN FUNCTION NOT IMPLEMENTED FOR CALCULATIONS YET'
-    stop
-endif 
+    enddo 
+enddo
+
 
 write(SLlogunit,*)'  ✓ Updated ocean function. '
 write(SLlogunit,*)
@@ -608,6 +597,7 @@ subroutine calculate_SL_A()
 
             ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
             ! UNSURE ABOUT THIS??? 
+            write(SLlogunit,*)'WARNING WE ARE PROJECTING THE AREA INTO THE VERTICAL'
             face_normal(1) = zero
             face_normal(2) = zero
 
