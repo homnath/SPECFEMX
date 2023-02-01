@@ -166,7 +166,6 @@ real(kind=kreal),allocatable :: nodalsl(:)  ! Nodal theta values
 real(kind=kreal),allocatable :: nodalslrate(:)  ! Nodal theta values
 real(kind=kreal),allocatable :: nodalice(:) ! Nodal I values
 real(kind=kreal),allocatable :: nodalicerate(:) ! Nodal rate of I values
-
 real(kind=kreal),allocatable :: iceload(:)  ! load term due to ice.
 
 
@@ -467,11 +466,12 @@ if(is_SL)then
   endif 
 
   ! Calc ocean func using initial SL and output if desired
-  call update_ocean_function(nodalice, nodalsl, errcode, errtag, use_orig=.true.)  
-  if(savedata%oceanf)then
-    call write_OF_to_ensight()
+  call update_ocean_function(nodalice, nodalsl, errcode, errtag)  
+  if(savedata%oceanf0)then
+    call write_OF_to_ensight(save_orig=.true.)
   endif                                    
 endif 
+
 
 
 !----------------------------------------------------------------------
@@ -499,9 +499,9 @@ loop_step: do i_step=istep0,nstep
   endif
 
   if(ISSL_DOF)then
-    ! nodalsl = ZERO 
+    nodalslrate = ZERO 
     ! Use ocean function to calculate area of ocean     
-    call calculate_SL_A()  
+    call calculate_SL_A(nodalsl)
   endif
 
  
@@ -510,8 +510,6 @@ loop_step: do i_step=istep0,nstep
                                          rhoload, isscale_ang_freq, & 
                                          ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
                                          eid_viscoelas, relaxtime)
-
-
                                          
 
   ! apply traction boundary conditions for first timestep
@@ -747,14 +745,28 @@ loop_step: do i_step=istep0,nstep
   ! WE: u(t + dt) = u(t) + dt * f(t) where f is the time derivative
   ! WE: These time derivatives are stored in nodalu, nodalphi, nodalsl 
   if (ISSL_DOF)then
+
+
+
     dt = 1.0_kreal
     write(logunit,*)'calculating update with dt: ', dt
     nodalu   = dt*nodalu      ! i guess initial displacement is zero but need to do this properly 
+
     nodalphi = dt*nodalphi    ! Need to convert to gravity for use...
 
     nodalsl  = nodalsl  + (dt*nodalslrate)
     nodalice = nodalice + (dt*nodalicerate)
+
+    ! Update ocean function and ocean area/volume 
+    call update_ocean_function(nodalice, nodalsl, errcode, errtag)  
+    if(savedata%oceanf)then
+      call write_OF_to_ensight(save_orig=.false.)
+    endif    
+
+    call calculate_SL_A(nodalsl)
   endif 
+
+
 
   if(ISDISP_DOF)then
     write(logunit,*)'   saving displacement variables'

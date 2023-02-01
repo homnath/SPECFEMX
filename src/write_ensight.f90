@@ -183,6 +183,10 @@ if(savedata%oceanf)then
   write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','oceanf',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.oceanf'
 endif
+if(savedata%oceanf0)then
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','oceanf0',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.oceanf0'
+endif
 if(savedata%ice0)then
   write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','ice0',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.ice0'

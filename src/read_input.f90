@@ -156,14 +156,15 @@ isstation=.false.
 
 
 ! Sea level defaults
-sl_stat      = 0 
-ISSL_DOF     = .false.
-IS_CART_SIM  = .false.
-IS_GLOB_SIM  = .false.
-is_SL        = .false.
-savedata%sl = .false. 
-savedata%sl0 = .false. 
-savedata%oceanf = .false. 
+sl_stat          = 0 
+ISSL_DOF         = .false.
+IS_CART_SIM      = .false.
+IS_GLOB_SIM      = .false.
+is_SL            = .false.
+savedata%sl      = .false. 
+savedata%sl0     = .false. 
+savedata%oceanf  = .false. 
+savedata%oceanf0 = .false. 
 
 
 ! Ice defaults: 
@@ -177,25 +178,25 @@ savedata%ice0     = .false.
 
 
 ! Default savedata options
-savedata%model=.false.
-savedata%model_cell=.false.
-savedata%disp=.false.
-savedata%stress=.false.
-savedata%strain=.false.
-savedata%porep=.false.
-savedata%psigma=.false.
-savedata%maxtau=.false.
-savedata%nsigma=.false.
-savedata%scf=.false.
+savedata%model        = .false.
+savedata%model_cell   = .false.
+savedata%disp         = .false.
+savedata%stress       = .false.
+savedata%strain       = .false.
+savedata%porep        = .false.
+savedata%psigma       = .false.
+savedata%maxtau       = .false.
+savedata%nsigma       = .false.
+savedata%scf          = .false.
 ! gravity potential
-savedata%gpot=.false.
-savedata%agrav=.false.
+savedata%gpot         = .false.
+savedata%agrav        = .false.
 ! magnetic potential
-savedata%mpot=.false.
-savedata%magb=.false.
-savedata%infinite=.false.
-savedata%fsplot=.false.
-savedata%fsplot_plane=.false.
+savedata%mpot         = .false.
+savedata%magb         = .false.
+savedata%infinite     = .false.
+savedata%fsplot       = .false.
+savedata%fsplot_plane = .false.
 
 ! Default development variables
 devel_nondim=.true.
@@ -1054,7 +1055,9 @@ do
       ! Save ocean function 
     call seek_integer('saveOF',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
-      savedata%oceanf  = .true.
+      savedata%oceanf   = .true.
+      savedata%oceanf0  = .true.
+
       savedata%fsplot  = .true.
       write(*,*)' SAVING OCEAN FUNCTION'
     endif 

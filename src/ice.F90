@@ -433,12 +433,12 @@ use math_library_serial
         !write(ICElogunit,*) 
 
 
-        write(ICElogunit,*)' gid_elmt : ', gid_elmt
-        write(ICElogunit,*)' face     : ', iface
-        write(ICElogunit,*)'  fgdof : '
-        do i_gll = 1, maxngll2d 
-            write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
-        enddo 
+        !write(ICElogunit,*)' gid_elmt : ', gid_elmt
+        !write(ICElogunit,*)' face     : ', iface
+        !write(ICElogunit,*)'  fgdof : '
+        !do i_gll = 1, maxngll2d 
+        !    write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
+        !enddo 
 
 
         do i_gll = 1, nfgll 
@@ -456,7 +456,9 @@ use math_library_serial
 
             ! Calculate the coefficient for phi and u that is shared
             ! Note that u values also need to be multiplied by background gravity
-            val = ( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - area_inv*oceanf(i_elmtfs, i_gll) 
+            
+
+            val =( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - area_inv*oceanf(i_elmtfs, i_gll) 
             val = val * pi_2d
 
 
@@ -465,17 +467,17 @@ use math_library_serial
                 dof = fgdof(j, i_gll) +1  
                 if (dof.gt.0)then 
                     iceload(dof) = iceload(dof) + ( val *  grav0_nodal(j, num_FS(i_gll)) )
-
                     if (savedata%iceload)then 
                         nodal_iceload_u(j,nodeid) = nodal_iceload_u(j, nodeid) + (val *  grav0_nodal(j, num_FS(i_gll)) )
                     endif 
                 endif  
             enddo
 
+            
             ! Phi:  + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi
             dof = fgdof(4, i_gll) + 1
             if (dof.gt.0)then 
-                iceload(dof) = iceload(dof) + val 
+                iceload(dof) = iceload(dof) + val  
 
                 if (savedata%iceload)then 
                     nodal_iceload_phi(nodeid) = nodal_iceload_phi(nodeid) + val
@@ -492,19 +494,19 @@ use math_library_serial
                 endif 
             endif
 
-
         enddo  ! i_gll 
     enddo  ! i_elmtfs
 
 
     ! Multiply whole of the vector by - rho_i 
-    iceload = - (rho_ice * iceload)
+    ! NOTE WE ARE MISSING THE MINUS SIGN 
+    iceload = -(rho_ice * iceload)
 
     ! Save iceload to file: 
     if (savedata%iceload)then 
-        nodal_iceload_u   =  - nodal_iceload_u   * rho_ice
-        nodal_iceload_phi =  - nodal_iceload_phi * rho_ice
-        nodal_iceload_sl  =  - nodal_iceload_sl  * rho_ice
+        nodal_iceload_u   =   -nodal_iceload_u   * rho_ice
+        nodal_iceload_phi =   -nodal_iceload_phi * rho_ice
+        nodal_iceload_sl  =   -nodal_iceload_sl  * rho_ice
 
         call write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step=0)
       
@@ -518,8 +520,8 @@ use math_library_serial
         write(ICElogunit,*)' Max value of nodal_iceload_sl: ', maxval(nodal_iceload_sl)
         write(ICElogunit,*)'--------------------------------------------------------'
     endif
-    write(ICElogunit,*)' Min value of nodalicerate: ', minval(nodalicerate)
-    write(ICElogunit,*)' Max value of nodalicerate: ', maxval(nodalicerate)
+    write(ICElogunit,*)' Min value of nodal ice change: ', minval(nodalicerate)
+    write(ICElogunit,*)' Max value of nodal ice change: ', maxval(nodalicerate)
     write(ICElogunit,*)
     write(ICElogunit,*)' Calculated ice load '
     write(ICElogunit,*)'  -->  Min value of iceload     : ', minscal(minval(iceload))
@@ -617,6 +619,19 @@ subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, 
             pi_2d         = gw(i_gll) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jac
 
             val = (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(rgnum_fs(i_gll, i_elmtfs)) * pi_2d
+
+
+            !write(ICElogunit,*)'  IGLL         : ', i_gll
+            !write(ICElogunit,*)'  J2D          : ', sqrt(dot_product(face_normal,face_normal))
+            !write(ICElogunit,*)'  gw(i_gll)    : ', gw(i_gll)
+            !write(ICElogunit,*)'  Ccancel      : ', (ONE - oceanf(i_elmtfs, i_gll))
+            !write(ICElogunit,*)'  nodalicerate : ', nodalicerate(rgnum_fs(i_gll, i_elmtfs))
+            !write(ICElogunit,*)'  int1         : ', val
+            !write(ICElogunit,*) 
+            !write(ICElogunit,*) 
+
+
+
             epsilon = epsilon + val 
         enddo 
     enddo 

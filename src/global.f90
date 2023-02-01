@@ -481,13 +481,14 @@ type savedata_options
   logical :: gpot,agrav
   logical :: mpot,magb
   logical :: infinite
-  logical :: sl0 ! initial sea level
-  logical :: sl  ! current sea level
-  logical :: ice0 ! initial ice level
+  logical :: sl0     ! initial sea level
+  logical :: sl      ! current sea level
+  logical :: ice0    ! initial ice level
   logical :: iceload ! initial ice level
-  logical :: oceanf ! ocean function 
-  logical :: ice  ! current ice level
-  logical :: icerate
+  logical :: oceanf  ! ocean function 
+  logical :: oceanf0 ! initial ocean function 
+  logical :: ice     ! current ice level
+  logical :: icerate 
   ! Free surface plot. If this option is .TRUE., and the free surface file is
   ! given, the result will be plotted on the free surface.
   logical :: fsplot,fsplot_plane 
@@ -550,7 +551,7 @@ integer,parameter :: nndofsl=1  ! number of sea level degrees of freedom per nod
 integer, dimension(nndofsl) :: idofsl    ! should be an array of size 1 (only 1 dof per node) and the ID will be 5 if phi and u are present
 integer :: nedofsl    ! number of elemental degrees of freedom for sea level
 integer,allocatable :: edofsl(:) !IDs for SL degrees of freedom per element
-real(kind=kreal)     :: SLarea            ! Area of water 
+real(kind=kreal)     :: SLarea, SLvolume            ! Area of water, Volume of water
 
 real(kind=kreal) icerateval ! constant value of ice change 
 

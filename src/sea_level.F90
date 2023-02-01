@@ -168,11 +168,12 @@ write(SLlogunit, '(A,/,A)')' ****** CREATED SL LOG FILE ****** ', ' '
 
 write(SLlogunit,*)
 write(SLlogunit,*)'-----------------------------------------------------'
-write(SLlogunit,*)'SL IS_SL         :  ', IS_SL
-write(SLlogunit,*)'SL DOF           :  ', ISSL_DOF
-write(SLlogunit,*)'Save original SL :  ', savedata%sl0
-write(SLlogunit,*)'Save SL          :  ', savedata%sl
-write(SLlogunit,*)'Save ocean func. :  ', savedata%oceanf
+write(SLlogunit,*)'SL IS_SL                 :  ', IS_SL
+write(SLlogunit,*)'SL DOF                   :  ', ISSL_DOF
+write(SLlogunit,*)'Save original SL         :  ', savedata%sl0
+write(SLlogunit,*)'Save SL                  :  ', savedata%sl
+write(SLlogunit,*)'Save ocean func. initial :  ', savedata%oceanf0
+write(SLlogunit,*)'Save ocean func.         :  ', savedata%oceanf
 write(SLlogunit,*)'-----------------------------------------------------'
 write(SLlogunit,*)
 
@@ -254,27 +255,37 @@ implicit none
 
 
 
-subroutine write_OF_to_ensight()
+subroutine write_OF_to_ensight(save_orig)
     ! Writes the ocean function to ensight 
     use global 
     use postprocess
     use free_surface
     implicit none 
 
-    write(SLlogunit,*)'Saving the Ocean function: '
-    write(SLlogunit,*)' --> total oceanic nodes = ', INT(SUM(nodalOF)), '/', nnode_fs
+    logical :: save_orig
+    character(len=250) :: extension
+
 
     
+    if (save_orig) then
+        extension = 'oceanf0'
+    else
+        extension = 'oceanf'
+    endif 
+
+    write(SLlogunit,*)'Saving the Ocean function for', trim(extension)
+    write(SLlogunit,*)' --> total oceanic nodes = ', INT(SUM(nodalOF)), '/', nnode_fs
+
 
     ! On the free surface
     if(savedata%fsplot)then
         call write_scalar_to_file_freesurf(nnode_fs, nodalOF, &
-        ext='oceanf',istep=0) 
+        ext=trim(extension),istep=0) 
     endif
     
     if(savedata%fsplot_plane)then
         call write_scalar_to_file_freesurf(nnode_fs, nodalOF, &
-        ext='oceanf', istep=0, plane=.true.) 
+        ext=trim(extension), istep=0, plane=.true.) 
     endif
 
     write(SLlogunit,*)'  ✓ Saved ocean function '
@@ -430,7 +441,6 @@ subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
             !endif 
         enddo 
     enddo 
-
     ! Log output
     write(SLlogunit,*)' -- Added water at constant Z value'
     write(SLlogunit,*)'    --> value     : ', sl_zcoord
@@ -497,7 +507,6 @@ subroutine update_ocean_function(nodalice, nodalsl, errcode, errtag)
 ! Routine checks each GLL point on the surface to see if it is part of the ocean set
 ! see Crawford et al 2018, eqn 31-32.
 ! Set contains any nodes in which rho_w * SL > rho_i * I 
-
 use global 
 use free_surface
 implicit none 
@@ -535,7 +544,6 @@ do i_elmt=1, nelmt_fs
             oceanf(i_elmt, i_gll) = 0.0_kreal
             nodalOF(rgnum_fs(i_gll, i_elmt)) = 0.0_kreal
         endif 
-
     enddo 
 enddo
 
@@ -546,7 +554,7 @@ end subroutine update_ocean_function
 
 
 
-subroutine calculate_SL_A()
+subroutine calculate_SL_A(nodalsl)
     ! Calculates the area covered by ocean (integral of ocean func
     ! over the solid surface)
     use global
@@ -558,11 +566,11 @@ subroutine calculate_SL_A()
     implicit none 
 
     integer                        :: i_elmtfs, i_gll ! loops
-    real(kind=kreal)               :: detjac2d        ! 2d jacobian
+    real(kind=kreal)               :: detjac2d, ocean_height! 2d jacobian
     integer                        :: iface           ! face ID for elmt 
     integer                        :: i_elmt          ! face ID for elmt 
     integer                        :: nfgll           ! ngll on 2D face
-    real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
+    real(kind=kreal), allocatable  :: gw(:), nodalsl(:) ! GLL weights 2D
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
     real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
                                     dx_dxi(NDIM), dx_deta(NDIM)
@@ -573,8 +581,12 @@ subroutine calculate_SL_A()
     allocate(dshape4(2,4,maxngll2d))
 
     write(SLlogunit,*)
-    write(SLlogunit,*)'Calculating ocean area'
-    SLarea = ZERO 
+    write(SLlogunit,*)'Calculating ocean area and volume'
+    SLarea   = ZERO 
+    SLvolume = ZERO 
+
+
+    write(SLlogunit,*)'WARNING WE ARE PROJECTING THE AREA INTO THE VERTICAL'
 
     do i_elmtfs = 1, nelmt_fs
 
@@ -584,7 +596,6 @@ subroutine calculate_SL_A()
         coord = g_coord(:,num4)
 
         do i_gll = 1, nfgll 
-            
             ! Calculate the magnitude of the 2D jacobian 
             dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
             dx_deta = matmul(coord,dshape4(2,:,i_gll))
@@ -597,18 +608,24 @@ subroutine calculate_SL_A()
 
             ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
             ! UNSURE ABOUT THIS??? 
-            write(SLlogunit,*)'WARNING WE ARE PROJECTING THE AREA INTO THE VERTICAL'
             face_normal(1) = zero
             face_normal(2) = zero
 
             detjac2d=sqrt(dot_product(face_normal,face_normal))       
-            SLarea = SLarea + oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d
+            SLarea   = SLarea + oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d
+
+
+            ocean_height = nodalsl(rgnum_fs(i_gll, i_elmtfs)) !- g_coord(3,  gnum_fs(i_gll,i_elmtfs))
+            
+
+            SLvolume     = SLvolume +  oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d*ocean_height
         enddo ! i_gll
     enddo   ! i_elmtfs
 
-    write(SLlogunit,*)'  --> Area of ocean:    ', SLarea 
+    write(SLlogunit,*)'  --> Area of ocean  :    ', SLarea 
+    write(SLlogunit,*)'  --> Volume of ocean:    ', SLvolume 
     write(SLlogunit,*)'  ✓ Calculated sea level area. '
-
+    flush(SLlogunit)
     ! Escape if no water. 
     if(SLarea.le.ZERO)then 
         write(*,*)'ERROR: Area of ocean = 0 -- NO WATER!!!' 
@@ -621,7 +638,6 @@ subroutine calculate_SL_A()
     deallocate(dshape4)
     
 end subroutine calculate_SL_A
-
 
 
 

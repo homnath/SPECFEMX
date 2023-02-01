@@ -2,12 +2,15 @@
 
 This form of SPECFEM-X is for the development of SPECFEM-C prior to any integration of SPECFEM-X with SPECFEM Kokkos. It incorporates the ability to model sea-level change based on the rate-dependent formulation of [Crawford, et al., 2018](https://scholar.google.com/scholar?hl=en&as_sdt=0%2C31&q=al+attar+crawford+2018&btnG=&oq=craw). 
 
+## Open areas in the code/uncertainties
+- [ ] Calculating SL Area - do we project the area to the vertical defined as orthogonal to the SL surface, or nah? 
+
 
 ## To do list: 
 
-- [ ] Add the final weak form term (ice contibution)
+- [x] Add the final weak form term (ice contibution)
 - [x] Write ocean function updater using ice and theta comparison 
-- [ ] When calling ```set_petsc_stiffness_SL``` do we need to parse the SL matrices as args? arent they global?
+- [x] When calling ```set_petsc_stiffness_SL``` do we need to parse the SL matrices as args? arent they global?
 
 
 ### Manual updates: 
