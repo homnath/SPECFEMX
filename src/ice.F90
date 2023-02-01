@@ -339,6 +339,8 @@ subroutine set_ice_rate(nodalice, nodalicerate)
     write(ICElogunit, *)'CAUTION: ONLY IMPLEMENTING FIXED ICE RATE ACROSS REGIONS WITH ICE'
     write(ICElogunit, *)'Using fixed ice rate value:', icerateval
 
+    
+
     ! Loop elements
     do i_elmtfs = 1, nelmt_fs  
         ! Get number of GLL 
@@ -352,10 +354,72 @@ subroutine set_ice_rate(nodalice, nodalicerate)
             endif 
         enddo 
     enddo 
-
-
 end subroutine set_ice_rate
 
+
+
+subroutine calculate_ice_change_volume(nodalicerate)
+    ! Simple integration of icerate change over the FS 
+
+    use global
+    use element
+    use free_surface
+    use integration
+    use math_constants
+
+    implicit none 
+
+    real(kind=kreal)               :: nodalicerate(:)
+
+    integer                        :: i_elmtfs, i_gll ! loops
+    real(kind=kreal)               :: detjac2d, ocean_height! 2d jacobian
+    integer                        :: iface           ! face ID for elmt 
+    integer                        :: i_elmt            ! face ID for elmt 
+    integer                        :: nfgll             ! ngll on 2D face
+    real(kind=kreal), allocatable  :: gw(:), nodalsl(:) ! GLL weights 2D
+    real(kind=kreal), allocatable  :: dshape4(:,:,:)
+    real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
+                                      dx_dxi(NDIM), dx_deta(NDIM)
+    integer :: num4(4)
+
+    ! Code
+    allocate(gw(maxngll2d))
+    allocate(dshape4(2,4,maxngll2d))
+
+    write(ICElogunit,*)'Calculating change in ice volume'
+    write(ICElogunit,*)'WARNING: USING PROJECTION OF AREA TO THE VERTICAL'
+    icechangevol = ZERO 
+
+    do i_elmtfs = 1, nelmt_fs
+        call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
+        num4   = gnum4_fs(:, i_elmtfs)
+        coord = g_coord(:,num4)
+
+        do i_gll = 1, nfgll 
+            ! Calculate the magnitude of the 2D jacobian 
+            dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
+            dx_deta = matmul(coord,dshape4(2,:,i_gll))
+            face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
+            face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+            face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+
+            ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
+            ! UNSURE ABOUT THIS??? 
+            face_normal(1) = zero; face_normal(2) = zero;
+            detjac2d=sqrt(dot_product(face_normal,face_normal))       
+
+            icechangevol = icechangevol + (gw(i_gll) * detjac2d * nodalicerate(rgnum_fs(i_gll, i_elmtfs)))
+        enddo ! i_gll
+    enddo   ! i_elmtfs
+
+    write(ICElogunit,*)'  --> Volume of ice change: ', icechangevol 
+    write(ICElogunit,*)'  --> Mass of ice change  : ', icechangevol*rho_ice
+    write(*,*)'ICE Mass change    :    ',icechangevol*rho_ice
+    flush(ICElogunit)
+
+    deallocate(gw)
+    deallocate(dshape4)
+end subroutine calculate_ice_change_volume
 
 
 subroutine calc_ice_load(iceload, nodalicerate,nodalu, i_step)

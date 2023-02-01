@@ -550,8 +550,15 @@ logical :: ISSL_DOF   ! Activates SL or not
 integer,parameter :: nndofsl=1  ! number of sea level degrees of freedom per node - \theta
 integer, dimension(nndofsl) :: idofsl    ! should be an array of size 1 (only 1 dof per node) and the ID will be 5 if phi and u are present
 integer :: nedofsl    ! number of elemental degrees of freedom for sea level
-integer,allocatable :: edofsl(:) !IDs for SL degrees of freedom per element
-real(kind=kreal)     :: SLarea, SLvolume            ! Area of water, Volume of water
+integer,allocatable  :: edofsl(:) !IDs for SL degrees of freedom per element
+
+! Area of water, Volume of water, for tracking changes in water mass
+real(kind=kreal)     ::  SLarea       = 0.0_kreal 
+real(kind=kreal)     ::  SLvolume     = 0.0_kreal   
+real(kind=kreal)     ::  SLarea_old   = 0.0_kreal 
+real(kind=kreal)     ::  SLvolume_old = 0.0_kreal
+
+real(kind=kreal)     :: icechangevol           ! Volume of ice change
 
 real(kind=kreal) icerateval ! constant value of ice change 
 

@@ -441,6 +441,7 @@ if(is_ICE)then
   call prepare_ice(nodalice, nodalicerate)
   call set_original_ice_level(nodalice)
   call set_ice_rate(nodalice, nodalicerate)
+  call calculate_ice_change_volume(nodalicerate)
 
   ! Save original ice to Ensight
   if(savedata%ice0)then 

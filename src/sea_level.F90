@@ -273,7 +273,7 @@ subroutine write_OF_to_ensight(save_orig)
         extension = 'oceanf'
     endif 
 
-    write(SLlogunit,*)'Saving the Ocean function for', trim(extension)
+    write(SLlogunit,*)'Saving the Ocean function to .', trim(extension)
     write(SLlogunit,*)' --> total oceanic nodes = ', INT(SUM(nodalOF)), '/', nnode_fs
 
 
@@ -582,6 +582,10 @@ subroutine calculate_SL_A(nodalsl)
 
     write(SLlogunit,*)
     write(SLlogunit,*)'Calculating ocean area and volume'
+    ! Store old values
+    SLarea_old   = SLarea
+    SLvolume_old = SLvolume
+
     SLarea   = ZERO 
     SLvolume = ZERO 
 
@@ -623,8 +627,17 @@ subroutine calculate_SL_A(nodalsl)
     enddo   ! i_elmtfs
 
     write(SLlogunit,*)'  --> Area of ocean  :    ', SLarea 
+    write(SLlogunit,*)'  --> Area change    :    ', SLarea   - SLarea_old
     write(SLlogunit,*)'  --> Volume of ocean:    ', SLvolume 
-    write(SLlogunit,*)'  ✓ Calculated sea level area. '
+    write(SLlogunit,*)'  --> Volume change  :    ', SLvolume - SLvolume_old
+    write(SLlogunit,*)'  --> Mass change    :    ', (SLvolume - SLvolume_old)*rho_water
+
+    write(*,*)'SL Mass change    :    ', (SLvolume - SLvolume_old)*rho_water
+
+
+
+    write(SLlogunit,*)'  ✓ Calculated sea level area and volume. '
+    write(SLlogunit,*)
     flush(SLlogunit)
     ! Escape if no water. 
     if(SLarea.le.ZERO)then 
