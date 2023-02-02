@@ -44,9 +44,9 @@ implicit none
         endif
         ! Always use positive value for nondimensionalizing
         maxdensity=max(abs(mindensity),abs(maxdensity))
-        write(SLlogunit, *)'Max density from model : ', maxdensity
+        write(SLlogunit, *)'Max density from model  : ', maxdensity
         maxdensity=max(maxdensity, rho_water_dim)
-        write(SLlogunit, *)'Using max density      : ', maxdensity
+        write(SLlogunit, *)'Using max density       : ', maxdensity
 
 
       endif

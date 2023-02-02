@@ -283,20 +283,6 @@ call compute_max_elementsize()
 ! Work out which solver to use
 call determine_solver(errcode, errtag)
 
-
-if(ISDISP_DOF)then 
-  write(*,*)' ************* '
-  write(*,*)' edofu:  ', edofu
-endif
-if(ISPOT_DOF)then
-  write(*,*)' ************* '
-  write(*,*)' edofphi:  ', edofphi
-endif 
-if(ISSL_DOF)then 
-  write(*,*)' ************* '
-  write(*,*)' edofsl:  ', edofsl
-endif 
-
  
 ! Now, call main routine...
 write(logunit,*)'CALLING SPECFEM3D'

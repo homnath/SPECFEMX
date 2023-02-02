@@ -36,11 +36,11 @@ implicit none
     endif 
     
     ! Write confirmation of file: 
-    write(*, *)' Created ICE log file'
-    write(ICElogunit, '(A,/,A)')' ****** CREATED ICE LOG FILE ****** ', ' '
-    
-    ! Write summary of ICE inputs: 
+    write(ICElogunit, *)' ****** CREATED ICE LOG FILE ****** '
     write(ICElogunit,*)
+    ! Write summary of ICE inputs: 
+    write(ICElogunit,*)'-----------------------------------------------------'
+    write(ICElogunit, *)'Ice data read from:  ', trim(icefile)
     write(ICElogunit,*)'-----------------------------------------------------'
     write(ICElogunit,*)'IS_ICE            :  ', IS_ICE
     write(ICElogunit,*)'Save original ice :  ', savedata%ice0
@@ -51,7 +51,6 @@ implicit none
     write(ICElogunit,*)
     
     
-    write(ICElogunit, *)'Ice data read from:  ', trim(icefile)
     if(IS_CART_SIM)then
         call summarise_ICE_input_cart()
     elseif(IS_GLOB_SIM)then 
@@ -69,6 +68,7 @@ subroutine summarise_ICE_input_cart()
 
     write(ICElogunit,*)
     write(ICElogunit,*)'Model setup          : Cartesian'
+    write(ICElogunit,*) 
 end subroutine summarise_ICE_input_cart
 
 
@@ -193,10 +193,12 @@ subroutine set_original_ice_level(nodalice)
     real(kind=kreal) :: params(4)
 
     ! Code: 
+    write(ICElogunit,*)'-----------------------------------------------------'
+    write(ICElogunit, *)'        Setting original ice distribution           '
+    write(ICElogunit,*)'-----------------------------------------------------'
 
     ! Loop through each ice object user inputted :
     do i_obj = 1, nice_obj
-        
         iceobjtype = iceobjs(i_obj, 1)
         params = iceobjs(i_obj,2:5)
 
@@ -212,13 +214,16 @@ subroutine set_original_ice_level(nodalice)
             stop
         endif 
     enddo 
-
+    
     ! update log file with results: 
     write(ICElogunit,*)''
-    write(ICElogunit,*)'* Finished setting original ice level '
+    write(ICElogunit,*)'✓ Finished setting original ice level '
     write(ICElogunit,*)'  -->  Number of ice objects added : ', nice_obj
     write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice)
     write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice)
+    write(ICElogunit,*)'-----------------------------------------------------'
+    write(ICElogunit,*)
+
 end subroutine set_original_ice_level
 
 
@@ -286,7 +291,7 @@ subroutine add_ice_cylinder(params, nodalice)
     write(ICElogunit,*)'      ->  centre (x,y): ', x, y
     write(ICElogunit,*)'      ->  height      : ', h
     write(ICElogunit,*)'      ->  radius      : ', r
-    write(ICElogunit,*)'NEED TO CHECK DIMENSIONS (NONDIM) of cylinder coords.'
+    write(ICElogunit,*)'      NEED TO CHECK DIMENSIONS (NONDIM) of cylinder coords.'
 
     
     ! Searches for nodes on FS that are within the radius of cylinder
@@ -335,9 +340,12 @@ subroutine set_ice_rate(nodalice, nodalicerate)
     integer :: iface, nfgll, i_elmtfs, i_gll, gid
     ! Code
 
-    write(ICElogunit, *)
+    write(ICElogunit,*)'-----------------------------------------------------'
+    write(ICElogunit, *)'             Setting ice rate/change                '
+    write(ICElogunit,*)'-----------------------------------------------------'
     write(ICElogunit, *)'CAUTION: ONLY IMPLEMENTING FIXED ICE RATE ACROSS REGIONS WITH ICE'
-    write(ICElogunit, *)'Using fixed ice rate value:', icerateval
+    write(ICElogunit, *)
+    write(ICElogunit, *)'* Using fixed ice rate value:', icerateval
 
     
 
@@ -354,6 +362,10 @@ subroutine set_ice_rate(nodalice, nodalicerate)
             endif 
         enddo 
     enddo 
+    write(ICElogunit,*)' ✓ Finished setting ice rate/change'
+    write(ICElogunit,*)'-----------------------------------------------------'
+    write(ICElogunit,*)
+
 end subroutine set_ice_rate
 
 
@@ -386,8 +398,10 @@ subroutine calculate_ice_change_volume(nodalicerate)
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
-    write(ICElogunit,*)'Calculating change in ice volume'
-    write(ICElogunit,*)'WARNING: USING PROJECTION OF AREA TO THE VERTICAL'
+    write(ICElogunit,*)'* Calculating change in ice volume'
+    write(ICElogunit,*)'  --> WARNING: USING PROJECTION OF AREA TO THE VERTICAL'
+    write(ICElogunit,*)
+
     icechangevol = ZERO 
 
     do i_elmtfs = 1, nelmt_fs
@@ -414,7 +428,7 @@ subroutine calculate_ice_change_volume(nodalicerate)
 
     write(ICElogunit,*)'  --> Volume of ice change: ', icechangevol 
     write(ICElogunit,*)'  --> Mass of ice change  : ', icechangevol*rho_ice
-    write(*,*)         'ICE Mass change           : ', icechangevol*rho_ice
+    write(ICElogunit,*)' ✓ Finished calculating change in ice volume'
     flush(ICElogunit)
 
     deallocate(gw)
@@ -456,13 +470,14 @@ use math_library_serial
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
+    write(ICElogunit,*)'-----------------------------------------------------'
+    write(ICElogunit,*)'             Calculating iceload (RHS)               '
+    write(ICElogunit,*)'-----------------------------------------------------'
 
-    write(ICElogunit,*)'Calculating iceload...'
     iceload = zero
 
 
     if (savedata%iceload)then 
-        write(ICElogunit,*) ' Saving nodal_icelog values.'
         allocate(nodal_iceload_u(ndim, nnode_fs), nodal_iceload_phi(nnode_fs), nodal_iceload_sl(nnode_fs))
         nodal_iceload_u   = zero
         nodal_iceload_phi = zero
@@ -490,22 +505,6 @@ use math_library_serial
 
         ! DOF IDs for the nodes in matrix (property, gll pt) where property goes from 1 - 5 (ux,uy,uz,phi,theta)
         fgdof(:, 1:nfgll) = reshape(gdof(:, g_num(hexface(iface)%node, gid_elmt)),(/nndof, maxngll2d/))
-        
-        write(ICElogunit,*)'  FACE_FS : ', i_elmtfs
-        do i_gll = 1, maxngll2d 
-            write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
-        enddo 
-        write(ICElogunit,*) 
-
-
-        !write(ICElogunit,*)' gid_elmt : ', gid_elmt
-        !write(ICElogunit,*)' face     : ', iface
-        !write(ICElogunit,*)'  fgdof : '
-        !do i_gll = 1, maxngll2d 
-        !    write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
-        !enddo 
-
-
 
 
         do i_gll = 1, nfgll 
@@ -523,8 +522,6 @@ use math_library_serial
 
             ! Calculate the coefficient for phi and u that is shared
             ! Note that u values also need to be multiplied by background gravity
-            
-
             val =( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - area_inv*oceanf(i_elmtfs, i_gll) 
             val = val * pi_2d
 
@@ -572,31 +569,22 @@ use math_library_serial
 
     ! Multiply whole of the vector by rho_i 
     iceload = rho_ice * iceload
-
-    ! Save iceload to file: 
-    if (savedata%iceload)then 
-        nodal_iceload_u   =   nodal_iceload_u   * rho_ice
-        nodal_iceload_phi =   nodal_iceload_phi * rho_ice
-        nodal_iceload_sl  =   nodal_iceload_sl  * rho_ice
-
-        call write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step=0)
-      
-        write(ICElogunit,*)' Min value of nodal_iceload_u: ', minval(nodal_iceload_u)
-        write(ICElogunit,*)' Max value of nodal_iceload_u: ', maxval(nodal_iceload_u)
-        write(ICElogunit,*)
-        write(ICElogunit,*)' Min value of nodal_iceload_phi: ', minval(nodal_iceload_phi)
-        write(ICElogunit,*)' Max value of nodal_iceload_phi: ', maxval(nodal_iceload_phi)
-        write(ICElogunit,*)
-        write(ICElogunit,*)' Min value of nodal_iceload_sl: ', minval(nodal_iceload_sl)
-        write(ICElogunit,*)' Max value of nodal_iceload_sl: ', maxval(nodal_iceload_sl)
-        write(ICElogunit,*)'--------------------------------------------------------'
-    endif
-    write(ICElogunit,*)' Min value of nodal ice change: ', minval(nodalicerate)
-    write(ICElogunit,*)' Max value of nodal ice change: ', maxval(nodalicerate)
     write(ICElogunit,*)
     write(ICElogunit,*)' Calculated ice load '
     write(ICElogunit,*)'  -->  Min value of iceload     : ', minscal(minval(iceload))
     write(ICElogunit,*)'  -->  Max value of iceload     : ', maxscal(maxval(iceload))
+    write(ICElogunit,*)
+
+
+
+    ! Save iceload to file: 
+    if (savedata%iceload)then 
+        write(ICElogunit,*) ' Saving nodal ice load values.'
+        nodal_iceload_u   =   nodal_iceload_u   * rho_ice
+        nodal_iceload_phi =   nodal_iceload_phi * rho_ice
+        nodal_iceload_sl  =   nodal_iceload_sl  * rho_ice
+        call write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step=0)
+    endif
 
     deallocate(gw)
     deallocate(dshape4)
@@ -651,6 +639,9 @@ subroutine write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_i
       call write_vector_to_file_freesurf(nnode_fs,nodal_iceload_u,&
       ext='iceload_u',istep=i_step,plane=.true.)
     endif
+
+    write(ICElogunit,*)'  ✓ Saved nodal ice load'
+    write(ICElogunit,*) 
 end subroutine write_iceload_to_ensight
 
 
@@ -706,9 +697,7 @@ subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, 
             epsilon = epsilon + val 
         enddo 
     enddo 
-    write(ICElogunit,*)' --------------------------------------------- '
-    write(ICElogunit,*)' ε value            : ', epsilon
-    write(ICElogunit,*)' --------------------------------------------- '
+    write(ICElogunit,*)'  * ε value            : ', epsilon
 end subroutine calc_iceload_epsilon
 
 

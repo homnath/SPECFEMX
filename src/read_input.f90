@@ -633,6 +633,9 @@ do
 
   ! read traction information
   if (trim(token)=='traction:')then
+    write(*,*)'* Detected traction flag'
+    write(*,*)
+
     if(traction_stat==1)then
       write(errtag,*)'ERROR: copy of line type traction: not permitted!'
       return
@@ -984,7 +987,8 @@ do
 
 ! read ice part: 
   if (trim(token)=='ice:')then
-    write(*,*)'Detected ICE flag'
+    write(*,*)'* Detected ice flag'
+
     if(ice_stat==1)then
       write(errtag,*)'ERROR: copy of line type ice: not permitted!'
       return
@@ -997,29 +1001,31 @@ do
 
     ice_stat  = 1
     is_ICE    = .true.
-    write(*,*)'WILL FETCH INFO FROM ICE FILE: ', trim(icefile)
-    write(*,*)'WILL FETCH ICE RATE INFO FROM: ', trim(iceratefile)
+    write(*,*)'  --> Fetching information from file: ', trim(icefile)
 
     ! Save ice0 
     call seek_integer('saveice0',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
       savedata%ice0    = .true.
       savedata%fsplot  = .true.
-      write(*,*)' SAVING INITIAL ICE LEVEL'
+      write(*,*)'        + Saving initial ice distribution'
     endif 
 
     call seek_integer('saveicerate',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
       savedata%icerate    = .true.
-      write(*,*)' SAVING ICE RATE'
+      write(*,*)'        + Saving ice rate'
     endif 
 
 
     call seek_integer('saveiceload',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
       savedata%iceload    = .true.
-      write(*,*)' SAVING ICE LOAD'
+      write(*,*)'        + Saving ice load'
     endif 
+
+    write(*,*)'  --> See ', trim(file_head), 'ICE.log for details '
+    write(*,*)
 
     cycle
   endif 
@@ -1031,7 +1037,7 @@ do
 
 ! read sea level part
   if (trim(token)=='sealevel:')then
-    write(*,*)'Detected sea level flag'
+    write(*,*)'* Detected sea level flag'
     if(sl_stat==1)then
       write(errtag,*)'ERROR: copy of line type sealevel: not permitted!'
       return
@@ -1042,14 +1048,15 @@ do
     slfile   = get_string('slfile',args,narg)
     sl_stat  = 1
     is_SL    = .true.
-    write(*,*)'WILL FETCH INFO FROM SL FILE: ', trim(slfile)
+    write(*,*)'  --> Fetching information from file: ', trim(slfile)
 
     ! Save sl0 
     call seek_integer('savesl0',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
       savedata%sl0    = .true.
       savedata%fsplot = .true.
-      write(*,*)' SAVING INITIAL SEA LEVEL'
+      write(*,*)'        + Saving initial Sea Level'
+
     endif 
 
       ! Save ocean function 
@@ -1057,9 +1064,9 @@ do
     if(istat==0 .and. issave==1)then 
       savedata%oceanf   = .true.
       savedata%oceanf0  = .true.
-
       savedata%fsplot  = .true.
-      write(*,*)' SAVING OCEAN FUNCTION'
+      write(*,*)'        + Saving ocean functions'
+
     endif 
 
    
@@ -1069,11 +1076,11 @@ do
       ISSL_DOF = .true.
       savedata%sl    = .true.
       savedata%ice    = .true.
-      write(*,*)' SOLVING SEA LEVEL'
     else 
       write(*,*)' WARNING: SL FILE PARSED BUT NOT SOLVING FOR SEA LEVEL'
     endif 
-
+    write(*,*)'  --> See ', trim(file_head), 'SL.log for details '
+    write(*,*)
 
     cycle
   endif
@@ -1085,6 +1092,9 @@ do
 
   ! read development vaiables if any
   if (trim(token)=='devel:')then
+    write(*,*)'* Detected devel flag'
+    write(*,*)
+
     if(devel_stat==1)then
       write(errtag,*)'ERROR: copy of line type eqsource: not permitted!'
       return

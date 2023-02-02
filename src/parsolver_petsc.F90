@@ -1150,7 +1150,7 @@ use output_to_user
         ! TIMESTEPPING 
         if (ISSL_DOF)then 
             log_msg = trim(' petsc_set_stiffness_matrix WITH SEA LEVEL: SUCCESS!') ;
-            log_msg = trim(' SETTING PETSC SYMMETRIC FLAG TO FALSE') ;
+            log_msg = trim(' --> Setting PETSC stiffness symmetry to false') ;
            symmetric_solver =.false.
         else 
             log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   
@@ -1159,8 +1159,7 @@ use output_to_user
         call petsc_set_stiffness_matrix(storekmat)
 
 
-        call write_ifproc0()
-        write(SLlogunit,*)log_msg
+        write(SLlogunit,*) trim(log_msg)
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
         call petsc_set_solver()
 

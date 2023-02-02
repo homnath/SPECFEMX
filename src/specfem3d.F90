@@ -502,7 +502,7 @@ loop_step: do i_step=istep0,nstep
   if(ISSL_DOF)then
     nodalslrate = ZERO 
     ! Use ocean function to calculate area of ocean     
-    call calculate_SL_A(nodalsl)
+    call calculate_SL_A(nodalsl, nodalu)
   endif
 
  
@@ -764,7 +764,7 @@ loop_step: do i_step=istep0,nstep
       call write_OF_to_ensight(save_orig=.false.)
     endif    
 
-    call calculate_SL_A(nodalsl)
+    call calculate_SL_A(nodalsl, nodalu)
   endif 
 
 
@@ -868,7 +868,7 @@ enddo loop_step ! i_step time/frequency stepping loop
 
 
 
-write(*,*)'Completed timesteps. Cleaning up... '
+write(*,*); write(*,*)'Completed timesteps. Cleaning up... '
 write(SLlogunit,*)'Completed timesteps. Cleaning up... '
 
 

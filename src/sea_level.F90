@@ -161,12 +161,11 @@ if(myrank==0)then
 endif 
 
 ! Write confirmation of file: 
-write(*, *)' Created SL log file'
-write(SLlogunit, '(A,/,A)')' ****** CREATED SL LOG FILE ****** ', ' '
+write(SLlogunit, *)' ****** CREATED SL LOG FILE ****** '
 
 ! Write summary of SL inputs: 
-
-write(SLlogunit,*)
+write(SLlogunit,*)'-----------------------------------------------------'
+write(SLlogunit, *)'Sea level data read from:  ', trim(slfile)
 write(SLlogunit,*)'-----------------------------------------------------'
 write(SLlogunit,*)'SL IS_SL                 :  ', IS_SL
 write(SLlogunit,*)'SL DOF                   :  ', ISSL_DOF
@@ -178,7 +177,6 @@ write(SLlogunit,*)'-----------------------------------------------------'
 write(SLlogunit,*)
 
 
-write(SLlogunit, *)'Sea level data read from:  ', trim(slfile)
 if(IS_CART_SIM)then
     write(SLlogunit,*)'Simulation type         :  CARTESIAN'
 elseif(IS_GLOB_SIM)then 
@@ -203,15 +201,16 @@ subroutine summarise_SL_input(nodalsl, nsl_obj)
 
     write(SLlogunit,*)
     if(IS_CART_SIM)then 
-        write(SLlogunit,*)'Model setup             :  Cartesian'
+        write(SLlogunit,*)'  Model setup             :  Cartesian'
     else 
-        write(SLlogunit,*)'Model setup             :  Global'  
+        write(SLlogunit,*)'  Model setup             :  Global'  
     endif 
 
-    write(SLlogunit,*)'Total SL objects added  :', nsl_obj 
-    write(SLlogunit,*)'Minimum sea level       :', minval(nodalsl)
-    write(SLlogunit,*)'Maximum sea level       :', maxval(nodalsl)
-
+    write(SLlogunit,*)'  Total SL objects added  :', nsl_obj 
+    write(SLlogunit,*)'  Minimum sea level       :', minval(nodalsl)
+    write(SLlogunit,*)'  Maximum sea level       :', maxval(nodalsl)
+    write(SLlogunit,*)'-----------------------------------------------------'
+    write(SLlogunit,*)
 end subroutine summarise_SL_input
 
 
@@ -273,7 +272,7 @@ subroutine write_OF_to_ensight(save_orig)
         extension = 'oceanf'
     endif 
 
-    write(SLlogunit,*)'Saving the Ocean function to .', trim(extension)
+    write(SLlogunit,*)'Saving the ocean function to .', trim(extension)
     write(SLlogunit,*)' --> total oceanic nodes = ', INT(SUM(nodalOF)), '/', nnode_fs
 
 
@@ -340,8 +339,8 @@ subroutine prepare_sea_level(nodalsl, nodalslrate)
     else 
         nodalsl = ZERO
         nodalslrate = ZERO
-        write(SLlogunit,*)'   --> Created/zeroed nodalsl '
-        write(SLlogunit,*)'   --> Created/zeroed nodalslrate '
+        write(SLlogunit,*)'  --> Created/zeroed nodalsl '
+        write(SLlogunit,*)'  --> Created/zeroed nodalslrate '
     endif
 
     write(SLlogunit,*)'  ✓ Prepared sea level. '
@@ -377,6 +376,11 @@ subroutine set_original_sea_level(nodalsl)
     !dlag_gll(2,maxngll2d,maxngll2d))
 
     ! Code:
+    write(SLlogunit,*)'-----------------------------------------------------'
+    write(SLlogunit, *)'       Setting original water distribution          '
+    write(SLlogunit,*)'-----------------------------------------------------'
+
+
     nodalsl = 0.0_kreal
 
     do i_obj = 1, nsl_obj
@@ -491,8 +495,8 @@ subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
      nodalsl(rgnum_fs(i_gll, i_elmtfs)) = nodalsl(rgnum_fs(i_gll, i_elmtfs)) + height  
     endif 
 
-    write(ICElogunit,*)' ✓ Injected at GLL point'
-    flush(ICElogunit)
+    write(SLlogunit,*)' ✓ Injected at GLL point'
+    flush(SLlogunit)
 
 end subroutine add_sl_gll
 
@@ -554,7 +558,7 @@ end subroutine update_ocean_function
 
 
 
-subroutine calculate_SL_A(nodalsl)
+subroutine calculate_SL_A(nodalsl, nodalu)
     ! Calculates the area covered by ocean (integral of ocean func
     ! over the solid surface)
     use global
@@ -570,7 +574,7 @@ subroutine calculate_SL_A(nodalsl)
     integer                        :: iface           ! face ID for elmt 
     integer                        :: i_elmt          ! face ID for elmt 
     integer                        :: nfgll           ! ngll on 2D face
-    real(kind=kreal), allocatable  :: gw(:), nodalsl(:) ! GLL weights 2D
+    real(kind=kreal), allocatable  :: gw(:), nodalsl(:), nodalu(:,:) ! GLL weights 2D
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
     real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
                                     dx_dxi(NDIM), dx_deta(NDIM)
@@ -630,10 +634,9 @@ subroutine calculate_SL_A(nodalsl)
     write(SLlogunit,*)'  --> Mass change    :    ', (SLvolume - SLvolume_old)*rho_water
     write(SLlogunit,*)'  ✓ Calculated sea level area and volume. '
     write(SLlogunit,*)
-    flush(SLlogunit)
-    ! Write to main slurm for comparison with Ice 
-    write(*,*)'SL Mass change    :    ', (SLvolume - SLvolume_old)*rho_water
- 
+    flush(SLlogunit) 
+
+
     ! Escape if no water. 
     if(SLarea.le.ZERO.or.SLvolume.le.ZERO)then 
         write(*,*)'ERROR: Volume/Area of ocean = 0 -- NO WATER!!!' 
