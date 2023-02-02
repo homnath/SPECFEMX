@@ -99,7 +99,7 @@ use solver_petsc
         log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0()
 
         write(logunit,*)'About to run solver'
-        !call petsc_print_vector()
+        call petsc_print_vector()
         !write(*,*)'MATRIX:'
         !call petsc_print_matrix()
 

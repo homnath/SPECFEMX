@@ -609,7 +609,6 @@ subroutine calculate_SL_A(nodalsl)
             face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
             face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
 
-
             ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
             ! UNSURE ABOUT THIS??? 
             face_normal(1) = zero
@@ -617,33 +616,31 @@ subroutine calculate_SL_A(nodalsl)
 
             detjac2d=sqrt(dot_product(face_normal,face_normal))       
             SLarea   = SLarea + oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d
-
-
-            ocean_height = nodalsl(rgnum_fs(i_gll, i_elmtfs)) !- g_coord(3,  gnum_fs(i_gll,i_elmtfs))
-            
+            ocean_height = nodalsl(rgnum_fs(i_gll, i_elmtfs)) - nodalu(3, rgnum_fs(i_gll, i_elmtfs))
 
             SLvolume     = SLvolume +  oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d*ocean_height
         enddo ! i_gll
     enddo   ! i_elmtfs
 
+    ! Summarise
     write(SLlogunit,*)'  --> Area of ocean  :    ', SLarea 
     write(SLlogunit,*)'  --> Area change    :    ', SLarea   - SLarea_old
     write(SLlogunit,*)'  --> Volume of ocean:    ', SLvolume 
     write(SLlogunit,*)'  --> Volume change  :    ', SLvolume - SLvolume_old
     write(SLlogunit,*)'  --> Mass change    :    ', (SLvolume - SLvolume_old)*rho_water
-
-    write(*,*)'SL Mass change    :    ', (SLvolume - SLvolume_old)*rho_water
-
-
-
     write(SLlogunit,*)'  ✓ Calculated sea level area and volume. '
     write(SLlogunit,*)
     flush(SLlogunit)
+    ! Write to main slurm for comparison with Ice 
+    write(*,*)'SL Mass change    :    ', (SLvolume - SLvolume_old)*rho_water
+ 
     ! Escape if no water. 
-    if(SLarea.le.ZERO)then 
-        write(*,*)'ERROR: Area of ocean = 0 -- NO WATER!!!' 
+    if(SLarea.le.ZERO.or.SLvolume.le.ZERO)then 
+        write(*,*)'ERROR: Volume/Area of ocean = 0 -- NO WATER!!!' 
+        write(*,*)'SL Area  : ', SLarea 
+        write(*,*)'SL Volume: ', SLvolume 
         write(*,*)'The assumption is that there is at least some defined ocean basin.' 
-        stop 
+        !stop 
     endif 
 
 

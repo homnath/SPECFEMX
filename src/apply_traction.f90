@@ -105,7 +105,6 @@ if(istraction)then
       read(11,*)nface ! number of points
       do i_face=1,nface
 
-        ! I am assuming it is on the free surface. 
         read(11,*)ielmt,iface,igll 
         !lngdof=gdof(idofu,g_num(hex8_gnode(inode),ielmt))
 

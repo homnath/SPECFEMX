@@ -414,7 +414,7 @@ subroutine calculate_ice_change_volume(nodalicerate)
 
     write(ICElogunit,*)'  --> Volume of ice change: ', icechangevol 
     write(ICElogunit,*)'  --> Mass of ice change  : ', icechangevol*rho_ice
-    write(*,*)'ICE Mass change    :    ',icechangevol*rho_ice
+    write(*,*)         'ICE Mass change           : ', icechangevol*rho_ice
     flush(ICElogunit)
 
     deallocate(gw)
@@ -470,10 +470,11 @@ use math_library_serial
     endif 
 
 
-    call calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, nodalicerate)
 
     ! Epsilon/Area
+    call calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, nodalicerate)
     area_inv = epsilon/SLarea
+
 
     ! Now calculate the actual iceload  - TODO there may be a way to combine the two loops
     ! and calculate epsilon, then apply it at the end, which would be more efficient
@@ -490,11 +491,11 @@ use math_library_serial
         ! DOF IDs for the nodes in matrix (property, gll pt) where property goes from 1 - 5 (ux,uy,uz,phi,theta)
         fgdof(:, 1:nfgll) = reshape(gdof(:, g_num(hexface(iface)%node, gid_elmt)),(/nndof, maxngll2d/))
         
-        !write(ICElogunit,*)'  FACE_FS : ', i_elmtfs
-        !do i_gll = 1, maxngll2d 
-        !    write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
-        !enddo 
-        !write(ICElogunit,*) 
+        write(ICElogunit,*)'  FACE_FS : ', i_elmtfs
+        do i_gll = 1, maxngll2d 
+            write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
+        enddo 
+        write(ICElogunit,*) 
 
 
         !write(ICElogunit,*)' gid_elmt : ', gid_elmt
@@ -503,6 +504,8 @@ use math_library_serial
         !do i_gll = 1, maxngll2d 
         !    write(ICElogunit,*)'     *  ', fgdof(:, i_gll)
         !enddo 
+
+
 
 
         do i_gll = 1, nfgll 
@@ -525,12 +528,14 @@ use math_library_serial
             val =( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - area_inv*oceanf(i_elmtfs, i_gll) 
             val = val * pi_2d
 
-
+            flush(ICElogunit)
             ! Displacement for direction j: + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi * \nabla\Phi_j
             do j = 1, NDIM    
-                dof = fgdof(j, i_gll) +1  
+                dof = fgdof(j, i_gll) 
                 if (dof.gt.0)then 
-                    iceload(dof) = iceload(dof) + ( val *  grav0_nodal(j, num_FS(i_gll)) )
+                    dof = dof + 1   ! For some reason! 
+
+                    iceload(dof) = iceload(dof) + (val *  grav0_nodal(j, num_FS(i_gll)) )
                     if (savedata%iceload)then 
                         nodal_iceload_u(j,nodeid) = nodal_iceload_u(j, nodeid) + (val *  grav0_nodal(j, num_FS(i_gll)) )
                     endif 
@@ -539,38 +544,40 @@ use math_library_serial
 
             
             ! Phi:  + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi
-            dof = fgdof(4, i_gll) + 1
+            dof = fgdof(4, i_gll) 
             if (dof.gt.0)then 
-                iceload(dof) = iceload(dof) + val  
+                dof = dof + 1   ! For some reason! 
 
+                iceload(dof) = iceload(dof) + val  
                 if (savedata%iceload)then 
                     nodal_iceload_phi(nodeid) = nodal_iceload_phi(nodeid) + val
                 endif 
             endif 
 
-            ! Theta: - epsilon/A * g * pi2d
-            dof = fgdof(5, i_gll) + 1
+
+            ! Theta: + epsilon/A * g * pi2d
+            dof = fgdof(5, i_gll)
             if (dof.gt.0)then 
-                iceload(dof) = iceload(dof) - (area_inv * pi_2d * g0_nodal(num_FS(i_gll)))
+                dof = dof + 1   ! For some reason! 
+
+                iceload(dof) = iceload(dof) + (area_inv * pi_2d * g0_nodal(num_FS(i_gll)))
 
                 if (savedata%iceload)then 
-                    nodal_iceload_sl(nodeid) = nodal_iceload_sl(nodeid) - (area_inv * pi_2d * g0_nodal(num_FS(i_gll)))
+                    nodal_iceload_sl(nodeid) = nodal_iceload_sl(nodeid) + (area_inv * pi_2d * g0_nodal(num_FS(i_gll)))
                 endif 
             endif
-
         enddo  ! i_gll 
     enddo  ! i_elmtfs
 
 
-    ! Multiply whole of the vector by - rho_i 
-    ! NOTE WE ARE MISSING THE MINUS SIGN 
-    iceload = -(rho_ice * iceload)
+    ! Multiply whole of the vector by rho_i 
+    iceload = rho_ice * iceload
 
     ! Save iceload to file: 
     if (savedata%iceload)then 
-        nodal_iceload_u   =   -nodal_iceload_u   * rho_ice
-        nodal_iceload_phi =   -nodal_iceload_phi * rho_ice
-        nodal_iceload_sl  =   -nodal_iceload_sl  * rho_ice
+        nodal_iceload_u   =   nodal_iceload_u   * rho_ice
+        nodal_iceload_phi =   nodal_iceload_phi * rho_ice
+        nodal_iceload_sl  =   nodal_iceload_sl  * rho_ice
 
         call write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step=0)
       

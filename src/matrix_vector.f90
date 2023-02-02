@@ -224,7 +224,6 @@ module matrix_vector
         ! Can do this by moving this whole IS_SLDOF loop to where it is added to storekmat and add it directly
         kSL = zero 
         call calc_SL_stiffness(i_elmtfs, kSL)
-        
         storekmatSL(:,:,id_elem_fs(i_elmtfs)) = storekmatSL(:,:,id_elem_fs(i_elmtfs)) +  kSL
 
       enddo ! loop FS elements  
@@ -1739,10 +1738,7 @@ end subroutine get_fs_details
       use free_surface
       use integration
       use math_constants
-      implicit none 
-  
-      ! The Q matrix is literally just the test function multiplied
-      ! by the Jac 2D 
+      implicit none  
       
       ! IO 
       integer                        :: i_elmtfs        ! loops
@@ -1828,7 +1824,6 @@ end subroutine get_fs_details
         gid_abg = gidloc(abg)            ! Global ID of node ABG
         g0abg   = g0_nodal(gid_abg)      ! g0 abg 
 
-
         ! Get Jacobian_2d x weights for ABG 
         dx_dxi  = matmul(coord,dshape4(1,:,abg))
         dx_deta = matmul(coord,dshape4(2,:,abg))
@@ -1836,23 +1831,20 @@ end subroutine get_fs_details
         face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
         face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
         pi_2d_abg     = gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
-
         
         ! Get the values here because they are repeated lots 
         Cabg       = oceanf(i_elmtfs, abg)  ! Ocean func abg
 
         ! Factor of rho/g outside of integral 
-        rho_over_g =  (-rho_water/g0abg)       ! -rho/g
-        rho_Ag     =  (rho_over_g / SLarea)    ! -rho/(g*Area)
+        rho_over_g =  (rho_water/g0abg)       ! rho/g
+        rho_Ag     =  (rho_over_g / SLarea)    ! rho/(g*Area)
 
-        ! theta_tilde theta_dot  - diagonal
+        ! DIAGONAL theta_tilde theta_dot
         kmatSL(dof_sl(abg), dof_sl(abg)) = kmatSL(dof_sl(abg), dof_sl(abg)) - (theta_tf * pi_2d_abg * g0abg * rho_water)
 
-
-
-
+        
         ! theta_tilde Phi_dot 
-        kmatSL(dof_sl(abg), dof_phi(abg)) = kmatSL(dof_sl(abg), dof_phi(abg)) + (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
+        kmatSL(dof_sl(abg), dof_phi(abg)) = kmatSL(dof_sl(abg), dof_phi(abg)) - (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
 
         ! phi_tilde Phi_dot 
         kmatSL(dof_phi(abg), dof_phi(abg)) = kmatSL(dof_phi(abg), dof_phi(abg)) + (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
@@ -1865,22 +1857,22 @@ end subroutine get_fs_details
             kmatSL(dof_u(j, abg), dof_phi(abg)) = kmatSL(dof_u(j, abg), dof_phi(abg)) + (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g) 
             
             ! theta_tilde u_dot 
-            kmatSL(dof_sl(abg), dof_u(j, abg)) = kmatSL(dof_sl(abg), dof_u(j, abg)) + (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)
+            kmatSL(dof_sl(abg), dof_u(j, abg)) = kmatSL(dof_sl(abg), dof_u(j, abg)) - (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)
 
             ! phi_tilde u_dot 
             kmatSL(dof_phi(abg), dof_u(j,abg)) = kmatSL(dof_phi(abg), dof_u(j,abg)) + (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
 
             do k=1,NDIM
-                ! u_tilde u_dot  
+              ! u_tilde u_dot  
               kmatSL(dof_u(k,abg),dof_u(j,abg)) = kmatSL(dof_u(k,abg),dof_u(j,abg))  + (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
-              enddo !k
+            enddo !k
         enddo  ! j 
 
 
-         ! Diagonal+non-diagonal components of Kmat coupling SL 
-          ! Note here that ABG is the index of the variable
-          ! and XYG is the test function so when we assemble the 
-          ! matrix, ABG should be the column index 
+        ! Diagonal+non-diagonal components of Kmat coupling SL 
+        ! Note here that ABG is the index of the variable
+        ! and XYG is the test function so when we assemble the 
+        ! matrix, ABG should be the column index 
 
         do xyg = 1, nfgll !XYG
           gid_xyg = gidloc(xyg)  
@@ -1897,31 +1889,29 @@ end subroutine get_fs_details
           Cxyg       =  oceanf(i_elmtfs, xyg)  ! Ocean func abg
   
           ! SL_tilde, Phi_dot coupling 
-          kmatSL(dof_sl(xyg), dof_phi(abg)) = kmatSL(dof_sl(xyg), dof_phi(abg)) - (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg *rho_Ag )
+          kmatSL(dof_sl(xyg), dof_phi(abg)) = kmatSL(dof_sl(xyg), dof_phi(abg)) + (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg *rho_Ag )
 
           ! Phi_tilde, Phi_dot coupling 
           kmatSL(dof_phi(xyg),dof_phi(abg)) = kmatSL(dof_phi(xyg),dof_phi(abg)) - (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
 
           do j=1,NDIM
-              v1 = pi_2d_abg * Cabg * grav0_nodal(j, gid_abg) * pi_2d_xyg 
+            v1 = pi_2d_abg * Cabg * grav0_nodal(j, gid_abg) * pi_2d_xyg 
 
-              ! U_tilde, Phi_dot coupling  
-              kmatSL(dof_u(j, xyg), dof_phi(abg)) = kmatSL(dof_u(j, xyg), dof_phi(abg)) - (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  grav0_nodal(j, gid_xyg) * rho_Ag )
+            ! U_tilde, Phi_dot coupling  
+            kmatSL(dof_u(j, xyg), dof_phi(abg)) = kmatSL(dof_u(j, xyg), dof_phi(abg)) - (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  grav0_nodal(j, gid_xyg) * rho_Ag )
 
-              ! SL_tilde, U_dot coupling
-              kmatSL(dof_sl(xyg), dof_u(j, abg)) = kmatSL(dof_sl(xyg), dof_u(j, abg)) - (v1 * g0xyg * theta_tf * rho_Ag) 
+            ! SL_tilde, U_dot coupling
+             kmatSL(dof_sl(xyg), dof_u(j, abg)) = kmatSL(dof_sl(xyg), dof_u(j, abg)) + (v1 * g0xyg * theta_tf * rho_Ag) 
 
-              ! Phi_tilde, U_dot coupling  
-              kmatSL(dof_phi(xyg), dof_u(j,abg)) = kmatSL(dof_phi(xyg), dof_u(j,abg)) - (v1 * Cxyg * phi_tf * rho_Ag)
+            ! Phi_tilde, U_dot coupling  
+            kmatSL(dof_phi(xyg), dof_u(j,abg)) = kmatSL(dof_phi(xyg), dof_u(j,abg)) - (v1 * Cxyg * phi_tf * rho_Ag)
 
-              do k = 1, NDIM 
-                ! U_tilde, U_dot coupling  
-                kmatSL(dof_u(k,xyg), dof_u(j,abg)) = kmatSL(dof_u(k,xyg), dof_u(j,abg))  - (v1 * Cxyg * u_tf(k) *  grav0_nodal(k, gid_xyg) * rho_Ag)
-              enddo ! k 
+            do k = 1, NDIM 
+              ! U_tilde, U_dot coupling  
+              kmatSL(dof_u(k,xyg), dof_u(j,abg)) = kmatSL(dof_u(k,xyg), dof_u(j,abg))  - (v1 * Cxyg * u_tf(k) *  grav0_nodal(k, gid_xyg) * rho_Ag)
+            enddo ! k 
           enddo ! j
-      enddo! xyg
-
-
+        enddo! xyg
 
         ! Prints matrix if desired
         !do iloop = 1,nedof
