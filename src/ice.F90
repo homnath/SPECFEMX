@@ -78,6 +78,7 @@ subroutine write_ICE0_to_ensight(nodalice)
     use postprocess
     use set_precision
     use free_surface
+    use dimensionless
     implicit none 
 
     real(kind=kreal),allocatable :: nodalice(:)
@@ -87,12 +88,12 @@ subroutine write_ICE0_to_ensight(nodalice)
     
     ! On the free surface
     if(savedata%fsplot)then
-        call write_scalar_to_file_freesurf(nnode_fs, nodalice, &
+        call write_scalar_to_file_freesurf(nnode_fs, nodalice*DIM_L, &
         ext='ice0',istep=0) 
     endif
     
     if(savedata%fsplot_plane)then
-        call write_scalar_to_file_freesurf(nnode_fs, nodalice, &
+        call write_scalar_to_file_freesurf(nnode_fs, nodalice*DIM_L, &
         ext='ice0', istep=0,plane=.true.) 
     endif
 
@@ -105,6 +106,7 @@ subroutine write_icerate_to_ensight(nodalicerate)
     use global 
     use postprocess
     use free_surface
+    use dimensionless
     implicit none 
     real(kind=kreal) :: nodalicerate(:) ! Nodal rate of I values
 
@@ -114,20 +116,18 @@ subroutine write_icerate_to_ensight(nodalicerate)
 
     ! On the free surface
     if(savedata%fsplot)then
-        call write_scalar_to_file_freesurf(nnode_fs, nodalicerate, &
+        call write_scalar_to_file_freesurf(nnode_fs, nodalicerate*DIM_L, &
         ext='icerate',istep=0) 
     endif
     
     if(savedata%fsplot_plane)then
-        call write_scalar_to_file_freesurf(nnode_fs, nodalicerate, &
+        call write_scalar_to_file_freesurf(nnode_fs, nodalicerate*DIM_L, &
         ext='nodalice', istep=0,plane=.true.) 
     endif
 
     write(ICElogunit,*)'  ✓ Saved ice rate level '
     write(ICElogunit,*)
 end subroutine write_icerate_to_ensight
-
-
 ! ################# END  LOG AND OUTPUT FUNCTIONS  ####################
 
 
@@ -235,6 +235,7 @@ subroutine add_ice_gll(i_elmtfs, i_gll, height, nodalice)
     use integration
     use free_surface
     use math_constants
+    use dimensionless 
 
     ! IO vars: 
     real(kind=kreal) :: height, nodalice(:) 
@@ -250,7 +251,7 @@ subroutine add_ice_gll(i_elmtfs, i_gll, height, nodalice)
 
 
     ! Add ice height to nodal point: 
-    nodalice(rgnum_fs(i_gll, i_elmtfs)) = height
+    nodalice(rgnum_fs(i_gll, i_elmtfs)) = height*NONDIM_L
 
     write(ICElogunit,*)' ✓ Injected at GLL point'
     flush(ICElogunit)
@@ -264,6 +265,7 @@ subroutine add_ice_cylinder(params, nodalice)
     ! Uses
     use set_precision
     use global 
+    use dimensionless
     use integration
     use free_surface
     use math_constants
@@ -280,18 +282,17 @@ subroutine add_ice_cylinder(params, nodalice)
 
 
     ! Cylinder params 
-    x = params(1)
-    y = params(2)
-    r = params(3)
-    h = params(4)
+    x = params(1)*NONDIM_L
+    y = params(2)*NONDIM_L
+    r = params(3)*NONDIM_L
+    h = params(4)*NONDIM_L
 
     ! Add to log file: 
     write(ICElogunit,*)
     write(ICElogunit,*)' --  Creating cylinder '
-    write(ICElogunit,*)'      ->  centre (x,y): ', x, y
-    write(ICElogunit,*)'      ->  height      : ', h
-    write(ICElogunit,*)'      ->  radius      : ', r
-    write(ICElogunit,*)'      NEED TO CHECK DIMENSIONS (NONDIM) of cylinder coords.'
+    write(ICElogunit,*)'      ->  centre (x,y): ', x*DIM_L, y*DIM_L
+    write(ICElogunit,*)'      ->  height      : ', h*DIM_L
+    write(ICElogunit,*)'      ->  radius      : ', r*DIM_L
 
     
     ! Searches for nodes on FS that are within the radius of cylinder
@@ -333,6 +334,7 @@ subroutine set_ice_rate(nodalice, nodalicerate)
     use set_precision
     use global 
     use free_surface
+    use dimensionless
     use math_constants 
     ! IO variables: 
     real(kind=kreal) :: nodalice(:), nodalicerate(:)  
@@ -358,7 +360,7 @@ subroutine set_ice_rate(nodalice, nodalicerate)
             gid = rgnum_fs(i_gll, i_elmtfs)
             ! Apply constant value to anywhere with ice: 
             if (nodalice(gid).gt.zero) then 
-                nodalicerate(gid) = icerateval
+                nodalicerate(gid) = icerateval*NONDIM_L
             endif 
         enddo 
     enddo 
@@ -426,6 +428,7 @@ subroutine calculate_ice_change_volume(nodalicerate)
         enddo ! i_gll
     enddo   ! i_elmtfs
 
+
     write(ICElogunit,*)'  --> Volume of ice change: ', icechangevol 
     write(ICElogunit,*)'  --> Mass of ice change  : ', icechangevol*rho_ice
     write(ICElogunit,*)' ✓ Finished calculating change in ice volume'
@@ -483,7 +486,6 @@ use math_library_serial
         nodal_iceload_phi = zero
         nodal_iceload_sl  = zero
     endif 
-
 
 
     ! Epsilon/Area
@@ -608,7 +610,6 @@ subroutine write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_i
 
         ! Save sea level iceload
     if(savedata%fsplot)then
-        write(ICElogunit,*)'Saving iceload_sl'
       call write_scalar_to_file_freesurf(nnode_fs, nodal_iceload_sl,&
       ext='iceload_sl',istep=i_step) 
     endif
@@ -701,6 +702,25 @@ subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, 
 end subroutine calc_iceload_epsilon
 
 
+
+subroutine nondimensionalise_ice(nodalice,nodalicerate)
+    use global 
+    use dimensionless
+    use set_precision
+
+    real(kind=kreal)  :: nodalice(:), nodalicerate(:)  
+
+    write(ICElogunit,*)' * Applying nondimensionalisation to ice'
+    
+    nodalice        = nodalice     * NONDIM_L
+    nodalicerate    = nodalicerate * NONDIM_L
+
+
+    write(ICElogunit,*)'  -->  NONDIM length value         : ', minval(nodalice)
+    write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice)
+    write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice)
+
+end subroutine nondimensionalise_ice
 
 
 end module

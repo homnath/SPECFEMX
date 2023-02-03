@@ -29,6 +29,7 @@ endif
 
 allocate(grav0_nodal(ndim,nnode))!,dgrav0_elmt(6,ngll,nelmt))
 grav0_nodal=ZERO
+
 ! set background gravity
 if(devel_nondim)then
   ! gravity acts downward (-Z direction)
@@ -52,7 +53,8 @@ allocate(g0_nodal(nnode))
 
 if(IS_SL)then 
   if(IS_CART_SIM)then 
-    ! For cartesian we take the z direction to be the local vertical 
+    ! For cartesian we take the z direction to be the local vertical
+    ! Shouldnt need to apply nondim again since taken value from above. 
     g0_nodal(:) = grav0_nodal(3,:) 
   elseif(IS_GLOB_SIM)then 
     ! Not implemented for global simulations yet 

@@ -224,10 +224,6 @@ real(kind=kreal) :: trace_vsigma0,trace_strain
 real(kind=kreal) :: esigma0_dev(nst),esigma_dev(nst)
 real(kind=kreal) :: maxresload,maxbodyload
 
-
-  
-
-
 integer :: geq,inum,nequ
 logical,allocatable :: iseq(:)
 integer,allocatable :: gdofu(:) 
@@ -374,10 +370,8 @@ endif
 
 
 
-
 ! prepare background gravity data
 call prepare_gravity()
-
 
 
 ! Allocate for built-in solver preconditioner stuff? 
@@ -438,10 +432,12 @@ endif
 ! Initialise ice: 
 if(is_ICE)then
   ! Prepare the ice stuff and set the user-inputted initial condition
+  write(*,*)' NONDIM ICE L: ', NONDIM_L
   call prepare_ice(nodalice, nodalicerate)
   call set_original_ice_level(nodalice)
   call set_ice_rate(nodalice, nodalicerate)
   call calculate_ice_change_volume(nodalicerate)
+
 
   ! Save original ice to Ensight
   if(savedata%ice0)then 
@@ -451,6 +447,7 @@ if(is_ICE)then
   if(savedata%icerate)then 
     call write_icerate_to_ensight(nodalicerate)
   endif 
+
 endif 
 
 
@@ -461,6 +458,7 @@ if(is_SL)then
   call prepare_sea_level(nodalsl, nodalslrate)
   call set_original_sea_level(nodalsl)
   
+
   ! Save initial sea level if flagged: 
   if(savedata%sl0)then 
     call write_SL0_to_ensight(nodalsl)
@@ -544,6 +542,7 @@ loop_step: do i_step=istep0,nstep
   ! Calculate ice load: 
   if (is_ICE)then 
     call calc_ice_load(iceload, nodalicerate, nodalu, i_step=0)
+    write(ICElogunit,*)'NOTE ICELOAD ENSIGHTS ARE NOT NONDIMENSIONALISED'
   endif 
 
 

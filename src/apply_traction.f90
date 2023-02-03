@@ -187,11 +187,6 @@ if(istraction)then
           
         enddo
 
-        write(kmatunit,*)' element : ', ielmt
-        write(kmatunit,*)' face    : ', iface
-        write(kmatunit,*)' fgdof   : ', fgdof
-
-
         ! Add traction contribution to load
         load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
 

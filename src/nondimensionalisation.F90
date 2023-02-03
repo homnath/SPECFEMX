@@ -38,16 +38,19 @@ implicit none
           mindensity=minscal(minval(massdens_elmt))
           maxdensity=maxscal(maxval(massdens_elmt))
         endif
-        if(myrank==0)then
-          write(logunit,'(a,g0.6,1x,g0.6)')'min, max density (kg/m3): ',mindensity,maxdensity
-          flush(logunit)
-        endif
+
         ! Always use positive value for nondimensionalizing
+        ! It may be that water is the largest density value
         maxdensity=max(abs(mindensity),abs(maxdensity))
         write(SLlogunit, *)'Max density from model  : ', maxdensity
         maxdensity=max(maxdensity, rho_water_dim)
         write(SLlogunit, *)'Using max density       : ', maxdensity
 
+
+        if(myrank==0)then
+          write(logunit,'(a,g0.6,1x,g0.6)')'min, max density (kg/m3): ',mindensity,maxdensity
+          flush(logunit)
+        endif
 
       endif
       ! minimum, maximum bulk modulus
@@ -82,7 +85,6 @@ implicit none
       endif
       
       return 
-
 end subroutine set_nondimensional_params 
 
 
@@ -163,9 +165,6 @@ subroutine calc_nondimensionalisation_vals
     DIM_GPOT=PI*GRAV_CONS*maxdensity*DIM_L*DIM_L
     DIM_G=PI*GRAV_CONS*maxdensity*DIM_L
   endif
-
-  
-
   end subroutine calc_nondimensionalisation_vals
 
 
@@ -182,14 +181,14 @@ subroutine calc_nondimensionalisation_vals
     ! Nondimensionlize
     g_coord=g_coord*NONDIM_L
     if(ISDISP_DOF)then
-      massdens_elmt=massdens_elmt*NONDIM_DENSITY
-      bulkmod_elmt=bulkmod_elmt*NONDIM_MOD
-      shearmod_elmt=shearmod_elmt*NONDIM_MOD
+      massdens_elmt = massdens_elmt * NONDIM_DENSITY
+      bulkmod_elmt  = bulkmod_elmt  * NONDIM_MOD
+      shearmod_elmt = shearmod_elmt * NONDIM_MOD
 
-      ym_blk=ym_blk*NONDIM_MOD
-      coh_blk=coh_blk*NONDIM_MOD
-      rho_blk=rho_blk*NONDIM_DENSITY
-      gam_blk=gam_blk*(NONDIM_DENSITY*NONDIM_ACCEL)
+      ym_blk        = ym_blk  * NONDIM_MOD
+      coh_blk       = coh_blk * NONDIM_MOD
+      rho_blk       = rho_blk * NONDIM_DENSITY
+      gam_blk       = gam_blk * (NONDIM_DENSITY*NONDIM_ACCEL)
     endif
 
     if(IS_SL)then
@@ -203,8 +202,6 @@ subroutine calc_nondimensionalisation_vals
     pole_coord0=pole_coord0*NONDIM_L
     pole_coord1=pole_coord1*NONDIM_L
     axis_range=axis_range*NONDIM_L
-
-
 
   end subroutine apply_nondimensionalisation
 end module nondimensionalisation 

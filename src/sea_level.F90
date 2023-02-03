@@ -220,6 +220,7 @@ subroutine write_SL0_to_ensight(nodalsl)
     use global 
     use postprocess
     use set_precision
+    use dimensionless
     use free_surface
 #if(USE_MPI)
 use math_library_mpi
@@ -233,18 +234,18 @@ implicit none
 
     write(SLlogunit,*)
     write(SLlogunit,*)'Saving the original SL values'
-    write(SLlogunit,*)'  --> Min sea level: ', minscal(minval(nodalsl))
-    write(SLlogunit,*)'  --> Max sea level: ', maxscal(maxval(nodalsl))
+    write(SLlogunit,*)'  --> Min sea level: ', minscal(minval(nodalsl))*DIM_L
+    write(SLlogunit,*)'  --> Max sea level: ', maxscal(maxval(nodalsl))*DIM_L
     
 
     ! On the free surface
     if(savedata%fsplot)then
-      call write_scalar_to_file_freesurf(nnode_fs, nodalsl, &
+      call write_scalar_to_file_freesurf(nnode_fs, nodalsl*DIM_L, &
       ext='sl0',istep=0) 
     endif
     
     if(savedata%fsplot_plane)then
-      call write_scalar_to_file_freesurf(nnode_fs, nodalsl, &
+      call write_scalar_to_file_freesurf(nnode_fs, nodalsl*DIM_L, &
       ext='sl0', istep=0,plane=.true.) 
     endif
 
@@ -416,6 +417,7 @@ end subroutine set_original_sea_level
 subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
     use global
     use free_surface
+    use dimensionless
     use set_precision
     ! IO: 
     real(kind=kreal) :: nodalsl(:), sl_zcoord
@@ -429,7 +431,7 @@ subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
     ! the z coordinate of the face 
 
     ! Store value: 
-    SL0_constant = sl_zcoord
+    SL0_constant = sl_zcoord*NONDIM_L
 
     do i_elmt=1, nelmt_fs  
         call get_fs_details_noweights(i_elmt, iface, nfgll)
@@ -438,7 +440,7 @@ subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
             ! Get Z coordinates for the face and global IDs 
             z_coord = g_coord(3,  gnum_fs(i_gll,i_elmt))
             ! SL = value - z_coord on surface
-            theta   = sl_zcoord - z_coord 
+            theta   = sl_zcoord*NONDIM_L - z_coord 
             
             !if(theta.gt.0.0_kreal)then
             nodalsl(rgnum_fs(i_gll, i_elmt)) = theta    ! Now storing negative values too. 
@@ -462,6 +464,7 @@ subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
     use global 
     use integration
     use free_surface
+    use dimensionless
     use math_constants
 
     ! IO vars: 
@@ -490,9 +493,9 @@ subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
 
     ! Add ice height to nodal point: 
     if (overwrite)then 
-     nodalsl(rgnum_fs(i_gll, i_elmtfs)) = height
+     nodalsl(rgnum_fs(i_gll, i_elmtfs)) = height*NONDIM_L
     else
-     nodalsl(rgnum_fs(i_gll, i_elmtfs)) = nodalsl(rgnum_fs(i_gll, i_elmtfs)) + height  
+     nodalsl(rgnum_fs(i_gll, i_elmtfs)) = nodalsl(rgnum_fs(i_gll, i_elmtfs)) + height*NONDIM_L 
     endif 
 
     write(SLlogunit,*)' ✓ Injected at GLL point'
@@ -565,6 +568,7 @@ subroutine calculate_SL_A(nodalsl, nodalu)
     use element
     use free_surface
     use integration
+    use dimensionless
     use math_constants
 
     implicit none 
@@ -587,7 +591,7 @@ subroutine calculate_SL_A(nodalsl, nodalu)
     write(SLlogunit,*)
     write(SLlogunit,*)'Calculating ocean area and volume'
     ! Store old values
-    SLarea_old   = SLarea
+    SLarea_old   = SLarea   
     SLvolume_old = SLvolume
 
     SLarea   = ZERO 
@@ -628,9 +632,9 @@ subroutine calculate_SL_A(nodalsl, nodalu)
 
     ! Summarise
     write(SLlogunit,*)'  --> Area of ocean  :    ', SLarea 
-    write(SLlogunit,*)'  --> Area change    :    ', SLarea   - SLarea_old
+    write(SLlogunit,*)'  --> Area change    :    ', SLarea    - SLarea_old
     write(SLlogunit,*)'  --> Volume of ocean:    ', SLvolume 
-    write(SLlogunit,*)'  --> Volume change  :    ', SLvolume - SLvolume_old
+    write(SLlogunit,*)'  --> Volume change  :    ', SLvolume  - SLvolume_old
     write(SLlogunit,*)'  --> Mass change    :    ', (SLvolume - SLvolume_old)*rho_water
     write(SLlogunit,*)'  ✓ Calculated sea level area and volume. '
     write(SLlogunit,*)
@@ -640,8 +644,8 @@ subroutine calculate_SL_A(nodalsl, nodalu)
     ! Escape if no water. 
     if(SLarea.le.ZERO.or.SLvolume.le.ZERO)then 
         write(*,*)'ERROR: Volume/Area of ocean = 0 -- NO WATER!!!' 
-        write(*,*)'SL Area  : ', SLarea 
-        write(*,*)'SL Volume: ', SLvolume 
+        write(*,*)'SL Area  : ', SLarea * DIM_L * DIM_L 
+        write(*,*)'SL Volume: ', SLvolume  * DIM_L * DIM_L * DIM_L
         write(*,*)'The assumption is that there is at least some defined ocean basin.' 
         !stop 
     endif 
@@ -651,7 +655,6 @@ subroutine calculate_SL_A(nodalsl, nodalu)
     deallocate(dshape4)
     
 end subroutine calculate_SL_A
-
 
 
 end module
