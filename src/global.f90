@@ -502,9 +502,9 @@ character(len=1),parameter :: CR=achar(13) ! carriage return to overwrite
 ! format string for time step
 character(len=20) :: tstep_sformat
 ! Log file all information
-character(len=250) :: log_file, SL_log_file, ICE_log_file, kmat_log_file
+character(len=250) :: log_file, SL_log_file, ICE_log_file, kmat_log_file, debug_file
 ! file unit ID for log file
-integer :: logunit=7, SLlogunit=57, ICElogunit=67, kmatunit=77
+integer :: logunit=7, SLlogunit=57, ICElogunit=67, kmatunit=77, debugunit=66
 integer :: stdout=6
 
 character(len=250) :: log_msg

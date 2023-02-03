@@ -432,7 +432,6 @@ endif
 ! Initialise ice: 
 if(is_ICE)then
   ! Prepare the ice stuff and set the user-inputted initial condition
-  write(*,*)' NONDIM ICE L: ', NONDIM_L
   call prepare_ice(nodalice, nodalicerate)
   call set_original_ice_level(nodalice)
   call set_ice_rate(nodalice, nodalicerate)
@@ -791,6 +790,8 @@ loop_step: do i_step=istep0,nstep
     write(SLlogunit,*)'Saving the current SL values'
     write(SLlogunit,*)'  --> Min sea level: ', minval(DIM_L*nodalsl)
     write(SLlogunit,*)'  --> Max sea level: ', maxval(DIM_L*nodalsl)
+
+    write(debugunit,*)maxval(DIM_L*nodalsl)
 
     ! WATER
     if(savedata%fsplot)then

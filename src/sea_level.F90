@@ -619,8 +619,8 @@ subroutine calculate_SL_A(nodalsl, nodalu)
 
             ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
             ! UNSURE ABOUT THIS??? 
-            face_normal(1) = zero
-            face_normal(2) = zero
+            !face_normal(1) = zero
+            !face_normal(2) = zero
 
             detjac2d=sqrt(dot_product(face_normal,face_normal))       
             SLarea   = SLarea + oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d
@@ -636,6 +636,8 @@ subroutine calculate_SL_A(nodalsl, nodalu)
     write(SLlogunit,*)'  --> Volume of ocean:    ', SLvolume 
     write(SLlogunit,*)'  --> Volume change  :    ', SLvolume  - SLvolume_old
     write(SLlogunit,*)'  --> Mass change    :    ', (SLvolume - SLvolume_old)*rho_water
+    write(debugunit,*) (SLvolume - SLvolume_old)*rho_water
+
     write(SLlogunit,*)'  ✓ Calculated sea level area and volume. '
     write(SLlogunit,*)
     flush(SLlogunit) 

@@ -112,6 +112,25 @@ call process_user_input(cmd, tdate, ttime, tzone, ios, path, &
 
 ismesh_only = .false.
 
+
+
+
+! Create debug file 
+if(myrank==0)then
+  debug_file = trim(file_head)//'_debug'
+  open(unit=debugunit,file=trim(debug_file),status='replace',action='write',iostat=ios)
+  if(ios.ne.0)then
+      write(errtag,'(a)')'ERROR: cannot open log file: '//trim(debug_file)
+      !call control_error(errcode,errtag,stdout,myrank)
+  endif
+endif 
+
+
+
+
+
+
+
 ! Create SL log file  
 if(is_SL)then 
   write(logunit,*)' Creating SL log file ... '

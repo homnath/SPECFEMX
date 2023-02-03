@@ -348,6 +348,7 @@ subroutine set_ice_rate(nodalice, nodalicerate)
     write(ICElogunit, *)'CAUTION: ONLY IMPLEMENTING FIXED ICE RATE ACROSS REGIONS WITH ICE'
     write(ICElogunit, *)
     write(ICElogunit, *)'* Using fixed ice rate value:', icerateval
+    write(debugunit, *)icerateval
 
     
 
@@ -421,7 +422,8 @@ subroutine calculate_ice_change_volume(nodalicerate)
 
             ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
             ! UNSURE ABOUT THIS??? 
-            face_normal(1) = zero; face_normal(2) = zero;
+            face_normal(1) = zero; 
+            face_normal(2) = zero;
             detjac2d=sqrt(dot_product(face_normal,face_normal))       
 
             icechangevol = icechangevol + (gw(i_gll) * detjac2d * nodalicerate(rgnum_fs(i_gll, i_elmtfs)))
@@ -431,6 +433,7 @@ subroutine calculate_ice_change_volume(nodalicerate)
 
     write(ICElogunit,*)'  --> Volume of ice change: ', icechangevol 
     write(ICElogunit,*)'  --> Mass of ice change  : ', icechangevol*rho_ice
+    write(debugunit,*) icechangevol*rho_ice
     write(ICElogunit,*)' ✓ Finished calculating change in ice volume'
     flush(ICElogunit)
 
