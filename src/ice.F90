@@ -69,6 +69,8 @@ subroutine summarise_ICE_input_cart()
     write(ICElogunit,*)
     write(ICElogunit,*)'Model setup          : Cartesian'
     write(ICElogunit,*) 
+    flush(ICElogunit)
+
 end subroutine summarise_ICE_input_cart
 
 
@@ -99,6 +101,8 @@ subroutine write_ICE0_to_ensight(nodalice)
 
     write(ICElogunit,*)'  ✓ Saved original ice level '
     write(ICElogunit,*)
+    flush(ICElogunit)
+
 end subroutine write_ICE0_to_ensight
 
 
@@ -127,6 +131,8 @@ subroutine write_icerate_to_ensight(nodalicerate)
 
     write(ICElogunit,*)'  ✓ Saved ice rate level '
     write(ICElogunit,*)
+    flush(ICElogunit)
+
 end subroutine write_icerate_to_ensight
 ! ################# END  LOG AND OUTPUT FUNCTIONS  ####################
 
@@ -172,6 +178,8 @@ subroutine prepare_ice(nodalice, nodalicerate)
 
     write(ICElogunit,*)'  ✓ Prepared ice '
     write(ICElogunit,*)
+    flush(ICElogunit)
+
     return 
 end subroutine prepare_ice
 
@@ -223,6 +231,7 @@ subroutine set_original_ice_level(nodalice)
     write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice)
     write(ICElogunit,*)'-----------------------------------------------------'
     write(ICElogunit,*)
+    flush(ICElogunit)
 
 end subroutine set_original_ice_level
 
@@ -368,6 +377,7 @@ subroutine set_ice_rate(nodalice, nodalicerate)
     write(ICElogunit,*)' ✓ Finished setting ice rate/change'
     write(ICElogunit,*)'-----------------------------------------------------'
     write(ICElogunit,*)
+    flush(ICElogunit)
 
 end subroutine set_ice_rate
 
@@ -593,6 +603,7 @@ use math_library_serial
 
     deallocate(gw)
     deallocate(dshape4)
+    flush(ICElogunit)
 
 end subroutine calc_ice_load    
 
@@ -646,6 +657,8 @@ subroutine write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_i
 
     write(ICElogunit,*)'  ✓ Saved nodal ice load'
     write(ICElogunit,*) 
+    flush(ICElogunit)
+
 end subroutine write_iceload_to_ensight
 
 
@@ -702,6 +715,8 @@ subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, 
         enddo 
     enddo 
     write(ICElogunit,*)'  * ε value            : ', epsilon
+    flush(ICElogunit)
+
 end subroutine calc_iceload_epsilon
 
 
@@ -722,6 +737,7 @@ subroutine nondimensionalise_ice(nodalice,nodalicerate)
     write(ICElogunit,*)'  -->  NONDIM length value         : ', minval(nodalice)
     write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice)
     write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice)
+    flush(ICElogunit)
 
 end subroutine nondimensionalise_ice
 

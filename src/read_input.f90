@@ -219,6 +219,8 @@ method='sem'
 ! input path
 if(ismpi.and.nproc.gt.1)then
   inp_path='./partition/'
+  SL_path='./input/'
+
 else
   inp_path='./input/'
 endif
@@ -406,10 +408,12 @@ do
       write(errtag,*)'ERROR: wrong value for method!'
       return
     endif
+    
     call seek_string('inp_path',strval,args,narg)
     if (.not. isblank(strval))inp_path=trim(strval)
     slen=len_trim(inp_path)
     if(inp_path(slen:slen)/='/')inp_path=trim(inp_path)//'/'
+
     if(ismpi .or. isfrom_partmesh)then
       call seek_string('part_path',strval,args,narg)
       if (.not. isblank(strval))part_path=trim(strval)
@@ -1202,6 +1206,10 @@ else
   data_path=trim(inp_path)
 endif
 
+SL_path =trim(inp_path)
+write(*,*)'Sea level path: ', trim(SL_path)
+
+
 if(myrank==0)then
   write(logunit,'(a)')'reading mesh & material IDs...'
   flush(logunit)
@@ -1234,6 +1242,7 @@ do i=1,ndim
   endif
 enddo
 close(11)
+
 ! Read connectivity
 fname=trim(data_path)//trim(confile)//trim(ptail_inp)
 open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
@@ -1269,7 +1278,7 @@ endif
 sl_read_ctr = 0 
 if(is_SL)then 
 
-  fname= trim(data_path)//trim(slfile)//trim(ptail_inp)
+  fname= trim(inp_path)//trim(slfile)//trim(ptail_inp)
   open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
   if( ios /= 0 ) then
     write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
@@ -1351,7 +1360,7 @@ ice_read_ctr = 0
 if(is_ICE)then 
 
   ! Open the file
-  fname= trim(data_path)//trim(icefile)//trim(ptail_inp)
+  fname= trim(inp_path)//trim(icefile)//trim(ptail_inp)
   open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
   if( ios /= 0 ) then
     write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
@@ -1413,7 +1422,7 @@ if(is_ICE)then
 
 
   ! Open the iceratefile file
-  fname= trim(data_path)//trim(iceratefile)//trim(ptail_inp)
+  fname= trim(inp_path)//trim(iceratefile)//trim(ptail_inp)
   open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
   if( ios /= 0 ) then
     write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
@@ -1421,10 +1430,7 @@ if(is_ICE)then
   endif
 
   read(11,*,IOSTAT=read_stat)icerateval 
-  
 endif 
-
-
 
 
 

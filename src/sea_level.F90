@@ -186,6 +186,7 @@ else
     write(*,*) 'ERROR: SIMULATION MUST BE GLOBAL OR CARTESIAN'
     stop
 endif 
+flush(SLlogunit) 
 end subroutine start_SL_log
 
 
@@ -211,6 +212,7 @@ subroutine summarise_SL_input(nodalsl, nsl_obj)
     write(SLlogunit,*)'  Maximum sea level       :', maxval(nodalsl)
     write(SLlogunit,*)'-----------------------------------------------------'
     write(SLlogunit,*)
+    flush(SLlogunit) 
 end subroutine summarise_SL_input
 
 
@@ -251,6 +253,7 @@ implicit none
 
     write(SLlogunit,*)'  ✓ Saved original sea level '
     write(SLlogunit,*)
+    flush(SLlogunit) 
     end subroutine write_SL0_to_ensight
 
 
@@ -290,6 +293,7 @@ subroutine write_OF_to_ensight(save_orig)
 
     write(SLlogunit,*)'  ✓ Saved ocean function '
     write(SLlogunit,*)
+    flush(SLlogunit) 
 end subroutine write_OF_to_ensight
 
 
@@ -346,6 +350,7 @@ subroutine prepare_sea_level(nodalsl, nodalslrate)
 
     write(SLlogunit,*)'  ✓ Prepared sea level. '
     write(SLlogunit,*)
+    flush(SLlogunit) 
 
     return 
 end subroutine prepare_sea_level
@@ -408,6 +413,7 @@ subroutine set_original_sea_level(nodalsl)
     enddo 
 
     call summarise_SL_input(nodalsl, nsl_obj)
+    flush(SLlogunit) 
 
 end subroutine set_original_sea_level
 
@@ -450,6 +456,7 @@ subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
     ! Log output
     write(SLlogunit,*)' -- Added water at constant Z value'
     write(SLlogunit,*)'    --> value     : ', sl_zcoord
+    flush(SLlogunit) 
 end subroutine set_cart_constant_SL0
 
 
@@ -557,6 +564,7 @@ enddo
 
 write(SLlogunit,*)'  ✓ Updated ocean function. '
 write(SLlogunit,*)
+flush(SLlogunit) 
 end subroutine update_ocean_function
 
 

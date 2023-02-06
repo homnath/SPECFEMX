@@ -113,8 +113,6 @@ call process_user_input(cmd, tdate, ttime, tzone, ios, path, &
 ismesh_only = .false.
 
 
-
-
 ! Create debug file 
 if(myrank==0)then
   debug_file = trim(file_head)//'_debug'
@@ -124,8 +122,6 @@ if(myrank==0)then
       !call control_error(errcode,errtag,stdout,myrank)
   endif
 endif 
-
-
 
 
 
@@ -143,6 +139,7 @@ if(is_ICE)then
   call start_ICE_log(errcode, errtag)
   flush(ICElogunit)
 endif 
+
 
 ! Calculate model extents for individual processors/whole model
 call calc_model_coord_extents(tot_nelmt,max_nelmt,min_nelmt, &

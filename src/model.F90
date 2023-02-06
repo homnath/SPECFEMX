@@ -48,7 +48,6 @@ if(ISDISP_DOF .or. (ISPOT_DOF.and.POT_TYPE==PGRAVITY))then
   ismassdens=.true.
   allocate(massdens_elmt(ngll,nelmt))
   massdens_elmt=ZERO
-
 endif
 
 ! Magnetization

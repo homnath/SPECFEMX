@@ -316,7 +316,7 @@ real(kind=kreal) :: eqkx,eqky,eqkz
 ! First three components are axial components. Last three components are
 ! shear components.
 integer,parameter :: NST=6
-character(len=250) :: file_head,inp_path,out_path,part_path
+character(len=250) :: file_head,inp_path,out_path,part_path, SL_path
 ! displacement BC, ghost, traction, and water surface files
 character(len=250) :: confile,idfile
 character(len=250),dimension(3) :: coordfile
