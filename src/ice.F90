@@ -441,6 +441,9 @@ subroutine calculate_ice_change_volume(nodalicerate)
     enddo   ! i_elmtfs
 
 
+
+
+    
     write(ICElogunit,*)'  --> Volume of ice change: ', icechangevol 
     write(ICElogunit,*)'  --> Mass of ice change  : ', icechangevol*rho_ice
     write(debugunit,*) icechangevol*rho_ice

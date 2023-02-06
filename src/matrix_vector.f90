@@ -200,8 +200,8 @@ module matrix_vector
     ! Sea level free surface contributions to stiffness matrix:
     if (ISSL_DOF) then
       ! Update logfile 
-      write(SLlogunit,*)
-      write(SLlogunit,*)'Calculating sea level stiffness matrix'
+      write(mySLlogunit,*)
+      write(mySLlogunit,*)'Calculating sea level stiffness matrix'
       
       ! Initialise
       allocate(kSL(nedof,nedof))

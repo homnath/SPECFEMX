@@ -85,6 +85,7 @@ endif
 
 trac_stat=.true. ! Necessary for empty trfile
 if(istraction)then
+  
   fname=trim(data_path)//trim(trfile)//trim(ptail_inp)
   open(unit=11,file=trim(fname),status='old',action='read',iostat=ios)
   if (ios /= 0)then

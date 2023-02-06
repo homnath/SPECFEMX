@@ -96,7 +96,7 @@ use solver_petsc
   
         
         call petsc_set_vector(resload)
-        log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0()
+        log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0(logunit)
 
         write(logunit,*)'About to run solver'
         !call petsc_print_vector()
@@ -104,7 +104,7 @@ use solver_petsc
         !call petsc_print_matrix()
 
         call petsc_solve(du(1:), ksp_iter, ksp_convreason)
-        log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0()
+        log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0(logunit)
   
         continue
 
@@ -217,8 +217,8 @@ subroutine update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
     enddo
 
     if(myrank.eq.0)then
-      write(SLlogunit,*)
-      write(SLlogunit,*)'Max nodal sea level rate value: ', maxval(nodalslrate)
+      write(mySLlogunit,*)
+      write(mySLlogunit,*)'Max nodal sea level rate value: ', maxval(nodalslrate)
     endif 
   endif
 

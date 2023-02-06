@@ -131,7 +131,7 @@ if (trim(method)/='sem')then
   write(errtag,'(a)')'ERROR: wrong input for SPECFEM3D!'
   call control_error(errcode,errtag,stdout,myrank)
 else
-  write(logunit, '(a)')'Correct method: sem'
+  !write(logunit, '(a)')'Correct method: sem'
 endif
 
 end subroutine process_user_input

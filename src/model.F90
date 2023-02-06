@@ -19,7 +19,7 @@ contains
 
 subroutine initialize_model(errcode,errtag)
 use global,only:NDIM,ngll,nelmt,ISDISP_DOF,ISPOT_DOF, &
-                POT_TYPE,PGRAVITY,PMAGNETIC, &
+                POT_TYPE,PGRAVITY,PMAGNETIC, myrank, &
                 isbulkmod,isshearmod,ismassdens,ismagnetization, &
                 bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt, logunit
 use math_constants,only:ZERO
@@ -58,7 +58,10 @@ if(ISPOT_DOF.and.POT_TYPE==PMAGNETIC)then
 endif
 errcode=0
 
-write(logunit,*)'Completed model initialisation. '
+if(myrank==0)then
+  write(logunit,*)'✓ Completed model initialisation'
+  write(logunit,*) 
+endif 
 end subroutine initialize_model
 !===============================================================================
 
@@ -677,6 +680,10 @@ real(kind=kreal) :: absmaxx,absmaxy,absmaxz
 ! Local variables
 ! none 
 
+if(myrank.eq.0)then
+  write(logunit,'(a)')'------------- Model Dimensions -------------'
+endif
+
 ! Set coordinate extents of the finite model. This extent is later used in
 ! location routine.
 if(infbc)then
@@ -708,12 +715,16 @@ if(infbc)then
   absmaxz=maxscal(maxval(abs(g_coord(3,:))))
   absmaxcoord=max(absmaxx,absmaxy,absmaxz)
   if(myrank==0)then
-    write(logunit,'(a)')'Original model size: Finite region'
-    write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' elements => total: ',tot_nelmt, &
-    'max: ',max_nelmt,'min: ',min_nelmt
-    write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' nodes    => total: ',tot_nnode, &
-    'max: ',max_nnode,'min: ',min_nnode
-    write(logunit,'(a,g0.6,1x,g0.6)')' x extent min max: ',model_minx,model_maxx
+    write(logunit,'(a)')' * Finite region      : '
+    write(logunit,'(a,i0)')'   --> total elements             : ',tot_nelmt
+    write(logunit,'(a,i0)')'   --> min. elements per processor: ',min_nelmt
+    write(logunit,'(a,i0)')'   --> max. elements per processor: ',max_nelmt
+    write(logunit,*)
+    write(logunit,'(a,i0)')'   --> total nodes                : ',tot_nnode
+    write(logunit,'(a,i0)')'   --> min. nodes per processor   : ',min_nnode
+    write(logunit,'(a,i0)')'   --> max. nodes per processor   : ',max_nnode
+    write(logunit,*)
+    write(logunit,'(a,g0.6,1x,g0.6),a')'   --> Maximum x extent       : [',model_minx,model_maxx, ']'
     write(logunit,'(a,g0.6,1x,g0.6)')' y extent min max: ',model_miny,model_maxy
     write(logunit,'(a,g0.6,1x,g0.6)')' z extent min max: ',model_minz,model_maxz
     write(logunit,'(a,g0.6,1x,g0.6)')' min/max coord: ',mincoord,maxcoord
@@ -728,27 +739,12 @@ else
   pmodel_maxy=maxval(g_coord(2,:))
   pmodel_minz=minval(g_coord(3,:))
   pmodel_maxz=maxval(g_coord(3,:))
-
-  write(logunit,*)'  Proc model boundaries:'
-  write(logunit,*)'     pmodel_minx: ', pmodel_minx, ' rank: ', myrank
-  write(logunit,*) '    pmodel_maxx: ', pmodel_maxx, ' rank: ', myrank
-  write(logunit,*) '    pmodel_miny: ', pmodel_miny, ' rank: ', myrank
-  write(logunit,*) '    pmodel_maxy: ', pmodel_maxy, ' rank: ', myrank
-  write(logunit,*) '    pmodel_minz: ', pmodel_minz, ' rank: ', myrank
-  write(logunit,*) '    pmodel_maxz: ', pmodel_maxz, ' rank: ', myrank
    
 endif
 
 tot_nelmt=sumscal(nelmt); tot_nnode=sumscal(nnode)
 max_nelmt=maxscal(nelmt); max_nnode=maxscal(nnode)
 min_nelmt=minscal(nelmt); min_nnode=minscal(nnode)
-
-write(logunit,*)'    tot_nelmt: ', tot_nelmt, ' rank: ', myrank
-write(logunit,*)'    max_nelmt: ', max_nelmt, ' rank: ', myrank
-write(logunit,*)'    min_nelmt: ', min_nelmt, ' rank: ', myrank
-write(logunit,*)'    tot_nnode: ', tot_nnode, ' rank: ', myrank
-write(logunit,*)'    max_nnode: ', max_nnode, ' rank: ', myrank
-write(logunit,*)'    min_nnode: ', min_nnode, ' rank: ', myrank
 
 
 ! Coordinate extents of whole model
@@ -761,17 +757,22 @@ absmaxx=maxscal(maxval(abs(g_coord(1,:))))
 absmaxy=maxscal(maxval(abs(g_coord(2,:))))
 absmaxz=maxscal(maxval(abs(g_coord(3,:))))
 absmaxcoord=max(absmaxx,absmaxy,absmaxz)
+
 if(myrank==0)then
-  write(logunit,'(a)')'Original model size: Whole region'
-  write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' elements => total: ',tot_nelmt, &
-  'max: ',max_nelmt,'min: ',min_nelmt
-  write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' nodes    => total: ',tot_nnode, &
-  'max: ',max_nnode,'min: ',min_nnode
-  write(logunit,'(a,g0.6,1x,g0.6)')' x extent min max: ',model_minx,model_maxx
-  write(logunit,'(a,g0.6,1x,g0.6)')' y extent min max: ',model_miny,model_maxy
-  write(logunit,'(a,g0.6,1x,g0.6)')' z extent min max: ',model_minz,model_maxz
-  write(logunit,'(a,g0.6,1x,g0.6)')' min/max coord: ',mincoord,maxcoord
-  write(logunit,'(a,g0.6)')' abs max coord: ',absmaxcoord
+  write(logunit,'(a)')' * Whole model      : '
+  write(logunit,'(a,i0)')'   --> total elements             : ',tot_nelmt
+  write(logunit,'(a,i0)')'   --> min. elements per processor: ',min_nelmt
+  write(logunit,'(a,i0)')'   --> max. elements per processor: ',max_nelmt
+  write(logunit,*)
+  write(logunit,'(a,i0)')'   --> total nodes                : ',tot_nnode
+  write(logunit,'(a,i0)')'   --> min. nodes per processor   : ',min_nnode
+  write(logunit,'(a,i0)')'   --> max. nodes per processor   : ',max_nnode
+  write(logunit,*)       
+  write(logunit,'(a,g0.6,2x,g0.6)')'   --> X extent                   : ',model_minx,model_maxx
+  write(logunit,'(a,g0.6,2x,g0.6)')'   --> Y extent                   : ',model_miny,model_maxy
+  write(logunit,'(a,g0.6,2x,g0.6)')'   --> Z extent                   : ',model_minz,model_maxz
+  write(logunit,'(a,g0.6)')        '   --> Absolute maximum coord     : ',absmaxcoord
+  write(logunit,*)
   flush(logunit)
 endif
 

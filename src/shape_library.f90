@@ -38,11 +38,8 @@ double precision :: xip,xim,etap,etam,zetap,zetam
 
 ! for checking the 3d shape functions
 double precision :: sum_shape
-integer :: lgunit = 7
 double precision, parameter :: one_eighth = 0.125d0
 
-write(lgunit,*)'     Running shape_function_hex8' 
-write(lgunit,*)'     compute shape function values at gll pts.'
 
 
 ! check that the parameter file is correct
@@ -105,17 +102,6 @@ do k=1,ngllz
 enddo
 
 
-write(lgunit,*)'     Created the following:'
-write(lgunit,*)'         GLL points of integration: '
-write(lgunit,*)'           xi gll:', xigll
-write(lgunit,*)'           eta gll:', etagll
-write(lgunit,*)'           zeta gll:', zetagll
-write(lgunit,*)'         shape_hex8 array (4D with dimensions) (8, ngllx,nglly,ngllz)'
-write(lgunit,*)'         which holds the 3D shape functions. e.g:'
-
-
-write(lgunit,*)'     shape_function_hex8 completed. '
-
 
 end subroutine shape_function_hex8
 !===============================================================================
@@ -150,7 +136,6 @@ double precision :: sum_dshapexi,sum_dshapeeta,sum_dshapezeta
 double precision, parameter :: one_eighth = 0.125_kreal
 
 
-write(logunit, *)'Computes derivatives of the shape funcs at gll pts... '
 
 ! check that the parameter file is correct
 if(ngnod /= 8)then
@@ -159,7 +144,6 @@ if(ngnod /= 8)then
 endif
 
 ngll=ngllx*nglly*ngllz
-write(logunit, *)'    ngll = ', ngll
 
 ! compute the derivatives of 3d shape functions
 igll=0
@@ -451,7 +435,6 @@ double precision :: sum_dshapexi,sum_dshapeeta
 
 double precision, parameter :: one_fourth = 0.25_kreal
 
-write(logunit,*)'     Entered dshape_function_quad4.'
 
 ! check that the parameter file is correct
 if(ngnod2d /= 4)then
@@ -513,8 +496,6 @@ do j=1,nglly
   enddo
 
 
-write(logunit,*)'        Created dshape_quad4 dim: (2, ', ngnod2d, ', ', ngllx*nglly, ' )'
-write(logunit,*)'     Finished dshape_function_quad4.'
 
 end subroutine dshape_function_quad4
 !===============================================================================

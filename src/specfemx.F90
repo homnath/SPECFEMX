@@ -129,14 +129,20 @@ endif
 
 ! Create SL log file  
 if(is_SL)then 
-  write(logunit,*)' Creating SL log file ... '
   call start_SL_log(errcode, errtag)
-  flush(SLlogunit)
+  if(myrank.eq.0)then
+    write(logunit,*)'✓ Creating sea level log file ... '
+    write(logunit,*) 
+  endif 
+  flush(mySLlogunit)
 endif 
 
 if(is_ICE)then 
-  write(logunit,*)' Creating ICE log file ... '
   call start_ICE_log(errcode, errtag)
+  if(myrank.eq.0)then
+    write(logunit,*)'✓ Creating ice log file ... '
+    write(logunit,*) 
+  endif 
   flush(ICElogunit)
 endif 
 
@@ -257,8 +263,6 @@ if(ISSL_DOF)then
 endif 
 
 
-
-
 case_file=trim(out_path)//trim(file_head)//trim(ptail)//'.case'
 if(nexcav==0)then
   geo_file=trim(file_head)//trim(ptail)//'.geo'
@@ -301,7 +305,13 @@ call determine_solver(errcode, errtag)
 
  
 ! Now, call main routine...
-write(logunit,*)'CALLING SPECFEM3D'
+if(myrank.eq.0)then 
+  write(logunit,*) 
+  write(logunit,*) '**************** Starting SPECFEM3D  *****************'
+  write(logunit,*) 
+  write(logunit,*) 
+endif 
+
 call specfem3d()
 
 
@@ -366,8 +376,9 @@ enddo
 maxsize_elmt=maxscal(maxsize)
 sqmaxsize_elmt=maxsize_elmt*maxsize_elmt
 if(myrank==0)then
-  write(logunit,'(a,g0.6)')'maximum element size across the diagonal: ', &
+  write(logunit,'(a,g0.6)')'* Maximum element size across the diagonal: ', &
   maxsize_elmt*DIM_L
+  write(logunit,*)
   flush(logunit)
 endif
 end subroutine compute_max_elementsize

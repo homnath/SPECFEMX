@@ -92,7 +92,7 @@ call control_error(errcode,errtag,stdout,myrank)
 ! Finalise the GDOF after BCs have been applied 
 call finalize_gdof(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
-log_msg = 'complete!' ; call write_ifproc0()
+log_msg = 'complete!' ; call write_ifproc0(logunit)
 
 call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
         eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB, currentu)

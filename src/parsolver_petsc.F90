@@ -1144,22 +1144,24 @@ use output_to_user
                                              ang_freq, scale_ang_freq2,  & 
                                              isscale_ang_freq)
         log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;  
-        call write_ifproc0()
+        call write_ifproc0(logunit)
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
     else 
         ! TIMESTEPPING 
         if (ISSL_DOF)then 
             log_msg = trim(' petsc_set_stiffness_matrix WITH SEA LEVEL: SUCCESS!') ;
+            call write_ifproc0(logunit)
             log_msg = trim(' --> Setting PETSC stiffness symmetry to false') ;
+
            symmetric_solver =.false.
         else 
-            log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;   
+            log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ; 
         endif 
+        call write_ifproc0(logunit)
+
 
         call petsc_set_stiffness_matrix(storekmat)
 
-
-        write(SLlogunit,*) trim(log_msg)
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
         call petsc_set_solver()
 
@@ -1242,9 +1244,7 @@ PetscInt    ireason
 
 
 ! Solve the linear system
-write(*,*)'Running KSPSOLVE...'
 call KSPSolve(ksp,bvec,xvec,ierr)
-write(*,*)'Completed KSPSOLVE...'
 
 
 ! View solver info; we could instead use the option -ksp_view

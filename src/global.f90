@@ -504,7 +504,7 @@ character(len=20) :: tstep_sformat
 ! Log file all information
 character(len=250) :: log_file, SL_log_file, ICE_log_file, kmat_log_file, debug_file
 ! file unit ID for log file
-integer :: logunit=7, SLlogunit=57, ICElogunit=67, kmatunit=77, debugunit=66
+integer :: logunit=7, ICElogunit=8, kmatunit=9, debugunit=10,  SLlogunit=11, mySLlogunit
 integer :: stdout=6
 
 character(len=250) :: log_msg
@@ -554,11 +554,15 @@ integer,allocatable  :: edofsl(:) !IDs for SL degrees of freedom per element
 
 ! Area of water, Volume of water, for tracking changes in water mass
 real(kind=kreal)     ::  SLarea       = 0.0_kreal 
+real(kind=kreal)     ::  totalSLA     = 0.0_kreal 
 real(kind=kreal)     ::  SLvolume     = 0.0_kreal   
+real(kind=kreal)     ::  SLmasschange = 0.0_kreal   
+real(kind=kreal)     ::  SLsummasschange = 0.0_kreal   
 real(kind=kreal)     ::  SLarea_old   = 0.0_kreal 
 real(kind=kreal)     ::  SLvolume_old = 0.0_kreal
 
 real(kind=kreal)     :: icechangevol           ! Volume of ice change
+real(kind=kreal)     :: icechangevoltmp           ! Volume of ice change
 
 real(kind=kreal) icerateval ! constant value of ice change 
 

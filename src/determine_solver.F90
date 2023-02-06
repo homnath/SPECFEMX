@@ -26,16 +26,16 @@ use math_library_serial
         endif
         if(ismpi)then
           if(solver_type.eq.builtin_solver)then
-            if(myrank==0)write(logunit,'(a)')'solver type: builtin parallel solver'
+            if(myrank==0)write(logunit,'(a)')'* Solver type: builtin parallel solver'
           elseif(solver_type.eq.petsc_solver)then
-            if(myrank==0)write(logunit,'(a)')'solver type: PETSc parallel solver'
+            if(myrank==0)write(logunit,'(a)')'* Solver type: PETSc parallel solver'
           else
             write(errtag,'(a,i4)')'ERROR: invalid solver type:',solver_type
             call control_error(errcode,errtag,logunit,myrank)
           endif
         else
           if(solver_type.eq.builtin_solver)then
-            write(logunit,'(a)')'solver type: builtin serial solver'
+            write(logunit,'(a)')'* Solver type: builtin serial solver'
           elseif(solver_type.eq.petsc_solver)then
             write(errtag,'(a,i4)')'ERROR: PETSc solver must be run with MPI:',solver_type
             call control_error(errcode,errtag,logunit,myrank)

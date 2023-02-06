@@ -92,11 +92,6 @@ if(ISSL_DOF)then
   nedof = nedof + nenode  
 endif 
 
-write(logunit,*)'Initialised degrees of freedom: '
-write(logunit,*)' --> Number of nodal total      -   (nndof)   : ', nndof
-write(logunit,*)' --> Number of elemental total  -   (nedof)   : ', nedof
-write(logunit,*)' --> Number of elemental u      -   (nedofu)  : ', nedofu
-write(logunit,*)' --> Number of elemental phi    -   (nedofphi): ', nedofphi
 
 
 end subroutine initialize_dof
@@ -304,7 +299,7 @@ end subroutine activate_dof
 ! This subroutine finalizes the global degrees of freedom IDs.
 subroutine finalize_gdof(errcode,errtag)
 use global, only:gdof,neq,nndof,nnode,g_num,part_path,proc_str,file_head, logunit
-use global, only:myrank,nedof, ISSL_DOF, SLlogunit
+use global, only:myrank,nedof, ISSL_DOF, mySLlogunit
 use free_surface
 implicit none
 integer,intent(out) :: errcode
@@ -421,7 +416,6 @@ subroutine sea_level_dof()
     ldof = ldof + 1 
   enddo 
 
-  write(logunit,*)' --> Number of elemental SL     -   (nedofsl) : ', nedofsl
 end subroutine sea_level_dof
 
 

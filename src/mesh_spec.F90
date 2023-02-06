@@ -34,20 +34,26 @@ integer :: tot_nelmt,max_nelmt,min_nelmt,tot_nnode,max_nnode,min_nnode
 ! Local variables
 
 ! Code: 
-  log_msg = trim('creating spectral elements...') ;   call write_ifproc0()
   call hex2spec(ndim,ngnode,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
   call control_error(errcode,errtag,stdout,myrank)
-  log_msg = trim('completed creating spectral elements') ;   call write_ifproc0()
-
 
   tot_nelmt=sumscal(nelmt); tot_nnode=sumscal(nnode)
   max_nelmt=maxscal(nelmt); max_nnode=maxscal(nnode)
   min_nelmt=minscal(nelmt); min_nnode=minscal(nnode)
+
   if(myrank==0)then
-    write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' spectral elements => total:',tot_nelmt, &
-    ' max:',max_nelmt,' min:',min_nelmt
-    write(logunit,'(a,i0,1x,a,i0,1x,a,i0)')' spectral nodes    => total:',tot_nnode, &
-    ' max:',max_nnode,' min:',min_nnode
+    write(logunit,*)'----------- SPECTRAL ELEMENTS ----------'
+
+    write(logunit,'(a, i0)')' * Total                       :  ',tot_nelmt
+    write(logunit,'(a, i0)')' * Min elements per processor  :  ',min_nelmt
+    write(logunit,'(a, i0)')' * Max elements per processor  :  ',max_nelmt
+    write(logunit,*) 
+    write(logunit,'(a, i0)')' * Total nodes                 :  ',tot_nnode
+    write(logunit,'(a, i0)')' * Min nodes per processor     :  ',min_nnode
+    write(logunit,'(a, i0)')' * Max nodes per processor     :  ',max_nnode
+    write(logunit,*)
+    write(logunit,*)
+
     flush(logunit)
   endif
 
@@ -65,7 +71,7 @@ end subroutine create_spec_elem
 ! This subroutine convert all hexahedral meshes (8-noded) to spectral elements
 ! of arbitrary order defined by ngllx, nglly, and ngllz
 subroutine hex2spec(ndim,ngnod,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
-use global,only : g_coord,g_num, logunit
+use global,only : g_coord,g_num, logunit, myrank
 use shape_library,only : shape_function_hex8
 use gll_library,only:gllpx,gllpy,gllpz
 
@@ -186,7 +192,12 @@ enddo
 
 deallocate(iglob,xstore,ystore,zstore)
 
-write(logunit, *)'Finished hex2spec'
+if(myrank.eq.0)then 
+  write(logunit,*)'✓ Finished hexahedra --> spectral elements' 
+  write(logunit,*) 
+endif
+
+
 
 errcode=0
 return

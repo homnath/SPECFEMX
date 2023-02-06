@@ -74,7 +74,6 @@ if(savedata%strain)then
 endif
 
 if(isstress0)then
-    write(logunit,*)'PRESTRESS PRESENT'
 
     if(s0_type==0)then
         ! compute initial stress using SEM itself
@@ -90,8 +89,7 @@ if(isstress0)then
         call stiffness_bodyload(nelmt,neq,hex8_gnode,g_num,gdof_elmt,mat_id,gam_blk, &
         storekmat,dprecon,extload,.true.,.false.)
 
-        log_msg = 'complete...' ; call write_ifproc0()
-        log_msg = '--------------------------------------------' ; call write_ifproc0()
+
 
         ! assemble from ghost partitions
         if(nproc.gt.1)then

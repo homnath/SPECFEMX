@@ -219,11 +219,12 @@ method='sem'
 ! input path
 if(ismpi.and.nproc.gt.1)then
   inp_path='./partition/'
-  SL_path='./input/'
-
 else
   inp_path='./input/'
 endif
+
+SL_path='./input/'
+
 ! output path
 out_path='./output/'
 ! partititon path
@@ -637,8 +638,11 @@ do
 
   ! read traction information
   if (trim(token)=='traction:')then
-    write(*,*)'* Detected traction flag'
-    write(*,*)
+    
+    if(myrank==0)then 
+      write(*,*)'* Detected traction flag'
+      write(*,*)
+    endif 
 
     if(traction_stat==1)then
       write(errtag,*)'ERROR: copy of line type traction: not permitted!'
@@ -991,7 +995,11 @@ do
 
 ! read ice part: 
   if (trim(token)=='ice:')then
-    write(*,*)'* Detected ice flag'
+
+    if(myrank==0)then
+      write(*,*)'* Detected ice flag'
+    endif 
+
 
     if(ice_stat==1)then
       write(errtag,*)'ERROR: copy of line type ice: not permitted!'
@@ -1005,31 +1013,44 @@ do
 
     ice_stat  = 1
     is_ICE    = .true.
-    write(*,*)'  --> Fetching information from file: ', trim(icefile)
+
+    if(myrank.eq.0)then 
+      write(*,*)'  --> Fetching information from file: ', trim(icefile)
+    endif 
 
     ! Save ice0 
     call seek_integer('saveice0',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
       savedata%ice0    = .true.
       savedata%fsplot  = .true.
-      write(*,*)'        + Saving initial ice distribution'
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving initial ice distribution'
+      endif 
     endif 
 
     call seek_integer('saveicerate',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
       savedata%icerate    = .true.
-      write(*,*)'        + Saving ice rate'
+
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving ice rate'
+      endif 
     endif 
 
 
     call seek_integer('saveiceload',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
       savedata%iceload    = .true.
-      write(*,*)'        + Saving ice load'
+
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving ice load'
+      endif 
     endif 
 
-    write(*,*)'  --> See ', trim(file_head), 'ICE.log for details '
-    write(*,*)
+    if(myrank.eq.0)then 
+      write(*,*)'  --> See ', trim(file_head), 'ICE.log for details '
+      write(*,*)
+    endif 
 
     cycle
   endif 
@@ -1041,7 +1062,9 @@ do
 
 ! read sea level part
   if (trim(token)=='sealevel:')then
-    write(*,*)'* Detected sea level flag'
+    if(myrank.eq.0)then 
+      write(*,*)'* Detected sea level flag'
+    endif 
     if(sl_stat==1)then
       write(errtag,*)'ERROR: copy of line type sealevel: not permitted!'
       return
@@ -1052,14 +1075,18 @@ do
     slfile   = get_string('slfile',args,narg)
     sl_stat  = 1
     is_SL    = .true.
-    write(*,*)'  --> Fetching information from file: ', trim(slfile)
-
+    if(myrank.eq.0)then 
+      write(*,*)'  --> Fetching information from file: ', trim(slfile)
+    endif 
     ! Save sl0 
     call seek_integer('savesl0',issave,args,narg,istat)
     if(istat==0 .and. issave==1)then 
       savedata%sl0    = .true.
       savedata%fsplot = .true.
-      write(*,*)'        + Saving initial Sea Level'
+      
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving initial Sea Level'
+      endif 
 
     endif 
 
@@ -1069,7 +1096,10 @@ do
       savedata%oceanf   = .true.
       savedata%oceanf0  = .true.
       savedata%fsplot  = .true.
-      write(*,*)'        + Saving ocean functions'
+
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving ocean functions'
+      endif 
 
     endif 
 
@@ -1081,10 +1111,14 @@ do
       savedata%sl    = .true.
       savedata%ice    = .true.
     else 
-      write(*,*)' WARNING: SL FILE PARSED BUT NOT SOLVING FOR SEA LEVEL'
+      if(myrank.eq.0)then 
+        write(*,*)' WARNING: SL FILE PARSED BUT NOT SOLVING FOR SEA LEVEL'
+      endif 
     endif 
-    write(*,*)'  --> See ', trim(file_head), 'SL.log for details '
-    write(*,*)
+    if(myrank.eq.0)then 
+      write(*,*)'  --> See ', trim(file_head), 'SL.log for details '
+      write(*,*)
+    endif 
 
     cycle
   endif
@@ -1096,8 +1130,11 @@ do
 
   ! read development vaiables if any
   if (trim(token)=='devel:')then
-    write(*,*)'* Detected devel flag'
-    write(*,*)
+
+    if(myrank.eq.0)then 
+      write(*,*)'* Detected devel flag'
+      write(*,*)
+    endif
 
     if(devel_stat==1)then
       write(errtag,*)'ERROR: copy of line type eqsource: not permitted!'
@@ -1206,9 +1243,9 @@ else
   data_path=trim(inp_path)
 endif
 
-SL_path =trim(inp_path)
-write(*,*)'Sea level path: ', trim(SL_path)
-
+if(myrank.eq.0)then 
+  write(*,*)'Sea level path: ', trim(SL_path)
+endif 
 
 if(myrank==0)then
   write(logunit,'(a)')'reading mesh & material IDs...'
@@ -1278,7 +1315,7 @@ endif
 sl_read_ctr = 0 
 if(is_SL)then 
 
-  fname= trim(inp_path)//trim(slfile)//trim(ptail_inp)
+  fname= trim(SL_path)//trim(slfile)
   open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
   if( ios /= 0 ) then
     write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
@@ -1360,7 +1397,7 @@ ice_read_ctr = 0
 if(is_ICE)then 
 
   ! Open the file
-  fname= trim(inp_path)//trim(icefile)//trim(ptail_inp)
+  fname= trim(SL_path)//trim(icefile)
   open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
   if( ios /= 0 ) then
     write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
@@ -1422,7 +1459,7 @@ if(is_ICE)then
 
 
   ! Open the iceratefile file
-  fname= trim(inp_path)//trim(iceratefile)//trim(ptail_inp)
+  fname= trim(SL_path)//trim(iceratefile)
   open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
   if( ios /= 0 ) then
     write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
@@ -1431,13 +1468,6 @@ if(is_ICE)then
 
   read(11,*,IOSTAT=read_stat)icerateval 
 endif 
-
-
-
-
-
-
-
 
 
 

@@ -88,7 +88,7 @@ end subroutine prepare_hex
 !===============================================================================
 
 subroutine prepare_hexface(errcode,errtag)
-use global,only:ngllx,nglly,ngllz,ngllxy,ngllyz,ngllzx,nndof, logunit
+use global,only:ngllx,nglly,ngllz,ngllxy,ngllyz,ngllzx,nndof, logunit, myrank
 use math_constants,only:ONE
 implicit none
 integer,intent(out) :: errcode
@@ -564,7 +564,11 @@ hexface_edge(iface,iedge)%node=hexface(iface)%node(indy)
 
 
 deallocate(indx,indy,indz)
-write(logunit, *)'Completed prepare_hexface'
+
+if(myrank.eq.0)then
+  write(logunit, *)'✓ Finished preparing hexahedra faces'
+  write(logunit, *)
+endif 
 errcode=0
 
 

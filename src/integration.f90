@@ -25,7 +25,7 @@ contains
 
 !-------------------------------------------------------------------------------
 subroutine prepare_integration(errcode,errtag)
-use global,only:ndim,ngllx,nglly,ngllz,ngll,ngnode, logunit
+use global,only:ndim,ngllx,nglly,ngllz,ngll,ngnode, myrank, logunit
 use gll_library,only:gllpx,gllpy,gllpz,gll_quadrature
 use shape_library,only:dshape_function_hex8
 implicit none
@@ -35,7 +35,6 @@ character(len=250),intent(out) :: errtag
 errtag="ERROR: unknown!"
 errcode=-1
 
-write(logunit, *)'Preparing integration...'
 
 
 ! get derivatives of shape functions for 8-noded hex
@@ -52,8 +51,12 @@ lagrange_gll,dlagrange_gll)
 
 errcode=0
 
-write(logunit,*)'Completed prepare_integration'
-write(logunit,*)'======================================================'
+
+if(myrank.eq.0)then
+    write(logunit, *)'✓ Finished preparing integration'
+    write(logunit, *)
+  endif 
+
 return
 
 end subroutine prepare_integration

@@ -34,7 +34,7 @@ integer                      :: errcode
 character(len=250)           :: errtag
 
 log_msg = trim(' Earthquake source type: moment-density tensor')
-call write_ifproc0()
+call write_ifproc0(logunit)
 
 call earthquake_load(neq,extload,errcode,errtag)
 call sync_process
@@ -64,7 +64,7 @@ real(kind=kreal),allocatable ::extload(:)
 
 
 ! apply magnetic traction
-log_msg = trim('applying magnetic traction...') ;   call write_ifproc0()
+log_msg = trim('applying magnetic traction...') ;   call write_ifproc0(logunit)
 call apply_mtraction(extload,errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)

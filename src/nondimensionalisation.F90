@@ -42,15 +42,24 @@ implicit none
         ! Always use positive value for nondimensionalizing
         ! It may be that water is the largest density value
         maxdensity=max(abs(mindensity),abs(maxdensity))
-        write(SLlogunit, *)'Max density from model  : ', maxdensity
-        maxdensity=max(maxdensity, rho_water_dim)
-        write(SLlogunit, *)'Using max density       : ', maxdensity
 
+        if(myrank.eq.0)then 
+          write(logunit, '(a,g0.6)')'Min. density from model  : ', mindensity
+          write(logunit, '(a,g0.6)')'Max. density from model  : ', maxdensity
+        endif 
 
-        if(myrank==0)then
-          write(logunit,'(a,g0.6,1x,g0.6)')'min, max density (kg/m3): ',mindensity,maxdensity
-          flush(logunit)
-        endif
+        
+        if(ISSL_DOF)then
+          maxdensity=max(maxdensity, rho_water_dim)
+
+          if(myrank==0)then
+            write(logunit, '(a,g0.6)')'Water density            : ', rho_water_dim
+            write(logunit, '(a,g0.6)')'Using max density        : ', maxdensity
+            write(logunit, *)
+          endif 
+        endif 
+
+        flush(logunit)
 
       endif
       ! minimum, maximum bulk modulus
@@ -64,7 +73,7 @@ implicit none
           maxbulkmod=maxscal(maxval(bulkmod_elmt))
         endif
         if(myrank==0)then
-          write(logunit,'(a,g0.6,1x,g0.6)')'min, max bulkmod (N/m2): ',minbulkmod,maxbulkmod
+          write(logunit,'(a,g0.6,1x,g0.6)')'Bulk modulus range (N/m2): ',minbulkmod,maxbulkmod
           flush(logunit)
         endif
       endif
@@ -79,11 +88,13 @@ implicit none
           maxshearmod=maxscal(maxval(shearmod_elmt))
         endif
         if(myrank==0)then
-          write(logunit,'(a,g0.6,1x,g0.6)')'min, max shearmod (N/m2): ',minshearmod,maxshearmod
-          flush(logunit)
+          write(logunit,'(a,g0.6,1x,g0.6)')'Shear modulus range (N/m2): ',minshearmod,maxshearmod
         endif
       endif
       
+      write(logunit,*)
+      flush(logunit)
+
       return 
 end subroutine set_nondimensional_params 
 
@@ -103,7 +114,7 @@ subroutine calc_nondimensionalisation_vals
   if(.not.devel_nondim)then
     ! DO NOT nondimensionalize
     if(myrank==0)then
-      write(logunit,*)'nondimensionalize: NO'
+      write(logunit,*)'* Nondimensionalize: NO'
       flush(logunit)
     endif
     DIM_DENSITY=ONE
@@ -136,7 +147,7 @@ subroutine calc_nondimensionalisation_vals
   else
     ! nondimensionalize
     if(myrank==0)then
-      write(logunit,*)'nondimensionalize: YES'
+      write(logunit,*)'* Nondimensionalize: YES'
       flush(logunit)
     endif
     DIM_DENSITY=maxdensity                               
@@ -165,6 +176,10 @@ subroutine calc_nondimensionalisation_vals
     DIM_GPOT=PI*GRAV_CONS*maxdensity*DIM_L*DIM_L
     DIM_G=PI*GRAV_CONS*maxdensity*DIM_L
   endif
+
+  write(logunit,*)
+  flush(logunit)
+
   end subroutine calc_nondimensionalisation_vals
 
 
