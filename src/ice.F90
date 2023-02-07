@@ -466,8 +466,11 @@ use math_constants
 
 #if(USE_MPI)
 use math_library_mpi
+use mpi_library
+use mpi
 #else
 use math_library_serial
+use serial_library
 #endif
 
     ! IO vars
@@ -480,8 +483,8 @@ use math_library_serial
     real(kind=kreal)               :: utf_dot_bkgrav, utf_dot_bkgrav_xyg, area_inv, xyg_sum
     real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
-    real(kind=kreal)               :: epsilon, pi_2d, ctr, val
-    integer                        :: fgdof(nndof, maxngll2d) ! face global degrees of freedom
+    real(kind=kreal)               :: epsilon, sumepsilon, pi_2d, ctr, val
+    integer                        :: fgdof(nndof, maxngll2d), errcode ! face global degrees of freedom
 
     real(kind=kreal), allocatable  :: nodal_iceload_u(:,:), nodal_iceload_phi(:), nodal_iceload_sl(:) ! dim nnode_fs
 
@@ -506,6 +509,16 @@ use math_library_serial
 
     ! Epsilon/Area
     call calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, nodalicerate)
+    call sync_process()
+    ! Sum up Epsilon over all of the nodes: 
+    call MPI_Allreduce(epsilon, sumepsilon, 1, MPI_KREAL, MPI_SUM, MPI_COMM_WORLD, errcode) 
+    epsilon = sumepsilon
+
+    if(myrank.eq.0)then
+        write(*,*)'  * ε value            : ', epsilon, myrank
+    endif 
+
+
     area_inv = epsilon/SLarea
 
 

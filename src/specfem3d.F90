@@ -167,7 +167,7 @@ real(kind=kreal),allocatable :: nodalslrate(:)  ! Nodal theta values
 real(kind=kreal),allocatable :: nodalice(:) ! Nodal I values
 real(kind=kreal),allocatable :: nodalicerate(:) ! Nodal rate of I values
 real(kind=kreal),allocatable :: iceload(:)  ! load term due to ice.
-
+real(kind=kreal)             :: minnodalsl, maxnodalsl
 
 ! magnetization
 real(kind=kreal),allocatable :: nodalB(:,:)
@@ -490,10 +490,10 @@ endif
 ! For elastic simulations there is only one timestep. 
 if (myrank.eq.0)then 
   write(logunit,*)
-  write(logunit,*)'----------------------------------------------'
-  write(logunit,*)'------------ Starting time loop! -------------'
+  write(logunit,*)    '----------------------------------------------'
+  write(logunit,*)    '------------ Starting time loop! -------------'
   write(mySLlogunit,*)'------------ Starting time loop! -------------'
-  write(ICElogunit,*)'------------ Starting time loop! -------------'
+  write(ICElogunit,*) '------------ Starting time loop! -------------'
   write(logunit,*)
   write(logunit,*)
 endif 
@@ -525,6 +525,15 @@ loop_step: do i_step=istep0,nstep
     call MPI_Allreduce(SLmasschange, SLsummasschange, 1, MPI_KREAL, MPI_SUM, MPI_COMM_WORLD, errcode) 
     SLarea = totalSLA
     SLmasschange = SLsummasschange
+
+    ! Escape if no water. 
+    if(SLarea.le.ZERO)then 
+      write(*,*)'ERROR: Volume/Area of ocean = 0 -- NO WATER!!!' 
+      write(*,*)'SL Area  : ', SLarea * DIM_L * DIM_L 
+      write(*,*)'The assumption is that there is at least some defined ocean basin.' 
+      stop 
+    endif 
+
 
     if (myrank.eq.0)then 
       write(*,*)'Total SL area across nodes: ', SLarea
@@ -649,11 +658,14 @@ loop_step: do i_step=istep0,nstep
                     scale_ang_freq2, ksp_iter, errcode, ksp_convreason,&
                     errtag, isscale_ang_freq)
 
+    
+   
+
     ! Log the time taken 
     call write_cpu_timer(format_str,cpu_tstart,cpu_tend,telap)
 
 
-    ! Update ksp number and write in log file 
+    ! Update ksp number and write in log file
     ksp_tot=ksp_tot+ksp_iter
     du(0)=ZERO
     maxdu=maxscal(maxval(abs(du)))
@@ -773,12 +785,11 @@ loop_step: do i_step=istep0,nstep
   ! WE: These time derivatives are stored in nodalu, nodalphi, nodalsl 
   if (ISSL_DOF)then
 
-
-
     dt = 1.0_kreal
 
-    write(logunit,*)'calculating update with dt: ', dt
-
+    if(myrank.eq.0)then 
+      write(*,*)'calculating update with dt: ', dt
+    endif
 
     nodalu   = dt*nodalu      ! i guess initial displacement is zero but need to do this properly 
     nodalphi = dt*nodalphi    ! Need to convert to gravity for use...
@@ -795,11 +806,12 @@ loop_step: do i_step=istep0,nstep
     call calculate_SL_A(nodalsl, nodalu)
   endif 
 
-
+  call sync_process()
+  
 
   if(ISDISP_DOF)then
     if(myrank.eq.0)then 
-      write(logunit,*)'   saving displacement variables'
+      write(*,*)'   saving displacement variables'
     endif 
 
     call save_displacement_variables(strain_elmt, strain_nodal, &
@@ -814,21 +826,24 @@ loop_step: do i_step=istep0,nstep
 
   if(ISPOT_DOF)then
     if(myrank.eq.0)then 
-      write(logunit,*)'   saving potential variables'
+      write(*,*)'  saving potential variables'
     endif 
     call save_pot_variables(nodalphi, nodalg, nodalB, node_valency,i_step=0)
   endif
   
 
   if(ISSL_DOF)then 
+
+
+    minnodalsl = minscal(minval(DIM_L*nodalsl))
+    maxnodalsl = maxscal(maxval(DIM_L*nodalsl))
     if(myrank.eq.0)then 
-      write(mySLlogunit,*)'Saving SL to free surface'
-      write(mySLlogunit,*)'Saving the current SL values'
-      write(mySLlogunit,*)'  --> Min sea level: ', minval(DIM_L*nodalsl)
-      write(mySLlogunit,*)'  --> Max sea level: ', maxval(DIM_L*nodalsl)
-      write(debugunit,*)maxval(DIM_L*nodalsl)
-      flush(mySLlogunit)
-    endif 
+      write(*,*)'Saving SL to free surface'
+      write(*,*)'Saving the current SL values'
+      write(*,*)'  --> Min sea level: ', minnodalsl
+      write(*,*)'  --> Max sea level: ', maxnodalsl
+    endif
+
 
     ! WATER
     if(savedata%fsplot)then

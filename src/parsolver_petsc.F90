@@ -806,12 +806,13 @@ end subroutine petsc_set_ksp_operator
 
 subroutine petsc_set_stiffness_matrix(storekmat)
   ! WHERE WE ACTUALLY SET THE STIFFNESS MATRIX
+use global
 use math_library_mpi,only:sumscal
 use ieee_arithmetic
 implicit none
 
 real(kind=kreal),intent(in) :: storekmat(:,:,:)                                  
-integer :: i,i_elmt,ielmt,j,n,ndzero ,igll, ictr   , iloop                                         
+integer :: i,i_elmt,ielmt,j,n,ndzero ,igll, ictr ,r  , iloop                                         
 integer :: ggdof_elmt(NNDOF, ngll)                                                     
 
 integer :: finaldof(NEDOF), nuphi_dof, theta_dof
@@ -829,7 +830,7 @@ real(kind=8) :: xval
 
 call MatZeroEntries(Amat,ierr) ! set all vals to 0
 CHKERRA(ierr)
-call sync_process
+call sync_process 
 rval=1.0
 
 
@@ -840,33 +841,14 @@ do i_elmt=1, nelmt
   ! Get global DOF indices for this element
   ielmt=i_elmt                                                                   
   ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))    
-  
-
-
 
   ! Reorders the u and phi DOFs into a 1D array
   nuphi_dof = nndofu+nndofphi
   finaldof = 0 
   finaldof(1:(nuphi_dof)*ngll) = reshape(ggdof_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
 
-
-  ! Now add the theta DOF starting from end of u, phi stuff: 
-  !ictr = 1 
-  !do igll = 1, ngll 
-  !  theta_dof = ggdof_elmt(nuphi_dof+1, igll)
-  !  if (theta_dof.ne.0) then 
-  !    finaldof((nuphi_dof)*ngll + ictr) = theta_dof
-  !    ictr=ictr+1
-  !  endif 
-  !enddo 
-!
+  ! Add the sea level DOFs
   finaldof((nuphi_dof)*ngll + 1:(nndof)*ngll) = ggdof_elmt(nndof, :)
- 
-  !write(kmatunit,*)'Final DOF: ', finaldof
-  !write(kmatunit,*)
-
-
-
   ! petsc index starts from 0   
   finaldof=finaldof-1 
 
@@ -875,7 +857,6 @@ do i_elmt=1, nelmt
     do j=1,NEDOF                                                                 
     irow=i; jcol=j 
 
-    
     if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                      
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
@@ -886,7 +867,6 @@ do i_elmt=1, nelmt
         stop                                                                     
       endif                                                                     
       call MatSetValues(Amat, 1, finaldof(irow), 1, finaldof(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr)
-      !write(logunit,*)'  ',finaldof(irow), finaldof(jcol), storekmat(i,j,ielmt)
       CHKERRA(ierr)                                                              
     endif 
     
@@ -939,7 +919,7 @@ if(ndzero.gt.0)then
   flush(logunit)
 endif                                                                            
 call VecRestoreArrayF90(vdiag,diag_array,ierr)                                   
-call sync_process                                                                
+call sync_process                                                        
 call VecDestroy(vdiag,ierr)
                                                       
 end subroutine petsc_set_stiffness_matrix
@@ -1157,7 +1137,10 @@ use output_to_user
         else 
             log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ; 
         endif 
-        call write_ifproc0(logunit)
+       ! call write_ifproc0(logunit)
+        if(myrank.eq.0)then
+          write(*,*)trim(log_msg)
+        endif 
 
 
         call petsc_set_stiffness_matrix(storekmat)

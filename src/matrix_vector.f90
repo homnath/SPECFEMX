@@ -124,8 +124,7 @@ module matrix_vector
     use shape_library
     !use sea_level
     use gll_library
-    use integration,only:dshape_hex8,lagrange_gll,dlagrange_gll,gll_weights,       &
-    prepare_integration
+    use integration,only:dshape_hex8,lagrange_gll,dlagrange_gll,gll_weights, prepare_integration
     use infinite_element
     use free_surface, only: nelmt_fs, iface_fs, id_elem_fs
 
@@ -200,11 +199,12 @@ module matrix_vector
     ! Sea level free surface contributions to stiffness matrix:
     if (ISSL_DOF) then
       ! Update logfile 
-      write(mySLlogunit,*)
+      write(mySLlogunit,*) 
       write(mySLlogunit,*)'Calculating sea level stiffness matrix'
       
       ! Initialise
       allocate(kSL(nedof,nedof))
+
       storekmatSL = zero
 
       ! Create stiffness file 
@@ -213,7 +213,6 @@ module matrix_vector
         open(unit=kmatunit,file=trim(kmat_log_file),status='replace',action='write',iostat=ios)
         if(ios.ne.0)then
             write(errtag,'(a)')'ERROR: cannot open log file: '//trim(kmat_log_file)
-            !call control_error(errcode,errtag,stdout,myrank)
         endif
       endif 
 
@@ -225,10 +224,9 @@ module matrix_vector
         kSL = zero 
         call calc_SL_stiffness(i_elmtfs, kSL)
         storekmatSL(:,:,id_elem_fs(i_elmtfs)) = storekmatSL(:,:,id_elem_fs(i_elmtfs)) +  kSL
-
       enddo ! loop FS elements  
     endif ! if IS_SLDOF 
-    
+   
 
 
 
@@ -1753,17 +1751,19 @@ end subroutine get_fs_details
       real(kind=kreal), allocatable  :: dshape4(:,:,:)
       real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
                                       dx_dxi(NDIM), dx_deta(NDIM)
-      integer :: num4(4), gid, phi_ind, u_ind, j,k, abg, xyg, gid_abg, gid_xyg, i_dim
+      integer :: num4(4), gid, phi_ind, u_ind, j,k, abg, xyg, gid_abg, gid_xyg, i_dim, i
       real(kind=kreal) ::   pi_2d_abg, pi_2d_xyg, area_inv, &
                           ival, iival, rho_over_g 
   
       real(kind=kreal) :: g0abg, grav_abgj, Cabg, utfj, g0xyg, Cxyg, v1,rho_Ag
-  
+      integer :: num(nenode)
+
   
       integer :: abgdof(5), xygdof(5), iloop, gidloc(maxngll2d)
       integer :: face_nodes(maxngll2d),  ggdof_elmt_fs(5,maxngll2d), & 
                  dof_u(NDIM, maxngll2d), dof_u_tmp(NDIM,ngll), dof_phi(maxngll2d), dof_sl(maxngll2d)
 
+      integer :: fgdof(nndof*maxngll2d)    , nfdof        
 
       ! Code
       allocate(gw(maxngll2d))
@@ -1773,21 +1773,45 @@ end subroutine get_fs_details
       ! Inverse area
       area_inv = ONE/SLarea
 
-  
-      ! Get details of element's face that lies on free surface
+        ! Get details of element's face that lies on free surface
       call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
       num4   = gnum4_fs(:, i_elmtfs)
       coord  = g_coord(:,num4)
       
+      ! Alt attempt:
+      !num=g_num(:,id_elem_fs(i_elmtfs))
+      !coord=g_coord(:,num(hexface(iface)%gnode))
+
+
+      !write(*,*)'iface: ',iface
+      !write(*,*)'num4 : ',num4
+      !write(*,*)'coord: ',coord
+
 
       ! Node values within the element (1-27) - returns 9 points
       face_nodes = hexface(iface)%node
 
+      !write(*,*)'facenode: ',face_nodes
+
       ! The global IDs of the nodes? array of length maxngll2d
       gidloc =  gnum_fs(:, i_elmtfs)
 
+      !write(*,*)'gidloc: ',gidloc
+
       ! The GLOBAL DOFs values of the entire element  (5,maxngll2d)
-      ggdof_elmt_fs(:,:) = ggdof(:, gnum_fs(:,i_elmtfs))
+      ggdof_elmt_fs(:,:) = ggdof(:, gnum_fs(:, i_elmtfs))
+      !do i=1,maxngll2d
+      !  write(*,*)'  * : ',ggdof_elmt_fs(:,i)
+      !enddo 
+
+      nfdof = nfgll * NNDOF
+      !write(*,*)'nfdof: ',nfdof
+
+      ! Alt attempt: 
+      fgdof(1:nfdof)=reshape(gdof(idofu,g_num(hexface(iface)%node,id_elem_fs(i_elmtfs))), (/nfdof/))
+
+      !write(*,*)'fgdof: ',fgdof
+
 
 
       ! Get the element-scale degrees of freedom  
@@ -1796,28 +1820,10 @@ end subroutine get_fs_details
       dof_phi   = edofphi(face_nodes)      !(maxngll2d)
       dof_sl    = edofsl(face_nodes)       !(maxngll2d)
 
-      !if (id_elem_fs(i_elmtfs).eq.225) then 
-      !  write(kmatunit,*)"Element ID         :  ", i_elmtfs
-      !  write(kmatunit,*)"Global Element ID  :  ", id_elem_fs(i_elmtfs)
-      !  write(kmatunit,*)"Face number        :  ", iface
-      !  write(kmatunit,*)"Face nodes         :  "
-      !  write(kmatunit,*)'  ', face_nodes(:)
-      !  write(kmatunit,*)
-      !  write(kmatunit,*) "GID for GLL points:  "
-      !  write(kmatunit,*) gidloc(:)
-      !  write(kmatunit,*)
-      !  write(kmatunit,*)"GGDOF_FS           :  "
-      !  do iloop = 1, maxngll2d
-      !    write(kmatunit,*)'  *  ', ggdof_elmt_fs(:,iloop)
-      !  enddo 
-      !  write(kmatunit,*)
 
-      !  write(kmatunit,*)'dof_u_tmp :', dof_u_tmp
-      !  write(kmatunit,*)'dof_u     :', dof_u
-      !  write(kmatunit,*)'dof_phi   :', dof_phi
-      !  write(kmatunit,*)'elmt dof for sl    :', edofsl
-      !  write(kmatunit,*)'dof_sl face nodes only:     :', edofsl(face_nodes)
-      !endif 
+      !write(*,*)'dof_phi: ',dof_phi
+      !write(*,*)'dof_sl: ',dof_sl
+
 
 
       do abg = 1, nfgll ! ABG
@@ -1831,20 +1837,42 @@ end subroutine get_fs_details
         face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
         face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
         pi_2d_abg     = gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
-        
+
         ! Get the values here because they are repeated lots 
         Cabg       = oceanf(i_elmtfs, abg)  ! Ocean func abg
+
+        !write(*,*)'gid_abg  : ',gid_abg
+        !write(*,*)'g0abg    : ',g0abg
+        !write(*,*)'gw(abg)  : ',gw(abg)
+        !write(*,*)'pi_2d_abg: ',pi_2d_abg
+        !write(*,*)'Cabg     : ',Cabg
+
+
 
         ! Factor of rho/g outside of integral 
         rho_over_g =  (rho_water/g0abg)       ! rho/g
         rho_Ag     =  (rho_over_g / SLarea)    ! rho/(g*Area)
 
+
+        !write(*,*)' ------ ABGDOF:  -----'
+        !write(*,*)'u_dof     : ',dof_u(1, abg)
+        !write(*,*)'u_dof     : ',dof_u(2, abg)
+        !write(*,*)'u_dof     : ',dof_u(3, abg)
+        !write(*,*)'u_phi     : ',dof_phi(abg)
+        !write(*,*)'u_sl      : ',dof_sl(abg)
+        !write(*,*)
+
+
+
         ! DIAGONAL theta_tilde theta_dot
         kmatSL(dof_sl(abg), dof_sl(abg)) = kmatSL(dof_sl(abg), dof_sl(abg)) - (theta_tf * pi_2d_abg * g0abg * rho_water)
 
+        !write(*,*)'v1     : ',(theta_tf * pi_2d_abg * g0abg * rho_water)
         
         ! theta_tilde Phi_dot 
         kmatSL(dof_sl(abg), dof_phi(abg)) = kmatSL(dof_sl(abg), dof_phi(abg)) - (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
+
+        !write(*,*)'v2     : ',(phi_tf * Cabg * pi_2d_abg  * rho_over_g)
 
         ! phi_tilde Phi_dot 
         kmatSL(dof_phi(abg), dof_phi(abg)) = kmatSL(dof_phi(abg), dof_phi(abg)) + (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
@@ -1856,15 +1884,24 @@ end subroutine get_fs_details
             ! u_tilde Phi_dot 
             kmatSL(dof_u(j, abg), dof_phi(abg)) = kmatSL(dof_u(j, abg), dof_phi(abg)) + (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g) 
             
+            !write(*,*)'v3     : ',(Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g)
+
+
             ! theta_tilde u_dot 
             kmatSL(dof_sl(abg), dof_u(j, abg)) = kmatSL(dof_sl(abg), dof_u(j, abg)) - (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)
+            !write(*,*)'v4     : ', (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)
+
 
             ! phi_tilde u_dot 
             kmatSL(dof_phi(abg), dof_u(j,abg)) = kmatSL(dof_phi(abg), dof_u(j,abg)) + (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
+            !write(*,*)'v5     : ', (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
+
 
             do k=1,NDIM
               ! u_tilde u_dot  
               kmatSL(dof_u(k,abg),dof_u(j,abg)) = kmatSL(dof_u(k,abg),dof_u(j,abg))  + (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
+            !write(*,*)'v6     : ', (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
+
             enddo !k
         enddo  ! j 
 

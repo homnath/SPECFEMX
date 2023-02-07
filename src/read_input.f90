@@ -223,7 +223,6 @@ else
   inp_path='./input/'
 endif
 
-SL_path='./input/'
 
 ! output path
 out_path='./output/'
@@ -1187,8 +1186,8 @@ do
   endif
   write(errtag,'(a)')'ERROR: invalid line type: "'//trim(token)//'"!'
   return
-
 enddo ! do
+
 
 if(.not.iswater)savedata%porep=.false.
 
@@ -1236,6 +1235,10 @@ if(myrank==0)then
   flush(logunit)
 endif
 !--------------------------------------------------------
+
+! SL files are not partitioned
+SL_path = inp_path
+
 ! set data path
 if(ismpi.and.nproc.gt.1)then
   data_path=trim(part_path)
@@ -1243,9 +1246,8 @@ else
   data_path=trim(inp_path)
 endif
 
-if(myrank.eq.0)then 
-  write(*,*)'Sea level path: ', trim(SL_path)
-endif 
+
+
 
 if(myrank==0)then
   write(logunit,'(a)')'reading mesh & material IDs...'

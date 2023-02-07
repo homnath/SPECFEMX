@@ -101,7 +101,10 @@ use solver_petsc
         write(logunit,*)'About to run solver'
         !call petsc_print_vector()
         !write(*,*)'MATRIX:'
-        !call petsc_print_matrix()
+        !if(myrank.eq.0)then
+        !  call petsc_print_matrix()
+        !endif 
+
 
         call petsc_solve(du(1:), ksp_iter, ksp_convreason)
         log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0(logunit)

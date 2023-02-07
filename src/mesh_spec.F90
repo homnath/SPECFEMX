@@ -156,6 +156,7 @@ enddo
 deallocate(g_coord,g_num) ! no longer need these
 allocate(iglob(npoint))
 
+
 ! gets ibool indexing from local (gll points) to global points
 call get_global(ndim,xstore,ystore,zstore,iglob,nnode,npoint,xmin,xmax)
 

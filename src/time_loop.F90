@@ -59,6 +59,7 @@ use global
 use matrix_vector
 #if (USE_MPI)
 use parsolver
+use mpi_library
 #if (USE_COMPLEX)
 use parsolver_petsc_complex
 #else
@@ -66,11 +67,12 @@ use parsolver_petsc
 #endif
 #else
 use sparse_serial
+use serial_library
 use solver_petsc
 #endif
         
 ! IO variables: 
-integer :: i_step 
+integer :: i_step ,i 
 real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:),  rhoload(:)
 logical            :: isscale_ang_freq
 real(kind=kreal)   :: ang_freq, scale_ang_freq2, dt
@@ -111,6 +113,7 @@ if(steptype.eq.FREQSTEP)then
             call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
             ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
         endif
+
         write(kmatunit,*)'--> Done.'
 
     elseif(i_step==2)then

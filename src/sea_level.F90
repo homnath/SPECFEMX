@@ -572,7 +572,7 @@ do i_elmt=1, nelmt_fs
 enddo
 
 
-write(*,*)'  ✓ Updated ocean function'
+
 write(mySLlogunit,*)
 flush(mySLlogunit) 
 end subroutine update_ocean_function
@@ -672,14 +672,7 @@ use serial_library
     flush( mySLlogunit) 
 
 
-    ! Escape if no water. 
-    if(SLarea.le.ZERO.or.SLvolume.le.ZERO)then 
-        write(*,*)'ERROR: Volume/Area of ocean = 0 -- NO WATER!!!' 
-        write(*,*)'SL Area  : ', SLarea * DIM_L * DIM_L 
-        write(*,*)'SL Volume: ', SLvolume  * DIM_L * DIM_L * DIM_L
-        write(*,*)'The assumption is that there is at least some defined ocean basin.' 
-        !stop 
-    endif 
+    
 
 
     deallocate(gw)
