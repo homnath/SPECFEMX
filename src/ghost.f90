@@ -5,7 +5,7 @@ module ghost
     contains 
 
     subroutine modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
-        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB, currentu)
+        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB, nodalphistore, nodalustore)
         ! Uses: 
         use global ! uses nproc, nenode
         use ghost_library_mpi ! uses prepare_ghost_gdof
@@ -16,7 +16,8 @@ module ghost
 
         real(kind=kreal) , allocatable :: coord(:,:), deriv(:,:), jac(:,:), bmat(:,:), &
                                           eld(:), eload(:),bload(:), vload(:), nodalu(:,:), &
-                                          nodalphi(:),  nodalg(:,:), nodalB(:,:), currentu(:,:)
+                                          nodalphi(:),  nodalg(:,:), nodalB(:,:),  &
+                                          nodalphistore(:), nodalustore(:,:)
 
         ! Local variables
         integer :: istat 
@@ -38,13 +39,14 @@ module ghost
             stop
         endif
 
+
         if(ISSL_DOF)then
-            allocate(currentu(nndofu,nnode),stat=istat)
-            if (istat/=0)then
+            allocate(nodalustore(nndofu,nnode), nodalphistore(nnode), stat=istat)
+            if(istat/=0)then
                 write(logunit,*)'ERROR: cannot allocate memory!'
                 flush(logunit)
                 stop
-            endif 
+            endif
         endif 
 
 

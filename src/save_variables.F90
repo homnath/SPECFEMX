@@ -2,7 +2,7 @@ module save_variables
 contains 
 
 
-subroutine save_pot_variables(nodalphi,nodalg, nodalB,node_valency, i_step)
+subroutine save_pot_variables(nodalphi,nodalg, nodalB, node_valency, i_step)
 ! USES
 use global 
 use postprocess

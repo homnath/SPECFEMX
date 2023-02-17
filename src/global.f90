@@ -553,16 +553,18 @@ integer :: nedofsl    ! number of elemental degrees of freedom for sea level
 integer,allocatable  :: edofsl(:) !IDs for SL degrees of freedom per element
 
 ! Area of water, Volume of water, for tracking changes in water mass
-real(kind=kreal)     ::  SLarea       = 0.0_kreal 
-real(kind=kreal)     ::  totalSLA     = 0.0_kreal 
-real(kind=kreal)     ::  SLvolume     = 0.0_kreal   
-real(kind=kreal)     ::  SLmasschange = 0.0_kreal   
+real(kind=kreal)     ::  SLarea          = 0.0_kreal 
+real(kind=kreal)     ::  totalSLA        = 0.0_kreal 
+real(kind=kreal)     ::  SLvolume        = 0.0_kreal   
+real(kind=kreal)     ::  SLmasschange    = 0.0_kreal   
 real(kind=kreal)     ::  SLsummasschange = 0.0_kreal   
-real(kind=kreal)     ::  SLarea_old   = 0.0_kreal 
-real(kind=kreal)     ::  SLvolume_old = 0.0_kreal
+real(kind=kreal)     ::  SLarea_old      = 0.0_kreal 
+real(kind=kreal)     ::  SLvolume_old    = 0.0_kreal
 
 real(kind=kreal)     :: icechangevol           ! Volume of ice change
-real(kind=kreal)     :: icechangevoltmp           ! Volume of ice change
+real(kind=kreal)     :: icechangevoltmp        ! Volume of ice change temporary
+
+real(kind=kreal)     :: total_ice_mass_change  = 0.0_kreal       ! Over all timesteps
 
 real(kind=kreal) icerateval ! constant value of ice change 
 
@@ -571,7 +573,7 @@ real(kind=kreal) :: theta_tf    = ONE
 real(kind=kreal) :: u_tf(3)     = ONE
 real(kind=kreal) :: phi_tf      = ONE
 
-
+integer :: oceannodes, totaloceannodes ! counts the number of ocean nodes (C=1)
 
 ! developement variables
 ! By default model is nondimensionalized unless the "devel_nondim" is .false. 

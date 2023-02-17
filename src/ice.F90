@@ -75,45 +75,47 @@ end subroutine summarise_ICE_input_cart
 
 
 
-subroutine write_ICE0_to_ensight(nodalice)
+subroutine write_ice_to_ensight(nodalice, i_step)
     use global 
     use postprocess
     use set_precision
     use free_surface
     use dimensionless
     implicit none 
+    integer :: i_step
+    real(kind=kreal) :: nodalice(:)
 
-    real(kind=kreal),allocatable :: nodalice(:)
+    if(myrank.eq.0)then
+        write(*,*)
+        write(*,*)'Saving ice values'
+    endif 
 
-    write(ICElogunit, *)
-    write(ICElogunit,*)'Saving the original ICE values'
-    
-    ! On the free surface
+
     if(savedata%fsplot)then
-        call write_scalar_to_file_freesurf(nnode_fs, nodalice*DIM_L, &
-        ext='ice0',istep=0) 
-    endif
-    
-    if(savedata%fsplot_plane)then
-        call write_scalar_to_file_freesurf(nnode_fs, nodalice*DIM_L, &
-        ext='ice0', istep=0,plane=.true.) 
-    endif
+        call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalice, &
+        ext='ice',istep=i_step) 
+      endif
 
-    write(ICElogunit,*)'  ✓ Saved original ice level '
-    write(ICElogunit,*)
-    flush(ICElogunit)
+      if(savedata%fsplot_plane)then
+        call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalice, &
+        ext='ice', istep=i_step, plane=.true.) 
+      endif
 
-end subroutine write_ICE0_to_ensight
+    if(myrank.eq.0)then 
+        write(*,*)'  ✓ Saved original ice level '
+        write(*,*)
+    endif 
+end subroutine write_ice_to_ensight
 
 
-subroutine write_icerate_to_ensight(nodalicerate)
+subroutine write_icerate_to_ensight(nodalicerate, i_step)
     use global 
     use postprocess
     use free_surface
     use dimensionless
     implicit none 
     real(kind=kreal) :: nodalicerate(:) ! Nodal rate of I values
-
+    integer :: i_step
 
     write(ICElogunit,*)'Saving the icerate values'
     
@@ -121,12 +123,12 @@ subroutine write_icerate_to_ensight(nodalicerate)
     ! On the free surface
     if(savedata%fsplot)then
         call write_scalar_to_file_freesurf(nnode_fs, nodalicerate*DIM_L, &
-        ext='icerate',istep=0) 
+        ext='icerate',istep=i_step) 
     endif
     
     if(savedata%fsplot_plane)then
         call write_scalar_to_file_freesurf(nnode_fs, nodalicerate*DIM_L, &
-        ext='nodalice', istep=0,plane=.true.) 
+        ext='nodalice', istep=i_step,plane=.true.) 
     endif
 
     write(ICElogunit,*)'  ✓ Saved ice rate level '
@@ -201,10 +203,12 @@ subroutine set_original_ice_level(nodalice)
     real(kind=kreal) :: params(4)
 
     ! Code: 
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit, *)'        Setting original ice distribution           '
-    write(ICElogunit,*)'-----------------------------------------------------'
-
+    if(myrank.eq.0)then
+    write(*,*)'-----------------------------------------------------'
+    write(*, *)'        Setting original ice distribution           '
+    write(*,*)'-----------------------------------------------------'
+    endif 
+    
     ! Loop through each ice object user inputted :
     do i_obj = 1, nice_obj
         iceobjtype = iceobjs(i_obj, 1)
@@ -216,6 +220,10 @@ subroutine set_original_ice_level(nodalice)
         elseif (iceobjtype.eq.2) then 
             ! Cylinder - args: x, y, rad, height
             call add_ice_cylinder(params, nodalice)
+        elseif (iceobjtype.eq.3)then 
+            ! Gaussian - args: x, y, amp, sigma
+            call add_ice_gaussian(params, nodalice)
+
         else
             ! Invalid entry
             write(*,*)'ERROR: Unknown ice object type: ', iceobjtype
@@ -332,6 +340,81 @@ subroutine add_ice_cylinder(params, nodalice)
     flush(ICElogunit)
 end subroutine add_ice_cylinder
 
+
+
+subroutine add_ice_gaussian(params, nodalice)
+    ! Adds a gaussian of ice in the required location
+    ! Uses 2D gaussian: (Amp/2 pi sigma^2) * exp(- (x^2 + y^2)/(2sigma^2) ) 
+    ! input params are x, y, amp, sigma
+    use set_precision
+    use global 
+    use dimensionless
+    use integration
+    use free_surface
+    use math_constants
+
+    ! IO vars: 
+    real(kind=kreal) :: params(4), nodalice(:) ! x, y, rad, height
+
+    ! Local vars: 
+    integer :: i_obj,i_elmtfs,i_gll, iface,nfgll ,node_ctr
+    integer :: iceobjtype
+    integer :: ios, errcode
+
+    real(kind=kreal):: x, y, amp, sigma, coeff, dis, x_coord, y_coord, coord(3)
+
+
+    ! Cylinder params 
+    x       = params(1)*NONDIM_L
+    y       = params(2)*NONDIM_L
+    amp     = params(3)*NONDIM_L
+    sigma   = params(4)*NONDIM_L
+
+    ! Add to log file: 
+    if(myrank.eq.0)then
+        write(*,*)
+        write(*,*)' --  Creating Gaussian '
+        write(*,*)'      ->  centre (x,y): ', x*DIM_L, y*DIM_L
+        write(*,*)'      ->  amplitude   : ', amp*DIM_L
+        write(*,*)'      ->  sigma       : ', sigma*DIM_L
+    endif
+    
+    ! Constant amplitude of gaussian:
+    if(sigma.ne.ZERO)then
+        coeff = (amp/(2*PI * (sigma**2))) 
+    else
+        write(*,*)'ERROR: TRYING TO ADD GAUSSIAN WITH SIGMA = 0'
+        stop
+    endif 
+
+
+    ! Loop through each face on the free surface
+    node_ctr = 0
+    do i_elmtfs=1, nelmt_fs  
+
+        ! For each GLL point get the coordinates
+        call get_fs_details_noweights(i_elmtfs, iface, nfgll)
+        do i_gll = 1, nfgll 
+            ! Get X, Y, Z coordinates for the face 
+            coord   = g_coord(:,  gnum_fs(i_gll,i_elmtfs))
+            x_coord = coord(1)
+            y_coord = coord(2)
+
+            ! Add ice height to nodal point: 
+            nodalice(rgnum_fs(i_gll, i_elmtfs)) =  coeff* EXP(- ( (x_coord**2) + (y_coord**2))/(2 * sigma**2) ) 
+        enddo 
+    enddo 
+
+    if(myrank.eq.0)then
+        write(*,*)' ✓ Overwrite with gaussian'
+        write(*,*)
+    endif
+    
+end subroutine add_ice_gaussian
+
+
+
+
 ! ################### END INITIAL SETUP FUNCTIONS  #####################
 
 
@@ -340,26 +423,29 @@ end subroutine add_ice_cylinder
 
 subroutine set_ice_rate(nodalice, nodalicerate)
     ! Uses:
+    ! Removes a constant amount from anywhere with ice
+    ! if less than that amount of ice present, removes all of it 
     use set_precision
     use global 
     use free_surface
     use dimensionless
     use math_constants 
     ! IO variables: 
-    real(kind=kreal) :: nodalice(:), nodalicerate(:)  
+    real(kind=kreal) :: nodalice(:), nodalicerate(:),z_coord, current_ice, residual, coord(3)
     ! Local variables: 
     integer :: iface, nfgll, i_elmtfs, i_gll, gid
     ! Code
 
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit, *)'             Setting ice rate/change                '
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit, *)'CAUTION: ONLY IMPLEMENTING FIXED ICE RATE ACROSS REGIONS WITH ICE'
-    write(ICElogunit, *)
-    write(ICElogunit, *)'* Using fixed ice rate value:', icerateval
-    write(debugunit, *)icerateval
-
-    
+    if(myrank.eq.0)then
+        write(*,*)'-----------------------------------------------------'
+        write(*,*)'             Setting ice rate/change                '
+        write(*,*)'-----------------------------------------------------'
+        write(*,*)'CAUTION: ONLY IMPLEMENTING FIXED ICE RATE ACROSS REGIONS WITH ICE'
+        write(*,*)
+        write(*,*)'* Using fixed ice rate value:', icerateval
+        write(*,*)'* If larger than height of ice, just removes all ice.'
+        write(*,*)
+    endif 
 
     ! Loop elements
     do i_elmtfs = 1, nelmt_fs  
@@ -367,19 +453,132 @@ subroutine set_ice_rate(nodalice, nodalicerate)
         call get_fs_details_noweights(i_elmtfs, iface, nfgll)
         ! Loop GLL 
         do i_gll = 1, nfgll 
-            gid = rgnum_fs(i_gll, i_elmtfs)
-            ! Apply constant value to anywhere with ice: 
-            if (nodalice(gid).gt.zero) then 
-                nodalicerate(gid) = icerateval*NONDIM_L
-            endif 
-        enddo 
-    enddo 
-    write(ICElogunit,*)' ✓ Finished setting ice rate/change'
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit,*)
-    flush(ICElogunit)
+            ! Get X, Y, Z coordinates for the face 
+            coord   = g_coord(:,  gnum_fs(i_gll,i_elmtfs))
+            z_coord = coord(3)
 
+            gid = rgnum_fs(i_gll, i_elmtfs)
+            current_ice = nodalice(gid)
+
+            ! Only for locations with ice present: 
+            if (current_ice.gt.zero) then 
+                residual  = (current_ice+icerateval)*NONDIM_L
+                
+                !if(current_ice.ge.ONE)then
+                !        write(*,*)'current ice: ',current_ice
+                !        write(*,*)'icerateval: ',icerateval
+                !        write(*,*)'residual: ',residual
+                !endif 
+
+                if(residual.le.zero)then 
+                    !if(current_ice.ge.ONE)then
+                    !    write(*,*)'remove1: ',-current_ice*NONDIM_L
+                    !    write(*,*) 
+                    !endif 
+                    !Just remove all of what is present currently
+                    nodalicerate(gid) = -current_ice*NONDIM_L
+                else
+                    ! Trim a bit off the top!
+                    !if(current_ice.ge.ONE)then
+                    !    write(*,*)'remove2: ',icerateval*NONDIM_L
+                    !    write(*,*) 
+                    !endif 
+                    nodalicerate(gid) = icerateval*NONDIM_L
+                endif
+            endif ! If some ice exists
+        enddo !igll
+    enddo !inode_fs
+
+    !if(myrank.eq.0)then
+    !    write(*,*)' ✓ Finished setting ice rate/change'
+    !    write(*,*)'-----------------------------------------------------'
+    !    write(*,*)
+    !endif 
 end subroutine set_ice_rate
+
+
+
+
+subroutine set_ice_rate_slice(nodalice, nodalicerate)
+    ! Uses:
+    ! Removes a slice of ice from the top
+    use set_precision
+    use global 
+    use free_surface
+    use dimensionless
+    use math_constants 
+#if(USE_MPI)
+use math_library_mpi
+use mpi_library
+use mpi
+#else
+use math_library_serial
+use serial_library
+#endif
+
+    ! IO variables: 
+    real(kind=kreal) :: nodalice(:), nodalicerate(:),z_coord, current_ice, residual, threshold, coord(3),maxice
+    ! Local variables: 
+    integer :: iface, nfgll, i_elmtfs, i_gll, gid
+    ! Code
+
+   ! Get maxvalue of current ice: 
+    maxice=maxscal(maxval(nodalice))
+    threshold = maxice + icerateval
+    
+
+
+    if(myrank.eq.0)then
+        write(*,*)'-----------------------------------------------------'
+        write(*,*)'             Setting ice rate/change                '
+        write(*,*)'* Using fixed ice rate value: ', icerateval
+        write(*,*)'* Threshold                 : ', threshold
+        write(*,*)'* maxice                    : ', maxice
+    endif 
+
+ 
+
+    if (maxice.gt.zero)then 
+        ! Loop elements
+        do i_elmtfs = 1, nelmt_fs  
+            ! Get number of GLL 
+            call get_fs_details_noweights(i_elmtfs, iface, nfgll)
+            ! Loop GLL 
+            do i_gll = 1, nfgll 
+                ! Get X, Y, Z coordinates for the face 
+                coord   = g_coord(:,  gnum_fs(i_gll,i_elmtfs))
+                z_coord = coord(3)
+
+                gid = rgnum_fs(i_gll, i_elmtfs)
+                current_ice = nodalice(gid)
+
+                
+                ! If within top threshold section... 
+                if(threshold.le.zero) then 
+                    nodalicerate(gid) = -current_ice*NONDIM_L
+                elseif (current_ice.gt.threshold) then 
+                    nodalicerate(gid) = (threshold-current_ice)*NONDIM_L  !icerateval*NONDIM_L
+                else 
+                    nodalicerate(gid) = zero 
+                endif 
+
+            enddo !igll
+        enddo !inode_fs
+    endif 
+
+
+
+    if(myrank.eq.0)then
+        write(*,*)' ✓ Finished setting ice rate/change'
+        write(*,*)'-----------------------------------------------------'
+        write(*,*)
+    endif
+end subroutine set_ice_rate_slice
+
+
+
+
+
 
 
 
@@ -412,15 +611,16 @@ subroutine calculate_ice_change_volume(nodalicerate)
     allocate(dshape4(2,4,maxngll2d))
 
     write(ICElogunit,*)'* Calculating change in ice volume'
-    write(ICElogunit,*)'  --> WARNING: USING PROJECTION OF AREA TO THE VERTICAL'
+    write(ICElogunit,*)'  --> WARNING: USING PROJECTION OF AREA TO THE Z direction'
     write(ICElogunit,*)
 
     icechangevol = ZERO 
 
     do i_elmtfs = 1, nelmt_fs
+
         call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
         num4   = gnum4_fs(:, i_elmtfs)
-        coord = g_coord(:,num4)
+        coord  = g_coord(:,num4)
 
         do i_gll = 1, nfgll 
             ! Calculate the magnitude of the 2D jacobian 
@@ -435,14 +635,10 @@ subroutine calculate_ice_change_volume(nodalicerate)
             face_normal(1) = zero; 
             face_normal(2) = zero;
             detjac2d=sqrt(dot_product(face_normal,face_normal))       
-
+            
             icechangevol = icechangevol + (gw(i_gll) * detjac2d * nodalicerate(rgnum_fs(i_gll, i_elmtfs)))
         enddo ! i_gll
     enddo   ! i_elmtfs
-
-
-
-
     
     write(ICElogunit,*)'  --> Volume of ice change: ', icechangevol 
     write(ICElogunit,*)'  --> Mass of ice change  : ', icechangevol*rho_ice
@@ -515,7 +711,8 @@ use serial_library
     epsilon = sumepsilon
 
     if(myrank.eq.0)then
-        write(*,*)'  * ε value            : ', epsilon, myrank
+        write(*,*)'  * ε value            : ', epsilon
+        write(*,*)
     endif 
 
 
@@ -614,7 +811,13 @@ use serial_library
         nodal_iceload_u   =   nodal_iceload_u   * rho_ice
         nodal_iceload_phi =   nodal_iceload_phi * rho_ice
         nodal_iceload_sl  =   nodal_iceload_sl  * rho_ice
-        call write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step=0)
+
+        call write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step=i_step-1)
+
+        if(i_step.eq.nstep)then 
+            call write_iceload_to_ensight(nodal_iceload_sl*zero, nodal_iceload_phi*zero, nodal_iceload_u*zero, nodalu, i_step=i_step-1)
+        endif
+
     endif
 
     deallocate(gw)
@@ -638,7 +841,7 @@ subroutine write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_i
     real(kind=kreal) :: nodalu(:,:)
     integer :: i_step
 
-        ! Save sea level iceload
+    ! Save sea level iceload
     if(savedata%fsplot)then
       call write_scalar_to_file_freesurf(nnode_fs, nodal_iceload_sl,&
       ext='iceload_sl',istep=i_step) 
@@ -659,8 +862,8 @@ subroutine write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_i
     endif
 
     ! Displacement
-    write(ICElogunit,*)'Saving iceload_u - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
-    call write_vector_to_file(nnode,nodalu,ext='iceload_u',istep=i_step) 
+    !write(ICElogunit,*)'Saving iceload_u - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
+    !call write_vector_to_file(nnode,nodalu,ext='iceload_u',istep=i_step) 
     ! On the free surface
     if(savedata%fsplot)then
       call write_vector_to_file_freesurf(nnode_fs,nodal_iceload_u,&

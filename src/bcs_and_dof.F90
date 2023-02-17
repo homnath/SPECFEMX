@@ -5,7 +5,7 @@ contains
 ! ______________________________________________________________________
 subroutine sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv,&
     eld, eload, bload, vload, rhoload, resload, jac, bmat, nodalu, & 
-    nodalg, nodalphi, nodalB, tot_neq, max_neq, min_neq, currentu)
+    nodalg, nodalphi, nodalB, tot_neq, max_neq, min_neq, nodalphistore, nodalustore)
 
     ! This was previously a large part of the specfem3d script. Overall this
     ! section does the following: 
@@ -37,7 +37,7 @@ use dof
 
 implicit none 
 
-real(kind=kreal), allocatable :: bcnodalv(:,:), nodalu(:,:), currentu(:,:), nodalphi(:),nodalg(:,:), nodalB(:,:)
+real(kind=kreal), allocatable :: bcnodalv(:,:), nodalu(:,:), nodalphistore(:), nodalustore(:,:), nodalphi(:),nodalg(:,:), nodalB(:,:)
 integer,allocatable::num(:)
 integer,allocatable :: egdof(:),egdofu(:)
 integer :: tot_neq,max_neq,min_neq
@@ -94,8 +94,13 @@ call finalize_gdof(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 log_msg = 'complete!' ; call write_ifproc0(logunit)
 
+
+
+
 call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
-        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB, currentu)
+        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB, nodalphistore, nodalustore)
+
+
 
 
 ! store elemental global degrees of freedoms from nodal gdof

@@ -220,8 +220,8 @@ subroutine update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
     enddo
 
     if(myrank.eq.0)then
-      write(mySLlogunit,*)
-      write(mySLlogunit,*)'Max nodal sea level rate value: ', maxval(nodalslrate)
+      write(SLlogunit,*)
+      write(SLlogunit,*)'Max nodal sea level rate value: ', maxval(nodalslrate)
     endif 
   endif
 

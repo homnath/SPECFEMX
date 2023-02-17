@@ -78,7 +78,7 @@ character(len=500) :: errsrc
 
 
 ! istat: status indicator for allocation (can be used in other contexts)
-integer :: istat, numberproc, myproc
+integer :: istat, numberproc, myproc, allnodesfs
 
 ! do-loop indices
 integer :: i_dof,i_elmt,i_eq,i_gll,i_mat,i_nliter,i_node,i_comp,j_dof,j_node
@@ -119,7 +119,7 @@ integer :: todalOFNodes
 ! node_valency: number of elements that share each node.
 integer,allocatable::num(:),node_valency(:)
 
-integer :: nzero_dprecon
+integer :: nzero_dprecon, spareint
 real(kind=kreal),allocatable :: dprecon(:),ndscale(:)
 
 real(kind=kreal),allocatable :: bmat(:,:),coord(:,:),deriv(:,:),    &
@@ -158,8 +158,8 @@ real(kind=kreal),allocatable :: strain_elmt(:,:,:),strain_nodal(:,:),      &
 stress_elmt(:,:,:),stress_nodal(:,:),evpt(:,:,:)
 !bcnodalv: prescribed BC nodal variables
 !nodalu: nodal displacement for all nodes (not just BC)
-real(kind=kreal),allocatable :: bcnodalv(:,:),nodalu(:,:), currentu(:,:)
-real(kind=kreal),allocatable :: nodalphi(:),nodalg(:,:)
+real(kind=kreal),allocatable :: bcnodalv(:,:),nodalu(:,:), nodalustore(:,:) 
+real(kind=kreal),allocatable :: nodalphi(:),nodalphistore(:),nodalg(:,:)
 
 ! Sea level edit - WE 
 real(kind=kreal),allocatable :: nodalsl(:)  ! Nodal theta values
@@ -258,6 +258,7 @@ allocate(elas_e0(nst,ngll,nelmt_viscoelas), &
 visco_q0(nst,nmaxwell,ngll,nelmt_viscoelas),q0(nst,nmaxwell))
 
 
+
 ! prepare ghost partitions for the communication
 if(nproc.gt.1)then
   call prepare_ghost()
@@ -280,9 +281,7 @@ endif
 call sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv, &
                        eld, eload, bload, vload, rhoload, resload, &
                        jac, bmat, nodalu, nodalg, nodalphi, nodalB,& 
-                       tot_neq, max_neq, min_neq, currentu)
-
-
+                       tot_neq, max_neq, min_neq, nodalphistore, nodalustore)
 
 ! Calculate any prestress 
 call calculate_prestress(strain_elmt, strain_nodal,       &
@@ -291,10 +290,10 @@ call calculate_prestress(strain_elmt, strain_nodal,       &
                          errcode, errtag, ksp_iter, istat)
    
 
-
 ! compute node valency and assemble all node_valency across processors
 call calculate_valency(node_valency, num)
 call assemble_ghosts_nodal_iscalar(node_valency,node_valency)
+
 
 ! Update log with KSP details
 call log_KSP_summary()
@@ -304,7 +303,9 @@ call log_KSP_summary()
 call initialise_RHS_vectors(load, bodyload, selfload, viscoload, &
                             resload, du, u, kmat, storekmat,     &
                             storemmat, rhoload, ubcload, nodalu, & 
-                            visco_q0, elas_e0, extload, iceload)
+                            visco_q0, elas_e0, extload, iceload, & 
+                            nodalustore, nodalphistore)
+
 
 
 
@@ -336,6 +337,7 @@ if(solver_type.eq.petsc_solver)then
     call petsc_create_solver()                           
     log_msg='petsc_preallocate_matrix_size: SUCCESS!'; call write_ifproc0(logunit)
 endif 
+
 
 
 
@@ -405,6 +407,7 @@ endif
 ! Compute ELASTIC mass matrix once and for all 
 call compute_mass_elastic(storemmat,errcode,errtag)
 
+
 if(isplastic)then
   ! Compute minimum pseudo-time step for viscoplasticity
   dt_vp=dt_viscoplas(nmatblk,nu_blk,phi_blk,ym_blk)
@@ -417,16 +420,6 @@ if(isbodyload)then
   call compute_bodyload(selfload,selfweight=isselfweight)
 endif 
 
-
-! Arrays: 
-! nodalu       - the u at each node, or rate for SL 
-! currentu     - for SL is the actual displacement etc, with nodalu as rate. (SL only)
-
-! nodalice     - Ice level (SL only)
-! nodalicerate - rate of ice change (SL only)
-
-! nodalsl      - Sea level (SL only)
-! nodalslrate  - rate of sea-level change (SL only)
 call sync_process()
 
 
@@ -435,53 +428,64 @@ if(is_ICE)then
   ! Prepare the ice stuff and set the user-inputted initial condition
   call prepare_ice(nodalice, nodalicerate)
   call set_original_ice_level(nodalice)
-  call set_ice_rate(nodalice, nodalicerate)
-
-  ! Calculate change in Ice mass expected
-  call calculate_ice_change_volume(nodalicerate)
-  call MPI_Allreduce(icechangevol, icechangevoltmp, 1, MPI_KREAL, MPI_SUM, MPI_COMM_WORLD, errcode) 
-  icechangevol = icechangevoltmp
-  if (myrank.eq.0)then 
-    write(*,*)'Ice mass change for timestep: ', icechangevol*rho_ice
-  endif 
-
-
-
-  ! Save original ice to Ensight
-  if(savedata%ice0)then 
-    call write_ICE0_to_ensight(nodalice)
-  endif 
-  
-  if(savedata%icerate)then 
-    call write_icerate_to_ensight(nodalicerate)
-  endif 
-
 endif 
 
 
-
-
-! Initialise Sea Level 
+! -------------------- Initialise Sea Level --------------------
 if(is_SL)then 
   call prepare_sea_level(nodalsl, nodalslrate)
   call set_original_sea_level(nodalsl)
 
-  ! Save initial sea level if flagged: 
-  if(savedata%sl0)then 
-    call write_SL0_to_ensight(nodalsl)
-  endif 
-
   ! Calc ocean func using initial SL and output if desired
   call update_ocean_function(nodalice, nodalsl, errcode, errtag)  
-  if(myrank.eq.0)then 
-    write(*,*)'  ✓ Updated ocean function'
-  endif 
 
-  ! Save initial ocean function 
-  if(savedata%oceanf0)then
-    call write_OF_to_ensight(save_orig=.true.)
-  endif                                    
+  call sync_process()
+  totaloceannodes = sumscal(oceannodes) 
+
+  if(myrank.eq.0)then 
+    write(*,*)'  Total ocean nodes: ',totaloceannodes
+    write(*,*)'  ✓ Updated ocean function'
+  endif                             
 endif 
+! ----------------- FINISHED INITIALISING SEA LEVEL--------------------
+
+
+
+
+! Write initial (pre-looping) values to istep = 0
+if(savedata%ice)then 
+  call write_ice_to_ensight(nodalice, i_step=istep0-1)
+endif 
+if(savedata%sl)then
+  call write_SL_to_ensight(nodalsl, i_step=istep0-1)
+endif 
+if(savedata%oceanf)then
+  call write_OF_to_ensight(i_step=istep0-1)
+endif 
+call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=istep0-1)
+call save_displacement_variables(strain_elmt, strain_nodal, &
+                                 stress_elmt, stress_nodal, & 
+                                 nodalustore, node_valency, i_step=istep0-1)
+
+
+
+
+
+call sync_process()
+allnodesfs      = sumscal(nnode_fs) 
+
+minnodalsl = minscal(minval(DIM_L*nodalsl))
+maxnodalsl = maxscal(maxval(DIM_L*nodalsl))
+if(myrank.eq.0)then 
+  write(*,*)'Initial values:'
+  write(*,'(a,f10.6)')'  --> Min sea level: ', minnodalsl
+  write(*,'(a,f10.6)')'  --> Max sea level: ', maxnodalsl
+  write(*,*)
+  write(*,*)
+  write(*,*)'Total nodes on FS: ', allnodesfs
+endif
+
+
 
 
 
@@ -489,57 +493,71 @@ endif
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
 ! For elastic simulations there is only one timestep. 
 if (myrank.eq.0)then 
-  write(logunit,*)
-  write(logunit,*)    '----------------------------------------------'
-  write(logunit,*)    '------------ Starting time loop! -------------'
-  write(mySLlogunit,*)'------------ Starting time loop! -------------'
-  write(ICElogunit,*) '------------ Starting time loop! -------------'
-  write(logunit,*)
-  write(logunit,*)
+  write(*,*)
+  write(*,*) '----------------------------------------------'
+  write(*,*) '------------ Starting time loop! -------------'
 endif 
+
+
+
+loop_step: do i_step=istep0,nstep
 
 call sync_process()
 
-loop_step: do i_step=istep0,nstep
+
+  if(myrank.eq.0)then   
+    write(*,*)
+    write(*,*)
+    write(*,'(a,i0,a)')' ~~~~~~~~~~~~~~~~~~~~ TIMESTEP ', i_step, ' ~~~~~~~~~~~~~~~~~~~~'
+  endif 
+
   ! determine time (dt) or freq (df) step and current time/freq
   call calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
   
-  ! initialise some values 
-  ! These are the rates for SL 
-  nodalu  = ZERO
-  ubcload = ZERO
-  rhoload = ZERO
+  call reset_nodal_arrays_loads(nodalu,ubcload,rhoload,nodalphi,nodalslrate)
 
-  if(ISPOT_DOF)then
-    nodalphi=ZERO
-  endif
 
+
+  ! Update SL area if necessary 
   if(ISSL_DOF)then
-    nodalslrate = ZERO 
-    
-    ! Use ocean function to calculate area of ocean     
-    call calculate_SL_A(nodalsl, nodalu)
-    call sync_process()
-    ! Sum up Area over all of the nodes: 
-    call MPI_Allreduce(SLarea, totalSLA, 1, MPI_KREAL, MPI_SUM, MPI_COMM_WORLD, errcode) 
-    call MPI_Allreduce(SLmasschange, SLsummasschange, 1, MPI_KREAL, MPI_SUM, MPI_COMM_WORLD, errcode) 
-    SLarea = totalSLA
-    SLmasschange = SLsummasschange
-
-    ! Escape if no water. 
-    if(SLarea.le.ZERO)then 
-      write(*,*)'ERROR: Volume/Area of ocean = 0 -- NO WATER!!!' 
-      write(*,*)'SL Area  : ', SLarea * DIM_L * DIM_L 
-      write(*,*)'The assumption is that there is at least some defined ocean basin.' 
-      stop 
-    endif 
-
-
-    if (myrank.eq.0)then 
-      write(*,*)'Total SL area across nodes: ', SLarea
-      write(*,*)'Total SL mass change across nodes: ', SLmasschange
-    endif 
+      call update_SL_area(nodalsl, nodalu)
   endif
+
+  ! Calculate the change in ice for this timestep:
+  if(is_ICE)then 
+      call sync_process()
+      nodalicerate = ZERO
+      call set_ice_rate_slice(nodalice, nodalicerate)
+
+
+      ! Calculate change in Ice mass expected
+      call calculate_ice_change_volume(nodalicerate)
+      icechangevoltmp = sumscal(icechangevol) 
+      icechangevol = icechangevoltmp
+ 
+      total_ice_mass_change = total_ice_mass_change + icechangevol*rho_ice
+
+      if(myrank.eq.0)then
+        write(*,*)'Change in ice mass to occur: ',icechangevol*rho_ice
+        write(*,*)'Total ice change so far    : ',total_ice_mass_change
+      endif   
+
+
+
+      if(savedata%icerate)then 
+        ! Save at the timestep before because this is being used to calculate THIS timestep
+        call write_icerate_to_ensight(nodalicerate, i_step=i_step-1)
+        
+        ! But then for the final setup we need something like: 
+        if(i_step.eq.nstep)then 
+          call write_icerate_to_ensight(nodalicerate*zero, i_step=i_step)
+        endif 
+        
+      endif 
+
+  endif 
+
+
 
  
   ! Set the stiffness matrix
@@ -549,17 +567,12 @@ loop_step: do i_step=istep0,nstep
                                          eid_viscoelas, relaxtime)
                                          
 
-  ! apply traction boundary conditions for first timestep
+  !apply traction boundary conditions for first timestep
   !WE Reads and adds the traction to the extload variable
   if((istraction.or.isfstraction).and.i_step==1)then
-    call  apply_traction(extload,errcode,errtag, nodalu, i_step)
+    call apply_traction(extload,errcode,errtag, nodalu, i_step)
     call control_error(errcode,errtag,stdout,myrank)
-    if(myrank==0)then
-      write(logunit,*)'applied traction!',maxval(abs(extload))
-      flush(logunit)
-    endif
   endif
-
   ! Other types of forces: 
   if(trim(devel_example).eq.'axial_rod')then
     if(i_step>600)extload=ZERO 
@@ -578,8 +591,7 @@ loop_step: do i_step=istep0,nstep
 
   ! Calculate ice load: 
   if (is_ICE)then 
-    call calc_ice_load(iceload, nodalicerate, nodalu, i_step=0)
-    write(ICElogunit,*)'NOTE ICELOAD ENSIGHTS ARE NOT NONDIMENSIONALISED'
+    call calc_ice_load(iceload, nodalicerate, nodalu, i_step=i_step)
   endif 
 
 
@@ -587,7 +599,6 @@ loop_step: do i_step=istep0,nstep
   ! Note this is NOT applying the loading terms (e.g. extload)
   call apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload,&
                         nodalu, nodalphi)
-
 
 
   ! PREPARE BUILT IN SOLVER
@@ -649,8 +660,6 @@ loop_step: do i_step=istep0,nstep
     ! starting timer
     call cpu_time(cpu_tstart)
 
- 
-
     ! Run NL solver for this timestep 
     ! For our purpose all this does is sets the RHS vector to be resload 
     ! And then calls the 'run' command from petsc
@@ -658,20 +667,14 @@ loop_step: do i_step=istep0,nstep
                     scale_ang_freq2, ksp_iter, errcode, ksp_convreason,&
                     errtag, isscale_ang_freq)
 
-    
-   
-
     ! Log the time taken 
     call write_cpu_timer(format_str,cpu_tstart,cpu_tend,telap)
-
 
     ! Update ksp number and write in log file
     ksp_tot=ksp_tot+ksp_iter
     du(0)=ZERO
     maxdu=maxscal(maxval(abs(du)))
     call log_ksp_iteration(maxdu, ksp_iter, ksp_convreason)
-
-
 
     ! Update the u array with du 
     ! time steps are not incremental!!
@@ -708,12 +711,9 @@ loop_step: do i_step=istep0,nstep
     ! Calculate the stress and strain for elastic/viscoelastic elements
     if(ISDISP_DOF)then
 
-      ! Compute stress
-      ! Elastic elements
-      ! This part is repeated for the first step. We should change this 
-      ! for efficiency.
+      ! Compute stress for Elastic elements;this part is repeated for the first step. 
+      ! We should change this for efficiency.
       if(isplastic)bload=ZERO
-
       ! Calculate elastic/plastic stress & strain  
       call calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
                             m1, m2, m3, nelmt_elas, nl_isconv, num,   &
@@ -725,20 +725,11 @@ loop_step: do i_step=istep0,nstep
       bodyload(0)=ZERO
 
 
-      !fmax=maxscal(fmax)                                                           
-      !if(myrank==0)then                                                            
-      !  write(logunit,'(a,f0.6)') &                           
-      !  ' f_max:',fmax
-      !  write(logunit,'(a)')'-------------------------------------------'
-      !  flush(logunit) 
-      !endif
-
-
       ! If all elastic then leave non-linear loop because only one timestep 
-      if(allelastic) then 
-        write(logunit,*)' ALL ELASTIC --> EXITING NON LINEAR'
-        exit nonlinear
-      endif 
+      !if(allelastic) then 
+      !  write(logunit,*)' ALL ELASTIC --> EXITING NON LINEAR'
+      !  exit nonlinear
+      !endif 
 
 
       ! Calculate stress and strain for viscoelastic elements
@@ -752,7 +743,8 @@ loop_step: do i_step=istep0,nstep
                               eid_viscoelas, dt, num, q0)
       bodyload(0)=ZERO
       !viscoload(0)=ZERO
-    endif !(ISDISP_DOF)
+    endif !(ISDISP_DOF) 
+
 
     ! time step 0  and i_nliter 0 is entirely elastic
     ! write data for tiem step 0
@@ -765,8 +757,6 @@ loop_step: do i_step=istep0,nstep
       !  exit loop_step 
       !endif
     !endif ! i_step==1.and.i_nliter==1
-
-
     ! Exit nonlinear loop if converged
     if(nl_isconv) then 
       write(logunit,*)'NL is converged...exiting non-linear '
@@ -777,116 +767,100 @@ loop_step: do i_step=istep0,nstep
   ! ===================== FINISHED NON-LINEAR ITERATIONS =====================
 
 
-
+  
 
   ! WE: Update our vectors with a timestep: 
   ! WE: For sea level we solve for the time derivatives of the system so then we use
   ! WE: u(t + dt) = u(t) + dt * f(t) where f is the time derivative
   ! WE: These time derivatives are stored in nodalu, nodalphi, nodalsl 
-  if (ISSL_DOF)then
 
+  if (ISSL_DOF)then
+    
+    ! TODO: MAKE FLEXIBLE DT FOR UPDATE
     dt = 1.0_kreal
 
-    if(myrank.eq.0)then 
-      write(*,*)'calculating update with dt: ', dt
-    endif
-
-    nodalu   = dt*nodalu      ! i guess initial displacement is zero but need to do this properly 
-    nodalphi = dt*nodalphi    ! Need to convert to gravity for use...
+    nodalustore   = nodalustore   +  dt*nodalu
+    nodalphistore = nodalphistore +  dt*nodalphi
 
     nodalsl  = nodalsl  + (dt*nodalslrate)
     nodalice = nodalice + (dt*nodalicerate)
 
     ! Update ocean function and ocean area/volume 
     call update_ocean_function(nodalice, nodalsl, errcode, errtag)  
+    call sync_process()
+    totaloceannodes = sumscal(oceannodes) 
+    allnodesfs      = sumscal(nnode_fs) 
+
+    if(myrank.eq.0)then 
+      write(*,'(a, i0, a, i0)')'Total ocean nodes: ', totaloceannodes,'/', allnodesfs
+    endif
+
     if(savedata%oceanf)then
-      call write_OF_to_ensight(save_orig=.false.)
+      call write_OF_to_ensight(i_step=i_step)
     endif    
 
-    call calculate_SL_A(nodalsl, nodalu)
   endif 
+
 
   call sync_process()
   
 
   if(ISDISP_DOF)then
     if(myrank.eq.0)then 
-      write(*,*)'   saving displacement variables'
+      write(*,*)' * saving displacement variables'
     endif 
 
     call save_displacement_variables(strain_elmt, strain_nodal, &
                                     stress_elmt, stress_nodal, & 
-                                    nodalu, node_valency, i_step=0)
-
-    ! Benchmark calculation for elastic result
-    !if(benchmark_okada .and. ISDISP_DOF)then
-    !  call compute_okada_solution()
-    !endif
+                                    nodalustore, node_valency, i_step=i_step)
   endif
+  
 
   if(ISPOT_DOF)then
     if(myrank.eq.0)then 
-      write(*,*)'  saving potential variables'
+      write(*,*)' * saving potential variables'
     endif 
-    call save_pot_variables(nodalphi, nodalg, nodalB, node_valency,i_step=0)
+    call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=i_step)
   endif
   
 
   if(ISSL_DOF)then 
-
-
     minnodalsl = minscal(minval(DIM_L*nodalsl))
     maxnodalsl = maxscal(maxval(DIM_L*nodalsl))
     if(myrank.eq.0)then 
       write(*,*)'Saving SL to free surface'
       write(*,*)'Saving the current SL values'
-      write(*,*)'  --> Min sea level: ', minnodalsl
-      write(*,*)'  --> Max sea level: ', maxnodalsl
+      write(*,'(a,f10.6)')'  --> Min sea level: ', minnodalsl
+      write(*,'(a,f10.6)')'  --> Max sea level: ', maxnodalsl
     endif
 
-
-    ! WATER
-    if(savedata%fsplot)then
-      call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalsl, &
-      ext='sl',istep=0) 
-    endif
-    if(savedata%fsplot_plane)then
-      call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalsl, &
-      ext='sl', istep=0, plane=.true.) 
-    endif
-
-    ! ICE
-    if(savedata%fsplot)then
-      call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalice, &
-      ext='ice',istep=0) 
-    endif
-    if(savedata%fsplot_plane)then
-      call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalice, &
-      ext='ice', istep=0, plane=.true.) 
-    endif
+    ! Save SL
+    if(savedata%sl)then
+      call write_SL_to_ensight(nodalsl, i_step)
+    endif 
+    ! Save ice:
+    if(savedata%ice)then 
+      call write_ice_to_ensight(nodalice, i_step)
+    endif 
 
   endif 
 
 
-
-
-
-
-
-
-  
   ! Print warning if not converging
   if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
     if(myrank==0)then
       write(logunit,*)'WARNING: nonconvergence in nonlinear iterations!'
-      write(logunit,*)'desired tolerance:',NL_TOL,' achieved tolerance:',uerr
+      write(logunit,*)'desired tolerance:', NL_TOL,' achieved tolerance:',uerr
       flush(logunit)
     endif
   endif
 
 
+
   ! Update number of non-linear iterations
   nl_tot=nl_tot+nl_iter
+
+
 
   ! CURRENTLY NOT BEING USED/ACTIVATED >>> IMPORTANT WITH MORE TIMESTEPS? 
   ! --------------- Saving/plotting variables to Ensight ---------------
@@ -914,10 +888,16 @@ enddo loop_step ! i_step time/frequency stepping loop
 !----------------------------------------------------------------------
 ! ++++++++++++++++ END OF TIME LOOPING CODE ++++++++++++++++++++++++
 
+
+
+
+
+
+
 if(myrank==0)then 
   write(*,*); write(*,*)'Completed timesteps. Cleaning up... '
-  write(mySLlogunit,*)'Completed timesteps. Cleaning up... '
-  flush(mySLlogunit)
+  write(SLlogunit,*)'Completed timesteps. Cleaning up... '
+  flush(SLlogunit)
 endif 
 
 ! ----------------------------- CLEANUP --------------------------------

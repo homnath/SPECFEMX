@@ -134,7 +134,7 @@ if(is_SL)then
     write(logunit,*)'✓ Creating sea level log file ... '
     write(logunit,*) 
   endif 
-  flush(mySLlogunit)
+  flush(SLlogunit)
 endif 
 
 if(is_ICE)then 

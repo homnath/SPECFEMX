@@ -8,7 +8,8 @@ module initialise_arrays
 subroutine initialise_RHS_vectors(load, bodyload, selfload, viscoload, &
                                   resload, du, u, kmat, storekmat,     &
                                   storemmat, rhoload, ubcload, nodalu, & 
-                                  visco_q0, elas_e0, extload, iceload)
+                                  visco_q0, elas_e0, extload, iceload, &
+                                  nodalustore, nodalphistore)
 
 use global 
 use math_constants
@@ -20,7 +21,8 @@ real(kind=kreal),allocatable :: slipload(:), extload(:), bodyload(:),  &
                                 load(:), resload(:), kmat(:,:), du(:), & 
                                 u(:), storekmat(:,:,:), storemmat(:,:),&
                                 rhoload(:), nodalu(:,:), iceload(:),   & 
-                                visco_q0(:,:,:,:), elas_e0(:,:,:)     
+                                visco_q0(:,:,:,:), elas_e0(:,:,:),     &
+                                nodalustore(:,:), nodalphistore(:)
                                 
 
 integer :: istat
@@ -53,6 +55,11 @@ load      = ZERO
 u         = ZERO
 extload   = ZERO
 rhoload   = ZERO
+
+if(ISSL_DOF)then
+  nodalustore   = ZERO 
+  nodalphistore = ZERO
+endif
 
 end subroutine initialise_RHS_vectors
 

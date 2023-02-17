@@ -1133,11 +1133,11 @@ use output_to_user
             call write_ifproc0(logunit)
             log_msg = trim(' --> Setting PETSC stiffness symmetry to false') ;
 
-           symmetric_solver =.false.
+            symmetric_solver =.false.
         else 
             log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ; 
         endif 
-       ! call write_ifproc0(logunit)
+
         if(myrank.eq.0)then
           write(*,*)trim(log_msg)
         endif 

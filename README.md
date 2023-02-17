@@ -8,6 +8,7 @@ This form of SPECFEM-X is for the development of SPECFEM-C prior to any integrat
 
 ## To do list: 
 
+- [ ] Non-dimensionalise the ice loads 
 - [x] Add the final weak form term (ice contibution)
 - [x] Write ocean function updater using ice and theta comparison 
 - [x] When calling ```set_petsc_stiffness_SL``` do we need to parse the SL matrices as args? arent they global?
