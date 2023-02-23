@@ -88,7 +88,7 @@ use solver_petsc
           dprecon,gdof_elmt,ksp_iter,errcode,errtag)
           call control_error(errcode,errtag,stdout,myrank)
         endif
-      else
+    else
          ! petsc solver 
         if(steptype.eq.FREQSTEP.and.isscale_ang_freq)then
           resload=scale_ang_freq2*resload
@@ -111,7 +111,7 @@ use solver_petsc
   
         continue
 
-      endif
+    endif
 end subroutine run_solver
 !#######################################################################
 
@@ -463,6 +463,216 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
 
 
 end subroutine visco_stressstrain
+
+
+
+
+
+
+
+
+subroutine run_nonlinear_solver(u, du, olddu, storekmat, ndscale, dprecon, resload, isscale_ang_freq,&
+                                ksp_iter, bodyload, load, scale_ang_freq2, nl_iter, ksp_tot, uerr,&
+                                nl_isconv, nodalu, nodalphi, nodalslrate, bload, egdofu, dt_vp, & 
+                                nelmt_elas, num, eld, eload, bmat, deriv, eid_elas,strain_elmt, evpt,&
+                                f, stress_elmt, visco_q0, elas_e0, vload,nelmt_viscoelas, relaxtime, &
+                                muratio, i_step, tratio, eid_viscoelas, dt, q0)
+use global 
+#if (USE_MPI)
+use mpi_library
+use ghost_library_mpi
+use math_library_mpi
+#else
+use serial_library
+use math_library_serial
+use sparse_serial
+use solver
+use solver_petsc
+#endif
+use output_to_user
+implicit none 
+
+! IO variables: 
+real(kind=kreal),allocatable :: nodalslrate(:), relaxtime(:,:),muratio(:), tratio(:), q0(:,:)
+real(kind=kreal),allocatable :: du(:),u(:),olddu(:),nodalu(:,:),nodalphi(:)
+real(kind=kreal),allocatable :: storekmat(:,:,:), bmat(:,:), deriv(:,:),strain_elmt(:,:,:), evpt(:,:,:), stress_elmt(:,:,:)
+real(kind=kreal),allocatable :: dprecon(:),ndscale(:), eld(:)
+real(kind=kreal),allocatable :: resload(:), bodyload(:), load(:),bload(:), eload(:), vload(:), visco_q0(:,:,:,:), elas_e0(:,:,:)
+real(kind=kreal) :: uerr
+integer,allocatable :: eid_viscoelas(:)
+integer,allocatable::num(:)
+integer,allocatable :: egdofu(:),eid_elas(:)
+
+logical :: isscale_ang_freq,nl_isconv
+integer :: ksp_iter, nl_iter,ksp_tot, nelmt_elas, i_step, nelmt_viscoelas
+real(kind=kreal) :: scale_ang_freq2, dt_vp, f, dt
+
+
+! Local variables
+integer :: ksp_convreason   ! KSP convergence reason
+integer :: i_nliter,imatve
+real(kind=kreal)  :: fmax, jacw, dq1,dq2,dq3,dsbar,lode_theta,sigm, sigma(nst)
+real(kind=kreal)  :: maxresload,maxbodyload
+real(kind=kreal)  :: cpu_tstart,cpu_tend, telap,max_telap,mean_telap
+real(kind=kreal)  :: maxu,maxdu, estrain(nst), esigma(nst)
+real(kind=kreal)  :: devp(nst),evp(nst),flow(nst,nst), m1(nst,nst),& 
+                     m2(nst,nst),m3(nst,nst), effsigma(nst), cmat(nst,nst),erate(nst)
+real(kind=kreal) :: vesigma(nst), vsigma(nst)
+real(kind=kreal) :: e0(nst) !e0: initial strain
+real(kind=kreal) :: dev_strain(nst)
+real(kind=kreal) :: G,K,trace_strain
+
+
+character(len=20)  :: format_str
+character(len=250) :: errtag ! error message
+integer :: errcode
+errtag=""; errcode=-1
+
+
+
+
+
+! ===================== RUN NON LINEAR ITERATIONS ====================
+
+nonlinear: do i_nliter=1,NL_MAXITER
+  fmax=0 ! failure indicator for plastic simulation.
+  nl_iter=nl_iter+1
+
+  if(isplastic)then
+    resload=load+bodyload
+  else
+    resload=load-bodyload
+  endif
+
+  resload(0)=ZERO
+  maxresload=maxscal(maxval(abs(resload)))
+  maxbodyload=maxscal(maxval(abs(bodyload)))
+  
+  if(myrank==0)then
+    write(logunit,'(a,i0,1x,e12.5,1x,e12.5)')' Residual NL: ',i_nliter,&
+    maxresload,maxbodyload
+    flush(logunit)
+  endif
+
+  ! starting timer
+  call cpu_time(cpu_tstart)
+
+  ! Run NL solver for this timestep 
+  ! For our purpose all this does is sets the RHS vector to be resload 
+  ! And then calls the 'run' command from petsc
+  call run_solver(resload, dprecon, ndscale, storekmat, du, &
+                  scale_ang_freq2, ksp_iter, errcode, ksp_convreason,&
+                  errtag, isscale_ang_freq)
+
+  ! Log the time taken 
+  call write_cpu_timer(format_str,cpu_tstart,cpu_tend,telap)
+
+  ! Update ksp number and write in log file
+  ksp_tot=ksp_tot+ksp_iter
+  du(0)=ZERO
+  maxdu=maxscal(maxval(abs(du)))
+  call log_ksp_iteration(maxdu, ksp_iter, ksp_convreason)
+
+  ! Update the u array with du 
+  ! time steps are not incremental!!
+  ! therefore, NOT u(t+1)=u(t)+du
+  ! u contains both diaplacement and/or gravity
+  ! displacement
+  if(isplastic)then
+    u=du
+  else
+    u=u+du
+  endif
+
+  ! Get maximum value of u (disp/grav/sl etc)
+  maxu=maxscal(maxval(abs(u)))
+
+  ! check convergence
+  call check_convergence(uerr, maxu, maxdu, u, olddu,& 
+                         resload, nl_isconv, i_nliter)
+
+  ! Update nodal vectors following inversion step 
+  call sync_process()
+
+  ! Copy values from u --> nodalu, nodalphi etc... 
+  call update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
+
+  ! Reset bodyload to ZERO for Viscoelastic iteration.
+  ! We need to reconcile platic and viscoelastic iterations.
+  if(.not.isplastic)then
+    write(logunit,*)'  --> set bodyload to 0'
+    bodyload=ZERO; !viscoload=ZERO
+  endif 
+
+
+  ! Calculate the stress and strain for elastic/viscoelastic elements
+  if(ISDISP_DOF)then
+
+    ! Compute stress for Elastic elements;this part is repeated for the first step. 
+    ! We should change this for efficiency.
+    if(isplastic)bload=ZERO
+    ! Calculate elastic/plastic stress & strain  
+    call calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
+                          m1, m2, m3, nelmt_elas, nl_isconv, num,   &
+                          eld, eload, bload, nodalu, erate,eid_elas,&
+                          cmat, estrain, bodyload, sigma, effsigma, &
+                          bmat, deriv, jacw, strain_elmt, evpt ,    &
+                          stress_elmt, dq1, dq2, dq3, dsbar, f,     &
+                          fmax,lode_theta,sigm)
+    bodyload(0)=ZERO
+
+
+    ! If all elastic then leave non-linear loop because only one timestep 
+    !if(allelastic) then 
+    !  write(logunit,*)' ALL ELASTIC --> EXITING NON LINEAR'
+    !  exit nonlinear
+    !endif 
+
+
+    ! Calculate stress and strain for viscoelastic elements
+    call visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
+                            elas_e0, e0, i_step, bmat, deriv, eload, &
+                            bload, K, G, strain_elmt, i_nliter,      & 
+                            stress_elmt, estrain, dev_strain, jacw,  &
+                            trace_strain, esigma, vsigma, bodyload,  &
+                            vload, imatve, nelmt_viscoelas,relaxtime,& 
+                            egdofu, eld, nodalu, muratio, tratio,    &
+                            eid_viscoelas, dt, num, q0)
+    bodyload(0)=ZERO
+    !viscoload(0)=ZERO
+  endif !(ISDISP_DOF) 
+
+
+
+  ! time step 0  and i_nliter 0 is entirely elastic
+  ! write data for tiem step 0
+  !if(i_step==1.and.i_nliter==1)then
+  !write(logunit,*)'istep = 1 and i_nliter = 1'
+
+    ! If only allowed on NL iteration and only 1 timestep then exit whole loop
+    !if(nstep.le.1.and.NL_MAXITER.le.1)then
+    !  write(logunit,*)'nstep.le.1.and.NL_MAXITER.le.1 - exiting loop step '
+    !  exit loop_step 
+    !endif
+  !endif ! i_step==1.and.i_nliter==1
+  ! Exit nonlinear loop if converged
+
+  if(nl_isconv) then 
+    if(myrank.eq.0)then
+      write(*,*)'NL is converged...exiting non-linear '
+    endif
+    exit nonlinear
+  endif 
+
+enddo nonlinear ! i_nliter=1,NL_MAXITER
+! ===================== FINISHED NON-LINEAR ITERATIONS =====================
+
+return 
+
+end subroutine run_nonlinear_solver
+
+
+
 
 
 

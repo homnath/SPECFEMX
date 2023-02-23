@@ -59,7 +59,7 @@ end subroutine petsc_initialize
 
 subroutine petsc_create_vector()
 implicit none
-IS global_is,local_is
+IS global_is,local_is ! Index sets
 
 errsrc=trim(myfname)//' => petsc_create_vector'
 
@@ -69,18 +69,30 @@ CHKERRA(ierr)
 call VecDuplicate(xvec,bvec,ierr)
 CHKERRA(ierr)
 
-! local vector
+! local vector, sequential in memory, of length NEQ 
 call VecCreateSeq(PETSC_COMM_SELF,neq,local_vec,ierr)
 CHKERRA(ierr)
 
 ! objects needed for global vector scattering to local vector
 ! create local and global IS (index set) objects from the array of local and
 ! global indices
+! Create index set of length NEQ holding vale=ues from l2gdof
+! This is stored in/accessed with global_is
 call ISCreateGeneral(PETSC_COMM_WORLD,neq,l2gdof(1:),PETSC_COPY_VALUES,global_is,ierr)
 CHKERRA(ierr)
+! Index set local_is (length neq) contains evenly-spaced integers, starting at 0 and going up by 1
+! ie its just an index set of 0, 1, 2, 3, ... neq-1
 call ISCreateStride(PETSC_COMM_SELF,neq,0,1,local_is,ierr);
 CHKERRA(ierr)
+
 ! create VecScatter object which is needed to scatter PETSc parallel vectors
+! The scatterer context is stored in/called vscat
+! bvec is an example (structure) of the vector that will be scattered 
+! local_vec defines the shape of what we are scattering too
+! global_is defines the indexes of BVEC to be scattered
+! local_is defines the indexes of local_vec to scatter into 
+! Overall then it is taking the indexes of l2gdof for this process and
+! telling petsc to scatter those bits of BVEC into the local_vec here
 call VecScatterCreate(bvec,global_is,local_vec,local_is,vscat,ierr)
 CHKERRA(ierr)
 call ISDestroy(global_is,ierr) ! no longer necessary

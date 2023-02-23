@@ -1831,7 +1831,8 @@ end subroutine get_fs_details
 
       do abg = 1, nfgll ! ABG
         gid_abg = gidloc(abg)            ! Global ID of node ABG
-        g0abg   = g0_nodal(gid_abg)      ! g0 abg 
+        g0abg   = ABS(g0_nodal(gid_abg)) ! g0 abg - in SL equation, this scalar g is positive
+
 
         ! Get Jacobian_2d x weights for ABG 
         dx_dxi  = matmul(coord,dshape4(1,:,abg))
@@ -1854,7 +1855,7 @@ end subroutine get_fs_details
 
         ! Factor of rho/g outside of integral 
         rho_over_g =  (rho_water/g0abg)       ! rho/g
-        rho_Ag     =  (rho_over_g / SLarea)    ! rho/(g*Area)
+        rho_Ag     =  (rho_over_g/SLarea)    ! rho/(g*Area)
 
 
         !write(*,*)' ------ ABGDOF:  -----'
@@ -1869,8 +1870,12 @@ end subroutine get_fs_details
 
         ! DIAGONAL theta_tilde theta_dot
         kmatSL(dof_sl(abg), dof_sl(abg)) = kmatSL(dof_sl(abg), dof_sl(abg)) - (theta_tf * pi_2d_abg * g0abg * rho_water)
-
         !write(*,*)'v1     : ',(theta_tf * pi_2d_abg * g0abg * rho_water)
+
+
+
+
+        
         
         ! theta_tilde Phi_dot 
         kmatSL(dof_sl(abg), dof_phi(abg)) = kmatSL(dof_sl(abg), dof_phi(abg)) - (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
@@ -1878,14 +1883,21 @@ end subroutine get_fs_details
         !write(*,*)'v2     : ',(phi_tf * Cabg * pi_2d_abg  * rho_over_g)
 
         ! phi_tilde Phi_dot 
-        kmatSL(dof_phi(abg), dof_phi(abg)) = kmatSL(dof_phi(abg), dof_phi(abg)) + (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
+        kmatSL(dof_phi(abg), dof_phi(abg)) = kmatSL(dof_phi(abg), dof_phi(abg)) - (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
         
 
         do j=1,NDIM
-            grav_abgj = grav0_nodal(j, gid_abg)
+            ! Grav0_nodal is defined as a negative vector (i.e. -9.8), but grad Phi is positive
+            ! g = - nabla Phi 
+            grav_abgj = -grav0_nodal(j, gid_abg)
+
+            !if(abg.eq.1)then 
+            !  write(*,*)'grav_abgj: ', grav_abgj
+            !endif 
+
 
             ! u_tilde Phi_dot 
-            kmatSL(dof_u(j, abg), dof_phi(abg)) = kmatSL(dof_u(j, abg), dof_phi(abg)) + (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g) 
+            kmatSL(dof_u(j, abg), dof_phi(abg)) = kmatSL(dof_u(j, abg), dof_phi(abg)) - (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g) 
             
             !write(*,*)'v3     : ',(Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g)
 
@@ -1896,16 +1908,17 @@ end subroutine get_fs_details
 
 
             ! phi_tilde u_dot 
-            kmatSL(dof_phi(abg), dof_u(j,abg)) = kmatSL(dof_phi(abg), dof_u(j,abg)) + (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
+            kmatSL(dof_phi(abg), dof_u(j,abg)) = kmatSL(dof_phi(abg), dof_u(j,abg)) - (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
             !write(*,*)'v5     : ', (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
 
 
             do k=1,NDIM
               ! u_tilde u_dot  
-              kmatSL(dof_u(k,abg),dof_u(j,abg)) = kmatSL(dof_u(k,abg),dof_u(j,abg))  + (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
+              ! NOTE THE NEGATIVE in grav0_nodal is needed for same reason as above 
+              kmatSL(dof_u(k,abg),dof_u(j,abg)) = kmatSL(dof_u(k,abg),dof_u(j,abg))  - (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * (-grav0_nodal(k, gid_abg)) * rho_over_g)
             !write(*,*)'v6     : ', (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
-
             enddo !k
+
         enddo  ! j 
 
 
@@ -1916,7 +1929,7 @@ end subroutine get_fs_details
 
         do xyg = 1, nfgll !XYG
           gid_xyg = gidloc(xyg)  
-          g0xyg   =  g0_nodal(gid_xyg)      ! g0 abg 
+          g0xyg   =  ABS(g0_nodal(gid_xyg))      ! g0 abg 
 
           ! Get Jacobian_2d x weights for XYG 
           dx_dxi  = matmul(coord,dshape4(1,:,xyg))
@@ -1929,26 +1942,26 @@ end subroutine get_fs_details
           Cxyg       =  oceanf(i_elmtfs, xyg)  ! Ocean func abg
   
           ! SL_tilde, Phi_dot coupling 
-          kmatSL(dof_sl(xyg), dof_phi(abg)) = kmatSL(dof_sl(xyg), dof_phi(abg)) + (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg *rho_Ag )
+          kmatSL(dof_sl(xyg), dof_phi(abg)) = kmatSL(dof_sl(xyg), dof_phi(abg)) + (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
 
           ! Phi_tilde, Phi_dot coupling 
-          kmatSL(dof_phi(xyg),dof_phi(abg)) = kmatSL(dof_phi(xyg),dof_phi(abg)) - (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
+          kmatSL(dof_phi(xyg),dof_phi(abg)) = kmatSL(dof_phi(xyg),dof_phi(abg)) + (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
 
           do j=1,NDIM
-            v1 = pi_2d_abg * Cabg * grav0_nodal(j, gid_abg) * pi_2d_xyg 
+            v1 = pi_2d_abg * Cabg * (-grav0_nodal(j, gid_abg)) * pi_2d_xyg 
 
             ! U_tilde, Phi_dot coupling  
-            kmatSL(dof_u(j, xyg), dof_phi(abg)) = kmatSL(dof_u(j, xyg), dof_phi(abg)) - (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  grav0_nodal(j, gid_xyg) * rho_Ag )
+            kmatSL(dof_u(j, xyg), dof_phi(abg)) = kmatSL(dof_u(j, xyg), dof_phi(abg)) + (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  (-grav0_nodal(j, gid_xyg)) * rho_Ag )
 
             ! SL_tilde, U_dot coupling
-             kmatSL(dof_sl(xyg), dof_u(j, abg)) = kmatSL(dof_sl(xyg), dof_u(j, abg)) + (v1 * g0xyg * theta_tf * rho_Ag) 
+            kmatSL(dof_sl(xyg), dof_u(j, abg)) = kmatSL(dof_sl(xyg), dof_u(j, abg)) + (v1 * g0xyg * theta_tf * rho_Ag) 
 
             ! Phi_tilde, U_dot coupling  
-            kmatSL(dof_phi(xyg), dof_u(j,abg)) = kmatSL(dof_phi(xyg), dof_u(j,abg)) - (v1 * Cxyg * phi_tf * rho_Ag)
+            kmatSL(dof_phi(xyg), dof_u(j,abg)) = kmatSL(dof_phi(xyg), dof_u(j,abg)) + (v1 * Cxyg * phi_tf * rho_Ag)
 
             do k = 1, NDIM 
               ! U_tilde, U_dot coupling  
-              kmatSL(dof_u(k,xyg), dof_u(j,abg)) = kmatSL(dof_u(k,xyg), dof_u(j,abg))  - (v1 * Cxyg * u_tf(k) *  grav0_nodal(k, gid_xyg) * rho_Ag)
+              kmatSL(dof_u(k,xyg), dof_u(j,abg)) = kmatSL(dof_u(k,xyg), dof_u(j,abg))  + (v1 * Cxyg * u_tf(k) *  (-grav0_nodal(k, gid_xyg)) * rho_Ag)
             enddo ! k 
           enddo ! j
         enddo! xyg

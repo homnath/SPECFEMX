@@ -676,7 +676,7 @@ use serial_library
     ! Local vars
     integer                        :: i_elmtfs,nodeid,dof, gid_elmt, num4(4), num_FS(maxngll2d), gid_abg, gid_xyg, iface, nfgll, abg,xyg, j,k, i_gll, i
     real(kind=kreal)               :: coord(ndim,4), face_normal(3), dx_dxi(NDIM), dx_deta(NDIM), pi_2d_abg, pi_2d_xyg
-    real(kind=kreal)               :: utf_dot_bkgrav, utf_dot_bkgrav_xyg, area_inv, xyg_sum
+    real(kind=kreal)               :: utf_dot_bkgrav, utf_dot_bkgrav_xyg, eps_area, xyg_sum
     real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
     real(kind=kreal)               :: epsilon, sumepsilon, pi_2d, ctr, val
@@ -716,7 +716,7 @@ use serial_library
     endif 
 
 
-    area_inv = epsilon/SLarea
+    eps_area = epsilon/SLarea
 
 
     ! Now calculate the actual iceload  - TODO there may be a way to combine the two loops
@@ -750,19 +750,19 @@ use serial_library
 
             ! Calculate the coefficient for phi and u that is shared
             ! Note that u values also need to be multiplied by background gravity
-            val =( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - area_inv*oceanf(i_elmtfs, i_gll) 
+            val =( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - eps_area*oceanf(i_elmtfs, i_gll) 
             val = val * pi_2d
 
-            flush(ICElogunit)
             ! Displacement for direction j: + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi * \nabla\Phi_j
             do j = 1, NDIM    
                 dof = fgdof(j, i_gll) 
                 if (dof.gt.0)then 
                     dof = dof + 1   ! For some reason! 
 
-                    iceload(dof) = iceload(dof) + (val *  grav0_nodal(j, num_FS(i_gll)) )
+                    iceload(dof) = iceload(dof) + (val *  (-grav0_nodal(j, num_FS(i_gll))) )
+                    
                     if (savedata%iceload)then 
-                        nodal_iceload_u(j,nodeid) = nodal_iceload_u(j, nodeid) + (val *  grav0_nodal(j, num_FS(i_gll)) )
+                        nodal_iceload_u(j,nodeid) = nodal_iceload_u(j, nodeid) + (val *  (-grav0_nodal(j, num_FS(i_gll)) ) )
                     endif 
                 endif  
             enddo
@@ -785,10 +785,10 @@ use serial_library
             if (dof.gt.0)then 
                 dof = dof + 1   ! For some reason! 
 
-                iceload(dof) = iceload(dof) + (area_inv * pi_2d * g0_nodal(num_FS(i_gll)))
+                iceload(dof) = iceload(dof) - (eps_area * pi_2d * ABS(g0_nodal(num_FS(i_gll))) )
 
                 if (savedata%iceload)then 
-                    nodal_iceload_sl(nodeid) = nodal_iceload_sl(nodeid) + (area_inv * pi_2d * g0_nodal(num_FS(i_gll)))
+                    nodal_iceload_sl(nodeid) = nodal_iceload_sl(nodeid) - (eps_area * pi_2d * ABS(g0_nodal(num_FS(i_gll))))
                 endif 
             endif
         enddo  ! i_gll 
@@ -796,7 +796,9 @@ use serial_library
 
 
     ! Multiply whole of the vector by rho_i 
-    iceload = rho_ice * iceload
+    iceload = -(rho_ice * iceload)
+
+
     write(ICElogunit,*)
     write(ICElogunit,*)' Calculated ice load '
     write(ICElogunit,*)'  -->  Min value of iceload     : ', minscal(minval(iceload))
@@ -808,14 +810,14 @@ use serial_library
     ! Save iceload to file: 
     if (savedata%iceload)then 
         write(ICElogunit,*) ' Saving nodal ice load values.'
-        nodal_iceload_u   =   nodal_iceload_u   * rho_ice
-        nodal_iceload_phi =   nodal_iceload_phi * rho_ice
-        nodal_iceload_sl  =   nodal_iceload_sl  * rho_ice
+        nodal_iceload_u   =   -nodal_iceload_u   * rho_ice
+        nodal_iceload_phi =   -nodal_iceload_phi * rho_ice
+        nodal_iceload_sl  =   -nodal_iceload_sl  * rho_ice
 
         call write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step=i_step-1)
 
         if(i_step.eq.nstep)then 
-            call write_iceload_to_ensight(nodal_iceload_sl*zero, nodal_iceload_phi*zero, nodal_iceload_u*zero, nodalu, i_step=i_step-1)
+            call write_iceload_to_ensight(nodal_iceload_sl*zero, nodal_iceload_phi*zero, nodal_iceload_u*zero, nodalu, i_step=i_step)
         endif
 
     endif

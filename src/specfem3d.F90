@@ -91,8 +91,6 @@ real(kind=kreal) :: dt,dt_vp ! time step
 
 real(kind=kreal) :: sfac ! slip factor
 
-! KSP convergence reason
-integer :: ksp_convreason
 ! ksp_iter: conjugate gradient iteration,
 ! ksp_tot: total cg interation, nl_iter: nonlinear iteration, nl_tot: total nl
 ! iteration
@@ -100,12 +98,7 @@ integer :: ksp_iter,ksp_tot,nl_iter,nl_tot
 logical :: nl_isconv ! logical variable to check convergence of
 ! nonlinear (NL) iterations
 
-real(kind=kreal) :: G,K
-real(kind=kreal) :: cmat(nst,nst),estrain(nst),dev_strain(nst),  &
-esigma(nst),sigma(nst),effsigma(nst),vsigma(nst)
-real(kind=kreal) :: devp(nst),erate(nst),evp(nst),      &
-flow(nst,nst),m1(nst,nst),m2(nst,nst),m3(nst,nst)
-real(kind=kreal) :: dq1,dq2,dq3,dsbar,f,fmax,lode_theta,sigm
+real(kind=kreal) :: f
 
 integer :: todalOFNodes
 ! cmat: elastic matric (Cijkl) in Voigt notation
@@ -133,10 +126,10 @@ real(kind=kreal),allocatable :: storemmat(:,:)
 !uerr: used to check convergence
 !umax: max of displacement magnitude
 !uxmax: max of displacement components
-real(kind=kreal) :: uerr,maxu,maxdu
 !du: incremental solution
 !u: solution (summed over du)
 real(kind=kreal),allocatable :: du(:),u(:),olddu(:)
+real(kind=kreal) :: uerr
 
 integer :: i
 
@@ -194,7 +187,7 @@ real(kind=kreal) :: freq,ang_freq,scale_ang_freq2
 
 ! Viscoelastic parameters
 integer :: mdomain
-integer :: ielmt_elas,ielmt_viscoelas,imatve,iviscoelas,nelmt_elas,            &
+integer :: ielmt_elas,ielmt_viscoelas,iviscoelas,nelmt_elas,            &
 nelmt_viscoelas
 integer :: tot_nelmt_elas,max_nelmt_elas,min_nelmt_elas
 integer :: tot_nelmt_viscoelas,max_nelmt_viscoelas,min_nelmt_viscoelas
@@ -209,20 +202,16 @@ real(kind=kreal) :: step !current step (t or f)
 
 !Factor for time unit conversion
 real(kind=kreal) :: tunitfac
-real(kind=kreal) :: cpu_tstart,cpu_tend,telap,max_telap,mean_telap
-character(len=20) :: format_str
 
 integer :: i_maxwell
 integer,allocatable :: eid_elas(:),eid_viscoelas(:)
 real(kind=kreal),allocatable :: relaxtime(:,:),muratio(:),tratio(:)
 ! q0: initial state variable for viscoelastic rheology
 real(kind=kreal),allocatable :: visco_q0(:,:,:,:),q0(:,:),elas_e0(:,:,:)
-real(kind=kreal) :: e0(nst) !e0: initial strain
 
-real(kind=kreal) :: vesigma(nst)
-real(kind=kreal) :: trace_vsigma0,trace_strain
+
+real(kind=kreal) :: trace_vsigma0
 real(kind=kreal) :: esigma0_dev(nst),esigma_dev(nst)
-real(kind=kreal) :: maxresload,maxbodyload
 
 integer :: geq,inum,nequ
 logical,allocatable :: iseq(:)
@@ -237,26 +226,26 @@ errtag=""; errcode=-1
 ! ______________________________________________________________________
 ! ______________________________________________________________________
 ! Calculate relaxation time for viscoelastic/plastic models
-allocate(relaxtime(nmaxwell,nmatblk_viscoelas),muratio(nmaxwell),tratio(nmaxwell))
-call calc_relaxation_time(relaxtime, tunitfac, muratio, tratio, min_relaxtime, max_relaxtime)
+call calc_relaxation_time(relaxtime, tunitfac, muratio, & 
+                          tratio, min_relaxtime, max_relaxtime)
 
 
 !Count number of viscoelastic and elastic elements 
-call count_elmts(errcode, nelmt_elas, nelmt_viscoelas, & 
-mdomain, tot_nelmt_elas, max_nelmt_elas, min_nelmt_elas, tot_nelmt_viscoelas, &
-max_nelmt_viscoelas, min_nelmt_viscoelas)
+call count_elmts(errcode, nelmt_elas, nelmt_viscoelas,     & 
+                 mdomain, tot_nelmt_elas, max_nelmt_elas,  &
+                 min_nelmt_elas, tot_nelmt_viscoelas,      &
+                 max_nelmt_viscoelas, min_nelmt_viscoelas)
 
 
 ! Split up IDs of elastic and viscoelastic elements into new arrays
 ! New arrays: eid_elas and eid_viscoelas
-call split_elas_visco_eids(nelmt_elas, &
-nelmt_viscoelas, eid_elas, eid_viscoelas )
+call split_elas_visco_eids(nelmt_elas, nelmt_viscoelas, eid_elas,&
+                           eid_viscoelas)
 
 
 ! Create new elastic/viscoelastic arrays
 allocate(elas_e0(nst,ngll,nelmt_viscoelas), &
-visco_q0(nst,nmaxwell,ngll,nelmt_viscoelas),q0(nst,nmaxwell))
-
+         visco_q0(nst,nmaxwell,ngll,nelmt_viscoelas),q0(nst,nmaxwell))
 
 
 ! prepare ghost partitions for the communication
@@ -283,6 +272,7 @@ call sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv, &
                        jac, bmat, nodalu, nodalg, nodalphi, nodalB,& 
                        tot_neq, max_neq, min_neq, nodalphistore, nodalustore)
 
+
 ! Calculate any prestress 
 call calculate_prestress(strain_elmt, strain_nodal,       &
                          stress_elmt, stress_nodal,       & 
@@ -305,8 +295,6 @@ call initialise_RHS_vectors(load, bodyload, selfload, viscoload, &
                             storemmat, rhoload, ubcload, nodalu, & 
                             visco_q0, elas_e0, extload, iceload, & 
                             nodalustore, nodalphistore)
-
-
 
 
 ! Timestepping only needed for plastic/viscoelastic situations
@@ -391,7 +379,6 @@ endif
 !endif
 
 
-
 ! Set initial timestep and output to user: 
 !   1 for time domain.
 !   0 for frequency domain.
@@ -404,7 +391,8 @@ if(steptype.eq.FREQSTEP)then
   endif
 endif
 
-! Compute ELASTIC mass matrix once and for all 
+
+! Compute elastic mass matrix once and for all 
 call compute_mass_elastic(storemmat,errcode,errtag)
 
 
@@ -415,12 +403,14 @@ if(isplastic)then
   dt_vp=minscal(dt_vp)
 endif
 
+
 ! Compute body loads
 if(isbodyload)then
   call compute_bodyload(selfload,selfweight=isselfweight)
 endif 
 
 call sync_process()
+
 
 
 ! Initialise ice: 
@@ -469,8 +459,6 @@ call save_displacement_variables(strain_elmt, strain_nodal, &
 
 
 
-
-
 call sync_process()
 allnodesfs      = sumscal(nnode_fs) 
 
@@ -502,8 +490,7 @@ endif
 
 loop_step: do i_step=istep0,nstep
 
-call sync_process()
-
+  call sync_process()
 
   if(myrank.eq.0)then   
     write(*,*)
@@ -513,9 +500,7 @@ call sync_process()
 
   ! determine time (dt) or freq (df) step and current time/freq
   call calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
-  
   call reset_nodal_arrays_loads(nodalu,ubcload,rhoload,nodalphi,nodalslrate)
-
 
 
   ! Update SL area if necessary 
@@ -523,27 +508,26 @@ call sync_process()
       call update_SL_area(nodalsl, nodalu)
   endif
 
+
   ! Calculate the change in ice for this timestep:
   if(is_ICE)then 
       call sync_process()
       nodalicerate = ZERO
       call set_ice_rate_slice(nodalice, nodalicerate)
 
-
       ! Calculate change in Ice mass expected
       call calculate_ice_change_volume(nodalicerate)
+
+      ! Update the total mass change to date 
       icechangevoltmp = sumscal(icechangevol) 
       icechangevol = icechangevoltmp
- 
       total_ice_mass_change = total_ice_mass_change + icechangevol*rho_ice
-
       if(myrank.eq.0)then
-        write(*,*)'Change in ice mass to occur: ',icechangevol*rho_ice
-        write(*,*)'Total ice change so far    : ',total_ice_mass_change
+        write(*,*)'Change in ice mass to occur: ', icechangevol*rho_ice
+        write(*,*)'Total ice change so far    : ', total_ice_mass_change
       endif   
 
-
-
+      ! Save the Icerate 
       if(savedata%icerate)then 
         ! Save at the timestep before because this is being used to calculate THIS timestep
         call write_icerate_to_ensight(nodalicerate, i_step=i_step-1)
@@ -552,12 +536,9 @@ call sync_process()
         if(i_step.eq.nstep)then 
           call write_icerate_to_ensight(nodalicerate*zero, i_step=i_step)
         endif 
-        
       endif 
 
   endif 
-
-
 
  
   ! Set the stiffness matrix
@@ -566,6 +547,7 @@ call sync_process()
                                          ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
                                          eid_viscoelas, relaxtime)
                                          
+
 
   !apply traction boundary conditions for first timestep
   !WE Reads and adds the traction to the extload variable
@@ -603,8 +585,8 @@ call sync_process()
 
   ! PREPARE BUILT IN SOLVER
   if(solver_type.eq.builtin_solver)then
-    call prep_inbuilt_solver(dprecon, egdof, storekmat, ndscale,     &
-                             nzero_dprecon, nelmt_elas, eid_elas,    &
+    call prep_inbuilt_solver(dprecon, egdof, storekmat, ndscale, &
+                             nzero_dprecon, nelmt_elas, eid_elas,&
                              nelmt_viscoelas, eid_viscoelas)
   endif
 
@@ -627,147 +609,23 @@ call sync_process()
     bodyload = ZERO
   endif
 
+
   ! RESETTING OF U AND DU 
-  du          = ZERO
-  u           = ZERO
-
-  ! ===================== RUN NON LINEAR ITERATIONS ====================
-  !bodyload=ZERO; bodyload(0)=ZERO
-  ! nonlinear iteration loop
-
-  write(logunit,*)'  Beginning the non-linear iterations: '
-
-  nonlinear: do i_nliter=1,NL_MAXITER
-    fmax=0 ! failure indicator for plastic simulation.
-    nl_iter=nl_iter+1
+  du = ZERO
+  u  = ZERO
   
-    if(isplastic)then
-      resload=load+bodyload
-    else
-      resload=load-bodyload
-    endif
 
-    resload(0)=ZERO
-    maxresload=maxscal(maxval(abs(resload)))
-    maxbodyload=maxscal(maxval(abs(bodyload)))
-    
-    if(myrank==0)then
-      write(logunit,'(a,i0,1x,e12.5,1x,e12.5)')' Residual NL: ',i_nliter,&
-      maxresload,maxbodyload
-      flush(logunit)
-    endif
+  call run_nonlinear_solver(u, du, olddu, storekmat, ndscale,           &
+                            dprecon, resload, isscale_ang_freq,         &
+                            ksp_iter, bodyload, load, scale_ang_freq2,  &
+                            nl_iter, ksp_tot, uerr, nl_isconv, nodalu,  &
+                            nodalphi, nodalslrate, bload, egdofu, dt_vp,& 
+                            nelmt_elas, num, eld, eload, bmat, deriv,   &
+                            eid_elas,strain_elmt, evpt, f, stress_elmt, &
+                            visco_q0, elas_e0, vload,nelmt_viscoelas,   &
+                            relaxtime, muratio, i_step, tratio,         &
+                            eid_viscoelas, dt, q0)
 
-    ! starting timer
-    call cpu_time(cpu_tstart)
-
-    ! Run NL solver for this timestep 
-    ! For our purpose all this does is sets the RHS vector to be resload 
-    ! And then calls the 'run' command from petsc
-    call run_solver(resload, dprecon, ndscale, storekmat, du, &
-                    scale_ang_freq2, ksp_iter, errcode, ksp_convreason,&
-                    errtag, isscale_ang_freq)
-
-    ! Log the time taken 
-    call write_cpu_timer(format_str,cpu_tstart,cpu_tend,telap)
-
-    ! Update ksp number and write in log file
-    ksp_tot=ksp_tot+ksp_iter
-    du(0)=ZERO
-    maxdu=maxscal(maxval(abs(du)))
-    call log_ksp_iteration(maxdu, ksp_iter, ksp_convreason)
-
-    ! Update the u array with du 
-    ! time steps are not incremental!!
-    ! therefore, NOT u(t+1)=u(t)+du
-    ! u contains both diaplacement and/or gravity
-    ! displacement
-    if(isplastic)then
-      u=du
-    else
-      u=u+du
-    endif
-
-    ! Get maximum value of u (disp/grav/sl etc)
-    maxu=maxscal(maxval(abs(u)))
-
-    ! check convergence
-    call check_convergence(uerr, maxu, maxdu, u, olddu,& 
-                           resload, nl_isconv, i_nliter)
-
-    ! Update nodal vectors following inversion step 
-    call sync_process()
-
-    ! Copy values from u --> nodalu, nodalphi etc... 
-    call update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
-
-    ! Reset bodyload to ZERO for Viscoelastic iteration.
-    ! We need to reconcile platic and viscoelastic iterations.
-    if(.not.isplastic)then
-      write(logunit,*)'  --> set bodyload to 0'
-      bodyload=ZERO; !viscoload=ZERO
-    endif 
-
-
-    ! Calculate the stress and strain for elastic/viscoelastic elements
-    if(ISDISP_DOF)then
-
-      ! Compute stress for Elastic elements;this part is repeated for the first step. 
-      ! We should change this for efficiency.
-      if(isplastic)bload=ZERO
-      ! Calculate elastic/plastic stress & strain  
-      call calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
-                            m1, m2, m3, nelmt_elas, nl_isconv, num,   &
-                            eld, eload, bload, nodalu, erate,eid_elas,&
-                            cmat, estrain, bodyload, sigma, effsigma, &
-                            bmat, deriv, jacw, strain_elmt, evpt ,    &
-                            stress_elmt, dq1, dq2, dq3, dsbar, f,     &
-                            fmax,lode_theta,sigm)
-      bodyload(0)=ZERO
-
-
-      ! If all elastic then leave non-linear loop because only one timestep 
-      !if(allelastic) then 
-      !  write(logunit,*)' ALL ELASTIC --> EXITING NON LINEAR'
-      !  exit nonlinear
-      !endif 
-
-
-      ! Calculate stress and strain for viscoelastic elements
-      call visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
-                              elas_e0, e0, i_step, bmat, deriv, eload, &
-                              bload, K, G, strain_elmt, i_nliter,      & 
-                              stress_elmt, estrain, dev_strain, jacw,  &
-                              trace_strain, esigma, vsigma, bodyload,  &
-                              vload, imatve, nelmt_viscoelas,relaxtime,& 
-                              egdofu, eld, nodalu, muratio, tratio,    &
-                              eid_viscoelas, dt, num, q0)
-      bodyload(0)=ZERO
-      !viscoload(0)=ZERO
-    endif !(ISDISP_DOF) 
-
-
-    ! time step 0  and i_nliter 0 is entirely elastic
-    ! write data for tiem step 0
-    !if(i_step==1.and.i_nliter==1)then
-    !write(logunit,*)'istep = 1 and i_nliter = 1'
-
-      ! If only allowed on NL iteration and only 1 timestep then exit whole loop
-      !if(nstep.le.1.and.NL_MAXITER.le.1)then
-      !  write(logunit,*)'nstep.le.1.and.NL_MAXITER.le.1 - exiting loop step '
-      !  exit loop_step 
-      !endif
-    !endif ! i_step==1.and.i_nliter==1
-    ! Exit nonlinear loop if converged
-    if(nl_isconv) then 
-      write(logunit,*)'NL is converged...exiting non-linear '
-      exit nonlinear
-    endif 
-
-  enddo nonlinear ! i_nliter=1,NL_MAXITER
-  ! ===================== FINISHED NON-LINEAR ITERATIONS =====================
-
-
-  
 
   ! WE: Update our vectors with a timestep: 
   ! WE: For sea level we solve for the time derivatives of the system so then we use
@@ -781,70 +639,20 @@ call sync_process()
 
     nodalustore   = nodalustore   +  dt*nodalu
     nodalphistore = nodalphistore +  dt*nodalphi
-
-    nodalsl  = nodalsl  + (dt*nodalslrate)
-    nodalice = nodalice + (dt*nodalicerate)
+    nodalsl       = nodalsl       + (dt*nodalslrate)
+    nodalice      = nodalice      + (dt*nodalicerate)
 
     ! Update ocean function and ocean area/volume 
     call update_ocean_function(nodalice, nodalsl, errcode, errtag)  
     call sync_process()
-    totaloceannodes = sumscal(oceannodes) 
-    allnodesfs      = sumscal(nnode_fs) 
-
+    
+    ! Evaluate the ocean nodes as proportion of overall FS nodes
+    totaloceannodes = sumscal(oceannodes);     allnodesfs      = sumscal(nnode_fs) 
     if(myrank.eq.0)then 
       write(*,'(a, i0, a, i0)')'Total ocean nodes: ', totaloceannodes,'/', allnodesfs
     endif
-
-    if(savedata%oceanf)then
-      call write_OF_to_ensight(i_step=i_step)
-    endif    
-
   endif 
-
-
-  call sync_process()
   
-
-  if(ISDISP_DOF)then
-    if(myrank.eq.0)then 
-      write(*,*)' * saving displacement variables'
-    endif 
-
-    call save_displacement_variables(strain_elmt, strain_nodal, &
-                                    stress_elmt, stress_nodal, & 
-                                    nodalustore, node_valency, i_step=i_step)
-  endif
-  
-
-  if(ISPOT_DOF)then
-    if(myrank.eq.0)then 
-      write(*,*)' * saving potential variables'
-    endif 
-    call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=i_step)
-  endif
-  
-
-  if(ISSL_DOF)then 
-    minnodalsl = minscal(minval(DIM_L*nodalsl))
-    maxnodalsl = maxscal(maxval(DIM_L*nodalsl))
-    if(myrank.eq.0)then 
-      write(*,*)'Saving SL to free surface'
-      write(*,*)'Saving the current SL values'
-      write(*,'(a,f10.6)')'  --> Min sea level: ', minnodalsl
-      write(*,'(a,f10.6)')'  --> Max sea level: ', maxnodalsl
-    endif
-
-    ! Save SL
-    if(savedata%sl)then
-      call write_SL_to_ensight(nodalsl, i_step)
-    endif 
-    ! Save ice:
-    if(savedata%ice)then 
-      call write_ice_to_ensight(nodalice, i_step)
-    endif 
-
-  endif 
-
 
   ! Print warning if not converging
   if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
@@ -857,32 +665,49 @@ call sync_process()
 
 
 
+  ! Save displacement variables to Ensight
+  if(ISDISP_DOF)then
+    call save_displacement_variables(strain_elmt, strain_nodal, &
+                                    stress_elmt, stress_nodal, & 
+                                    nodalustore, node_valency, i_step=i_step)
+  endif
+
+  ! Save potential variables to Ensight
+  if(ISPOT_DOF)then
+    if(myrank.eq.0)then 
+      write(*,*)' * saving potential variables'
+    endif 
+    call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=i_step)
+  endif
+
+  ! Save the ice and water to Ensight
+  if(ISSL_DOF)then 
+    minnodalsl = minscal(minval(DIM_L*nodalsl))
+    maxnodalsl = maxscal(maxval(DIM_L*nodalsl))
+    if(myrank.eq.0)then 
+      write(*,*)'Saving SL to free surface'
+      write(*,*)'Saving the current SL values'
+      write(*,'(a,f10.6)')'  --> Min sea level: ', minnodalsl
+      write(*,'(a,f10.6)')'  --> Max sea level: ', maxnodalsl
+    endif
+
+    if(savedata%sl)then
+      call write_SL_to_ensight(nodalsl, i_step)
+    endif 
+      ! Save the ocean function
+    if(savedata%oceanf)then
+      call write_OF_to_ensight(i_step=i_step)
+    endif   
+    if(savedata%ice)then 
+      call write_ice_to_ensight(nodalice, i_step)
+    endif 
+  endif 
+
+
+
+
   ! Update number of non-linear iterations
   nl_tot=nl_tot+nl_iter
-
-
-
-  ! CURRENTLY NOT BEING USED/ACTIVATED >>> IMPORTANT WITH MORE TIMESTEPS? 
-  ! --------------- Saving/plotting variables to Ensight ---------------
-  !if(ISDISP_DOF)then
-  !  write(*,* )'SAVING displacement istep: ', i_step
-  !  call save_displacement_variables(strain_elmt, strain_nodal,    &
-  !                                   stress_elmt, stress_nodal,    & 
-  !                                   nodalu, node_valency, i_step)
-  !endif
-  !if(ISPOT_DOF)then
-  !  ! plot gravity potential
-  !  write(*,*) 'SAVING potential istep: ', i_step
-  !  call save_pot_variables(nodalphi, nodalg, nodalB, node_valency,&
-  !                                i_step)
-  !endif
-  ! ---------- Finished saving/plotting variables to Ensight -----------
-
-  ! Add spacing to log file
-  if(myrank==0)then
-    write(logunit,*)' ' 
-    flush(logunit)
-  endif
 
 enddo loop_step ! i_step time/frequency stepping loop
 !----------------------------------------------------------------------
@@ -893,14 +718,11 @@ enddo loop_step ! i_step time/frequency stepping loop
 
 
 
-
+! ----------------------------- CLEANUP --------------------------------
 if(myrank==0)then 
   write(*,*); write(*,*)'Completed timesteps. Cleaning up... '
-  write(SLlogunit,*)'Completed timesteps. Cleaning up... '
-  flush(SLlogunit)
 endif 
 
-! ----------------------------- CLEANUP --------------------------------
 if(savedata%strain)then
   close(77)
   deallocate(strain_elmt,strain_nodal)

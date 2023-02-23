@@ -29,6 +29,7 @@ subroutine calc_relaxation_time(relaxtime, tunitfac, muratio, tratio, min_relaxt
   real(kind=kreal) :: min_relaxtime,max_relaxtime
 
 
+  allocate(relaxtime(nmaxwell,nmatblk_viscoelas),muratio(nmaxwell),tratio(nmaxwell))
 
   ! Relaxation time
   ! Convert relaxation time unit to the time step time unit for consistency
