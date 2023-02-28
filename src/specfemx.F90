@@ -113,38 +113,15 @@ call process_user_input(cmd, tdate, ttime, tzone, ios, path, &
 ismesh_only = .false.
 
 
-! Create debug file 
-if(myrank==0)then
-  debug_file = trim(file_head)//'_debug'
-  open(unit=debugunit,file=trim(debug_file),status='replace',action='write',iostat=ios)
-  if(ios.ne.0)then
-      write(errtag,'(a)')'ERROR: cannot open log file: '//trim(debug_file)
-      !call control_error(errcode,errtag,stdout,myrank)
-  endif
-endif 
 
 
 
-
-
-! Create SL log file  
+! Print info from read input for SL/Ice 
 if(is_SL)then 
-  call start_SL_log(errcode, errtag)
-  if(myrank.eq.0)then
-    write(logunit,*)'✓ Creating sea level log file ... '
-    write(logunit,*) 
-  endif 
-  flush(SLlogunit)
+  call print_SL_read()
+  call print_ice_read()
 endif 
 
-if(is_ICE)then 
-  call start_ICE_log(errcode, errtag)
-  if(myrank.eq.0)then
-    write(logunit,*)'✓ Creating ice log file ... '
-    write(logunit,*) 
-  endif 
-  flush(ICElogunit)
-endif 
 
 
 ! Calculate model extents for individual processors/whole model

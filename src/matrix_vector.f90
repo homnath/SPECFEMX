@@ -198,23 +198,14 @@ module matrix_vector
 
     ! Sea level free surface contributions to stiffness matrix:
     if (ISSL_DOF) then
-      ! Update logfile 
-      write(SLlogunit,*) 
-      write(SLlogunit,*)'Calculating sea level stiffness matrix'
-      
+      if(myrank.eq.0)then 
+        write(*,*)' --> Calculating sea-level stiffness matrix'
+      endif 
+
       ! Initialise
       allocate(kSL(nedof,nedof))
 
       storekmatSL = zero
-
-      ! Create stiffness file 
-      if(myrank==0)then
-        kmat_log_file = trim(file_head)//'_stiffness'
-        open(unit=kmatunit,file=trim(kmat_log_file),status='replace',action='write',iostat=ios)
-        if(ios.ne.0)then
-            write(errtag,'(a)')'ERROR: cannot open log file: '//trim(kmat_log_file)
-        endif
-      endif 
 
       ! Loop for each face on the free surface (note some elements, those with more than one face on the FS)
       ! will be considered multiple times, but for different dofs.
@@ -228,9 +219,7 @@ module matrix_vector
     endif ! if IS_SLDOF 
    
 
-
-
-
+    ! CALCULATE THE REST OF MATRIX
     !storekmat=zero
     rhoload=zero
     ! Purely elastic elements
@@ -378,7 +367,9 @@ module matrix_vector
 
     ! Combine with the sea level contributions!
     if (ISSL_DOF)then 
-      write(kmatunit,*)'Combined stiffness matrices'
+      if(myrank.eq.0)then
+        write(*,*)' --> Combined SL and normal Kmats'
+      endif
       storekmat = storekmat + storekmatSL
     endif 
 
@@ -1965,11 +1956,6 @@ end subroutine get_fs_details
             enddo ! k 
           enddo ! j
         enddo! xyg
-
-        ! Prints matrix if desired
-        !do iloop = 1,nedof
-        !  write(kmatunit,*)kmatSL(:,iloop)
-        !enddo 
 
       enddo! abg
       deallocate(gw)

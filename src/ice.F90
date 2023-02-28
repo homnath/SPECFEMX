@@ -11,7 +11,7 @@ module ice
 
 ! ################### LOG AND OUTPUT FUNCTIONS  #######################
 
-subroutine start_ICE_log(errcode, errtag)
+subroutine print_ice_read()
 ! Opens the ice log file and writes initial info 
 use global
 #if(USE_MPI)
@@ -21,58 +21,21 @@ use serial_library
 #endif  
 implicit none 
     
-    character(len=250) :: errtag
-    integer :: ios, errcode
-    
-    
-    ! Create file 
-    if(myrank==0)then
-        ICE_log_file = trim(file_head)//'ICE.log'
-        open(unit=ICElogunit,file=trim(ICE_log_file),status='replace',action='write',iostat=ios)
-        if(ios.ne.0)then
-            write(errtag,'(a)')'ERROR: cannot open log file: '//trim(ICE_log_file)
-            call control_error(errcode,errtag,stdout,myrank)
-        endif
-    endif 
-    
-    ! Write confirmation of file: 
-    write(ICElogunit, *)' ****** CREATED ICE LOG FILE ****** '
-    write(ICElogunit,*)
+if(myrank.eq.0)then
     ! Write summary of ICE inputs: 
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit, *)'Ice data read from:  ', trim(icefile)
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit,*)'IS_ICE            :  ', IS_ICE
-    write(ICElogunit,*)'Save original ice :  ', savedata%ice0
-    write(ICElogunit,*)'Save ice          :  ', savedata%ice
-    write(ICElogunit,*)'Save ice rate     :  ', savedata%icerate
-    write(ICElogunit,*)'Save ice load     :  ', savedata%iceload
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit,*)
-    
-    
-    if(IS_CART_SIM)then
-        call summarise_ICE_input_cart()
-    elseif(IS_GLOB_SIM)then 
-        write(*,*) 'ERROR: GLOBAL SIMULATIONS NOT IMPLEMETED YET'
-        stop
-    else
-        write(*,*) 'ERROR: SIMULATION MUST BE GLOBAL OR CARTESIAN'
-        stop
-    endif 
-end subroutine start_ICE_log
+    write(*,*)'-----------------------------------------------------'
+    write(*,*)'Ice data read from:  ', trim(icefile)
+    write(*,*)'-----------------------------------------------------'
+    write(*,*)'IS_ICE            :  ', IS_ICE
+    write(*,*)'Save original ice :  ', savedata%ice0
+    write(*,*)'Save ice          :  ', savedata%ice
+    write(*,*)'Save ice rate     :  ', savedata%icerate
+    write(*,*)'Save ice load     :  ', savedata%iceload
+    write(*,*)'-----------------------------------------------------'
+    write(*,*)
+endif 
+end subroutine print_ice_read
         
-subroutine summarise_ICE_input_cart()
-    use global 
-    implicit none 
-
-    write(ICElogunit,*)
-    write(ICElogunit,*)'Model setup          : Cartesian'
-    write(ICElogunit,*) 
-    flush(ICElogunit)
-
-end subroutine summarise_ICE_input_cart
-
 
 
 subroutine write_ice_to_ensight(nodalice, i_step)
@@ -85,24 +48,19 @@ subroutine write_ice_to_ensight(nodalice, i_step)
     integer :: i_step
     real(kind=kreal) :: nodalice(:)
 
-    if(myrank.eq.0)then
-        write(*,*)
-        write(*,*)'Saving ice values'
-    endif 
-
-
+ 
     if(savedata%fsplot)then
         call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalice, &
         ext='ice',istep=i_step) 
-      endif
+    endif
 
-      if(savedata%fsplot_plane)then
+    if(savedata%fsplot_plane)then
         call write_scalar_to_file_freesurf(nnode_fs,  DIM_L*nodalice, &
         ext='ice', istep=i_step, plane=.true.) 
-      endif
+    endif
 
-    if(myrank.eq.0)then 
-        write(*,*)'  ✓ Saved original ice level '
+    if(myrank.eq.0)then
+        write(*,'(a,i6)')'  ✓ Saved nodal ice for step ', i_step
         write(*,*)
     endif 
 end subroutine write_ice_to_ensight
@@ -117,8 +75,6 @@ subroutine write_icerate_to_ensight(nodalicerate, i_step)
     real(kind=kreal) :: nodalicerate(:) ! Nodal rate of I values
     integer :: i_step
 
-    write(ICElogunit,*)'Saving the icerate values'
-    
 
     ! On the free surface
     if(savedata%fsplot)then
@@ -131,9 +87,11 @@ subroutine write_icerate_to_ensight(nodalicerate, i_step)
         ext='nodalice', istep=i_step,plane=.true.) 
     endif
 
-    write(ICElogunit,*)'  ✓ Saved ice rate level '
-    write(ICElogunit,*)
-    flush(ICElogunit)
+
+    if(myrank.eq.0)then
+        write(*,'(a,i6)')'  ✓ Saved ice rate for step ', i_step
+        write(*,*)
+    endif 
 
 end subroutine write_icerate_to_ensight
 ! ################# END  LOG AND OUTPUT FUNCTIONS  ####################
@@ -153,8 +111,9 @@ subroutine prepare_ice(nodalice, nodalicerate)
     integer :: istattemp, istat
     real(kind=kreal), allocatable :: nodalice(:), nodalicerate(:)
 
-    write(ICElogunit, *)'Preparing ice variables...'
-    
+    if(myrank.eq.0)then
+        write(*,*)'Preparing ice variables...'
+    endif
     istat = 0
 
    
@@ -168,19 +127,44 @@ subroutine prepare_ice(nodalice, nodalicerate)
  
     ! Check allocations 
     if(istat/=0)then
-        write(logunit,*)'ERROR: cannot allocate memory in prepare_ice!'
-        flush(logunit)
+        write(*,*)'ERROR: cannot allocate memory in prepare_ice!'
         stop
     else 
         nodalice = ZERO
         ! Output confirmation to log. 
-        write(ICElogunit, *)'  --> Created initial ICE (nodal)'
-        write(ICElogunit, *)'  --> Created ICE (nodal)'
+        if(myrank.eq.0)then
+            write(*, *)'  --> Created initial ICE (nodal)'
+            write(*, *)'  --> Created ICE (nodal)'
+        endif 
     endif
 
-    write(ICElogunit,*)'  ✓ Prepared ice '
-    write(ICElogunit,*)
-    flush(ICElogunit)
+
+
+    if (savedata%iceload)then 
+        ! Arrays for saving iceload 
+        allocate(nodal_iceload_u(ndim, nnode_fs), & 
+                 nodal_iceload_phi(nnode_fs),     &
+                 nodal_iceload_sl(nnode_fs),      & 
+                 stat=istattemp)
+    endif 
+
+
+       ! Check allocations 
+    if(istat/=0)then
+        write(*,*)'ERROR: cannot allocate memory for saving iceload!'
+        stop
+    else 
+        if(myrank.eq.0)then
+            write(*, *)'  --> Created iceload_save arrays'
+        endif 
+    endif
+
+
+
+    if(myrank.eq.0)then
+        write(*,*)'  ✓ Prepared ice '
+        write(*,*)
+    endif 
 
     return 
 end subroutine prepare_ice
@@ -194,6 +178,7 @@ subroutine set_original_ice_level(nodalice)
     use integration
     use free_surface
     use math_constants
+    use dimensionless
 
     real(kind=kreal) :: nodalice(:)
     
@@ -212,7 +197,10 @@ subroutine set_original_ice_level(nodalice)
     ! Loop through each ice object user inputted :
     do i_obj = 1, nice_obj
         iceobjtype = iceobjs(i_obj, 1)
-        params = iceobjs(i_obj,2:5)
+        
+        ! All of the parameters need to be non_dimensionalised in length 
+        params = iceobjs(i_obj,2:5)*NONDIM_L
+
 
         if (iceobjtype.eq.1) then 
             ! Single point of ice: args: nodeid, height  
@@ -232,14 +220,19 @@ subroutine set_original_ice_level(nodalice)
     enddo 
     
     ! update log file with results: 
-    write(ICElogunit,*)''
-    write(ICElogunit,*)'✓ Finished setting original ice level '
-    write(ICElogunit,*)'  -->  Number of ice objects added : ', nice_obj
-    write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice)
-    write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice)
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit,*)
-    flush(ICElogunit)
+    if(myrank.eq.0)then 
+        write(*,*)
+        write(*,*)'✓ Finished setting original ice level '
+        write(*,'(a,i6)')'  -->  Number of ice objects added   : ', nice_obj
+        write(*,'(a,g0.6)')'  -->  Min ice level                 : ', minval(nodalice)
+        write(*,'(a,g0.6)')'  -->  Max ice level                 : ', maxval(nodalice)
+        if(devel_nondim)then
+            write(*,'(a,g0.6)')'  -->  Dimensionalised min ice level : ', minval(nodalice)*DIM_L
+            write(*,'(a,g0.6)')'  -->  Dimensionalised ice level     : ',  maxval(nodalice)*DIM_L
+        endif 
+        write(*,*)'-----------------------------------------------------'
+        write(*,*)
+    endif 
 
 end subroutine set_original_ice_level
 
@@ -260,18 +253,21 @@ subroutine add_ice_gll(i_elmtfs, i_gll, height, nodalice)
 
     ! Params should be the faceID, nodeID and the height
     ! Add to log file: 
-    write(ICElogunit,*)
-    write(ICElogunit,*)' --  Adding ice at point '
-    write(ICElogunit,*)'      ->  FS Elmt ID             : ', i_elmtfs
-    write(ICElogunit,*)'      ->  GLL Node (1-maxngll2d) : ', i_gll
-    write(ICElogunit,*)'      ->  height                 : ', height
-
+    if(myrank.eq.0)then
+        write(*,*)
+        write(*,*)' --  Adding ice at point '
+        write(*,'(a,i6)')'      ->  FS Elmt ID                : ', i_elmtfs
+        write(*,'(a,i6)')'      ->  GLL Node (1 to maxngll2d) : ', i_gll
+        write(*,'(a,g0.6)')'      ->  height                    : ', height
+    endif 
 
     ! Add ice height to nodal point: 
-    nodalice(rgnum_fs(i_gll, i_elmtfs)) = height*NONDIM_L
+    nodalice(rgnum_fs(i_gll, i_elmtfs)) = height
 
-    write(ICElogunit,*)' ✓ Injected at GLL point'
-    flush(ICElogunit)
+    if(myrank.eq.0)then
+        write(*,*)' ✓ Injected at GLL point'
+        write(*,*)
+    endif 
 end subroutine add_ice_gll
 
 
@@ -299,18 +295,25 @@ subroutine add_ice_cylinder(params, nodalice)
 
 
     ! Cylinder params 
-    x = params(1)*NONDIM_L
-    y = params(2)*NONDIM_L
-    r = params(3)*NONDIM_L
-    h = params(4)*NONDIM_L
+    x = params(1)
+    y = params(2)
+    r = params(3)
+    h = params(4)
 
     ! Add to log file: 
-    write(ICElogunit,*)
-    write(ICElogunit,*)' --  Creating cylinder '
-    write(ICElogunit,*)'      ->  centre (x,y): ', x*DIM_L, y*DIM_L
-    write(ICElogunit,*)'      ->  height      : ', h*DIM_L
-    write(ICElogunit,*)'      ->  radius      : ', r*DIM_L
+    if(myrank.eq.0)then
+        write(*,*)' --  Creating cylinder '
+        write(*,'(a,g0.6,1x,g0.6)')'      ->  centre (x,y): ', x, y
+        write(*,'(a,g0.6)')'      ->  height      : ', h
+        write(*,'(a,g0.6)')'      ->  radius      : ', r
 
+        if(devel_nondim)then
+            write(*,*)' --  Dimensionalised values '
+            write(*,'(a,g0.6,1x,g0.6)')'      ->  centre (x,y): ', x*DIM_L, y*DIM_L
+            write(*,'(a,g0.6)')'      ->  height      : ', h*DIM_L
+            write(*,'(a,g0.6)')'      ->  radius      : ', r*DIM_L
+        endif 
+    endif 
     
     ! Searches for nodes on FS that are within the radius of cylinder
     ! Loop through each face on the free surface
@@ -336,8 +339,9 @@ subroutine add_ice_cylinder(params, nodalice)
         enddo 
     enddo 
 
-    write(ICElogunit,*)' ✓ Injected cylinder at ', node_ctr, 'nodal points'
-    flush(ICElogunit)
+    if(myrank.eq.0)then
+        write(*,*)' ✓ Injected cylinder at ', node_ctr, 'nodal points'
+    endif
 end subroutine add_ice_cylinder
 
 
@@ -364,19 +368,26 @@ subroutine add_ice_gaussian(params, nodalice)
     real(kind=kreal):: x, y, amp, sigma, coeff, dis, x_coord, y_coord, coord(3)
 
 
-    ! Cylinder params 
-    x       = params(1)*NONDIM_L
-    y       = params(2)*NONDIM_L
-    amp     = params(3)*NONDIM_L
-    sigma   = params(4)*NONDIM_L
+    ! Gaussian params 
+    x       = params(1)
+    y       = params(2)
+    amp     = params(3)*NONDIM_L*NONDIM_L ! To maintain mass/vol of gaussian need to div by L^3 (already divided by L)
+    sigma   = params(4)
 
     ! Add to log file: 
     if(myrank.eq.0)then
         write(*,*)
         write(*,*)' --  Creating Gaussian '
-        write(*,*)'      ->  centre (x,y): ', x*DIM_L, y*DIM_L
-        write(*,*)'      ->  amplitude   : ', amp*DIM_L
-        write(*,*)'      ->  sigma       : ', sigma*DIM_L
+        write(*,'(a,g0.6,1x,g0.6)')'      ->  centre (x,y): ', x, y
+        write(*,'(a,g0.6)')'      ->  amplitude   : ', amp
+        write(*,'(a,g0.6)')'      ->  sigma       : ', sigma
+
+        if(devel_nondim)then
+            write(*,*)' --  Dimensionalised values '
+            write(*,'(a,g0.6,1x,g0.6)')'      ->  centre (x,y): ', x*DIM_L, y*DIM_L
+            write(*,'(a,g0.6)')'      ->  amplitude   : ', amp*DIM_L*DIM_L*DIM_L
+            write(*,'(a,g0.6)')'      ->  sigma       : ', sigma*DIM_L
+        endif 
     endif
     
     ! Constant amplitude of gaussian:
@@ -406,7 +417,7 @@ subroutine add_ice_gaussian(params, nodalice)
     enddo 
 
     if(myrank.eq.0)then
-        write(*,*)' ✓ Overwrite with gaussian'
+        write(*,*)' ✓ Overwritten with gaussian'
         write(*,*)
     endif
     
@@ -436,13 +447,19 @@ subroutine set_ice_rate(nodalice, nodalicerate)
     integer :: iface, nfgll, i_elmtfs, i_gll, gid
     ! Code
 
+
+    icerateval = icerateval*NONDIM_L
+
     if(myrank.eq.0)then
         write(*,*)'-----------------------------------------------------'
         write(*,*)'             Setting ice rate/change                '
         write(*,*)'-----------------------------------------------------'
         write(*,*)'CAUTION: ONLY IMPLEMENTING FIXED ICE RATE ACROSS REGIONS WITH ICE'
         write(*,*)
-        write(*,*)'* Using fixed ice rate value:', icerateval
+        write(*,'(a,g0.6)')'* Using fixed ice rate value        : ', icerateval
+        if(devel_nondim)then 
+            write(*,*)'  --> dimensionalised ice rate value: ', icerateval*NONDIM_L
+        endif 
         write(*,*)'* If larger than height of ice, just removes all ice.'
         write(*,*)
     endif 
@@ -462,7 +479,7 @@ subroutine set_ice_rate(nodalice, nodalicerate)
 
             ! Only for locations with ice present: 
             if (current_ice.gt.zero) then 
-                residual  = (current_ice+icerateval)*NONDIM_L
+                residual  = (current_ice+icerateval)
                 
                 !if(current_ice.ge.ONE)then
                 !        write(*,*)'current ice: ',current_ice
@@ -476,14 +493,14 @@ subroutine set_ice_rate(nodalice, nodalicerate)
                     !    write(*,*) 
                     !endif 
                     !Just remove all of what is present currently
-                    nodalicerate(gid) = -current_ice*NONDIM_L
+                    nodalicerate(gid) = -current_ice
                 else
                     ! Trim a bit off the top!
                     !if(current_ice.ge.ONE)then
                     !    write(*,*)'remove2: ',icerateval*NONDIM_L
                     !    write(*,*) 
                     !endif 
-                    nodalicerate(gid) = icerateval*NONDIM_L
+                    nodalicerate(gid) = icerateval
                 endif
             endif ! If some ice exists
         enddo !igll
@@ -524,18 +541,27 @@ use serial_library
 
    ! Get maxvalue of current ice: 
     maxice=maxscal(maxval(nodalice))
+
+    ! Nondimensionalise the ice rate val
+    icerateval = icerateval*NONDIM_L
+
+    ! Threshold for slice
     threshold = maxice + icerateval
     
-
 
     if(myrank.eq.0)then
         write(*,*)'-----------------------------------------------------'
         write(*,*)'             Setting ice rate/change                '
-        write(*,*)'* Using fixed ice rate value: ', icerateval
-        write(*,*)'* Threshold                 : ', threshold
-        write(*,*)'* maxice                    : ', maxice
+        write(*,'(a,g0.6)')'* Using fixed ice rate value   : ', icerateval
+        write(*,'(a,g0.6)')'* Threshold                    : ', threshold
+        write(*,'(a,g0.6)')'* maxice                       : ', maxice
+        if(devel_nondim)then 
+            write(*,*)'  Dimensional values...'
+            write(*,'(a,g0.6)')'   * Using fixed ice rate value: ', icerateval*DIM_L
+            write(*,'(a,g0.6)')'   * Threshold                 : ', threshold*DIM_L
+            write(*,'(a,g0.6)')'   * maxice                    : ', maxice*DIM_L
+        endif 
     endif 
-
  
 
     if (maxice.gt.zero)then 
@@ -553,11 +579,12 @@ use serial_library
                 current_ice = nodalice(gid)
 
                 
-                ! If within top threshold section... 
                 if(threshold.le.zero) then 
-                    nodalicerate(gid) = -current_ice*NONDIM_L
+                    ! Remove what is left
+                    nodalicerate(gid) = -current_ice
                 elseif (current_ice.gt.threshold) then 
-                    nodalicerate(gid) = (threshold-current_ice)*NONDIM_L  !icerateval*NONDIM_L
+                    ! If within top threshold section, reduce down to threshold value 
+                    nodalicerate(gid) = threshold-current_ice
                 else 
                     nodalicerate(gid) = zero 
                 endif 
@@ -610,9 +637,10 @@ subroutine calculate_ice_change_volume(nodalicerate)
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
-    write(ICElogunit,*)'* Calculating change in ice volume'
-    write(ICElogunit,*)'  --> WARNING: USING PROJECTION OF AREA TO THE Z direction'
-    write(ICElogunit,*)
+    if(myrank.eq.0)then 
+        write(*,*)'* Calculating change in ice volume'
+        write(*,*)' --> WARNING: USING PROJECTION OF AREA TO THE Z direction'
+    endif 
 
     icechangevol = ZERO 
 
@@ -640,11 +668,6 @@ subroutine calculate_ice_change_volume(nodalicerate)
         enddo ! i_gll
     enddo   ! i_elmtfs
     
-    write(ICElogunit,*)'  --> Volume of ice change: ', icechangevol 
-    write(ICElogunit,*)'  --> Mass of ice change  : ', icechangevol*rho_ice
-    write(debugunit,*) icechangevol*rho_ice
-    write(ICElogunit,*)' ✓ Finished calculating change in ice volume'
-    flush(ICElogunit)
 
     deallocate(gw)
     deallocate(dshape4)
@@ -659,7 +682,7 @@ use element
 use set_precision 
 use free_surface
 use math_constants
-
+use dimensionless
 #if(USE_MPI)
 use math_library_mpi
 use mpi_library
@@ -678,25 +701,26 @@ use serial_library
     real(kind=kreal)               :: coord(ndim,4), face_normal(3), dx_dxi(NDIM), dx_deta(NDIM), pi_2d_abg, pi_2d_xyg
     real(kind=kreal)               :: utf_dot_bkgrav, utf_dot_bkgrav_xyg, eps_area, xyg_sum
     real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
-    real(kind=kreal), allocatable  :: dshape4(:,:,:)
+    real(kind=kreal), allocatable  :: dshape4(:,:,:),miniceload,maxiceload
     real(kind=kreal)               :: epsilon, sumepsilon, pi_2d, ctr, val
     integer                        :: fgdof(nndof, maxngll2d), errcode ! face global degrees of freedom
 
-    real(kind=kreal), allocatable  :: nodal_iceload_u(:,:), nodal_iceload_phi(:), nodal_iceload_sl(:) ! dim nnode_fs
 
     ! Code: 
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
-    write(ICElogunit,*)'-----------------------------------------------------'
-    write(ICElogunit,*)'             Calculating iceload (RHS)               '
-    write(ICElogunit,*)'-----------------------------------------------------'
+    if(myrank.eq.0)then
+        write(*,*)
+        write(*,*)'-----------------------------------------------------'
+        write(*,*)'             Calculating iceload (RHS)               '
+        write(*,*)
+    endif 
 
+    ! Initialise 
     iceload = zero
-
-
     if (savedata%iceload)then 
-        allocate(nodal_iceload_u(ndim, nnode_fs), nodal_iceload_phi(nnode_fs), nodal_iceload_sl(nnode_fs))
+        ! Zero for saving iceload 
         nodal_iceload_u   = zero
         nodal_iceload_phi = zero
         nodal_iceload_sl  = zero
@@ -706,12 +730,15 @@ use serial_library
     ! Epsilon/Area
     call calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, nodalicerate)
     call sync_process()
-    ! Sum up Epsilon over all of the nodes: 
-    call MPI_Allreduce(epsilon, sumepsilon, 1, MPI_KREAL, MPI_SUM, MPI_COMM_WORLD, errcode) 
-    epsilon = sumepsilon
+    ! Sum up Epsilon over all of the nodes and copy to local epsilon
+    sumepsilon = sumscal(epsilon)
+    epsilon    = sumepsilon
 
     if(myrank.eq.0)then
-        write(*,*)'  * ε value            : ', epsilon
+        write(*,'(a,g0.8)')'  * ε value                 : ', epsilon
+        if(devel_nondim)then
+            write(*,'(a,g0.8)')'  * ε value dimensionalised : ', epsilon*DIM_L*DIM_L*DIM_L
+        endif 
         write(*,*)
     endif 
 
@@ -798,33 +825,40 @@ use serial_library
     ! Multiply whole of the vector by rho_i 
     iceload = -(rho_ice * iceload)
 
+    call sync_process()
 
-    write(ICElogunit,*)
-    write(ICElogunit,*)' Calculated ice load '
-    write(ICElogunit,*)'  -->  Min value of iceload     : ', minscal(minval(iceload))
-    write(ICElogunit,*)'  -->  Max value of iceload     : ', maxscal(maxval(iceload))
-    write(ICElogunit,*)
+    miniceload = minscal(minval(iceload))
+    maxiceload = maxscal(maxval(iceload))
 
-
+    if(myrank.eq.0)then
+        write(*,*)
+        write(*,*)'✓ Calculated ice load:'
+        write(*,'(a, g0.6)')'  -->  Min value of iceload     : ', miniceload
+        write(*,'(a, g0.6)')'  -->  Max value of iceload     : ', maxiceload
+        write(*,*)
+    endif 
 
     ! Save iceload to file: 
     if (savedata%iceload)then 
-        write(ICElogunit,*) ' Saving nodal ice load values.'
         nodal_iceload_u   =   -nodal_iceload_u   * rho_ice
         nodal_iceload_phi =   -nodal_iceload_phi * rho_ice
         nodal_iceload_sl  =   -nodal_iceload_sl  * rho_ice
 
-        call write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step=i_step-1)
+        call write_iceload_to_ensight(nodalu, i_step=i_step-1)
 
         if(i_step.eq.nstep)then 
-            call write_iceload_to_ensight(nodal_iceload_sl*zero, nodal_iceload_phi*zero, nodal_iceload_u*zero, nodalu, i_step=i_step)
+            ! Need to save at last timestep for ensight files to be 
+            ! created properly/viewed in paraview, but these values are 
+            ! irrelevant...would act on the (nstep+1)th timestep
+            nodal_iceload_u   = zero 
+            nodal_iceload_phi = zero
+            nodal_iceload_sl  = zero
+            call write_iceload_to_ensight(nodalu, i_step=i_step)
         endif
-
     endif
 
     deallocate(gw)
     deallocate(dshape4)
-    flush(ICElogunit)
 
 end subroutine calc_ice_load    
 
@@ -833,17 +867,15 @@ end subroutine calc_ice_load
 
 
 
-subroutine write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_iceload_u, nodalu, i_step)
+subroutine write_iceload_to_ensight(nodalu, i_step)
     use global
     use postprocess
     use free_surface
     use set_precision
-
-    real(kind=kreal) :: nodal_iceload_sl(:), nodal_iceload_phi(:), nodal_iceload_u(:,:)
     real(kind=kreal) :: nodalu(:,:)
     integer :: i_step
 
-    ! Save sea level iceload
+    ! Sea level iceload
     if(savedata%fsplot)then
       call write_scalar_to_file_freesurf(nnode_fs, nodal_iceload_sl,&
       ext='iceload_sl',istep=i_step) 
@@ -863,10 +895,7 @@ subroutine write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_i
         ext='iceload_phi',istep=i_step,plane=.true.) 
     endif
 
-    ! Displacement
-    !write(ICElogunit,*)'Saving iceload_u - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
-    !call write_vector_to_file(nnode,nodalu,ext='iceload_u',istep=i_step) 
-    ! On the free surface
+    ! Displacement iceload 
     if(savedata%fsplot)then
       call write_vector_to_file_freesurf(nnode_fs,nodal_iceload_u,&
       ext='iceload_u',istep=i_step)
@@ -876,9 +905,10 @@ subroutine write_iceload_to_ensight(nodal_iceload_sl, nodal_iceload_phi, nodal_i
       ext='iceload_u',istep=i_step,plane=.true.)
     endif
 
-    write(ICElogunit,*)'  ✓ Saved nodal ice load'
-    write(ICElogunit,*) 
-    flush(ICElogunit)
+    if(myrank.eq.0)then
+        write(*,'(a,i6)')'  ✓ Saved ice load for step ', i_step
+        write(*,*)
+    endif 
 
 end subroutine write_iceload_to_ensight
 
@@ -919,48 +949,45 @@ subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, 
             pi_2d         = gw(i_gll) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jac
 
             val = (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(rgnum_fs(i_gll, i_elmtfs)) * pi_2d
-
-
-            !write(ICElogunit,*)'  IGLL         : ', i_gll
-            !write(ICElogunit,*)'  J2D          : ', sqrt(dot_product(face_normal,face_normal))
-            !write(ICElogunit,*)'  gw(i_gll)    : ', gw(i_gll)
-            !write(ICElogunit,*)'  Ccancel      : ', (ONE - oceanf(i_elmtfs, i_gll))
-            !write(ICElogunit,*)'  nodalicerate : ', nodalicerate(rgnum_fs(i_gll, i_elmtfs))
-            !write(ICElogunit,*)'  int1         : ', val
-            !write(ICElogunit,*) 
-            !write(ICElogunit,*) 
-
-
-
             epsilon = epsilon + val 
         enddo 
     enddo 
-    write(ICElogunit,*)'  * ε value            : ', epsilon
-    flush(ICElogunit)
 
 end subroutine calc_iceload_epsilon
 
 
 
-subroutine nondimensionalise_ice(nodalice,nodalicerate)
+
+
+
+subroutine summarise_ice_vol_change()
     use global 
     use dimensionless
-    use set_precision
+#if(USE_MPI)
+use mpi_library
+use math_library_mpi
+use ghost_library_mpi
+#else
+use serial_library
+use math_library_serial
+#endif
 
-    real(kind=kreal)  :: nodalice(:), nodalicerate(:)  
+    ! Update the total mass change to date 
+    icechangevoltmp = sumscal(icechangevol) 
+    icechangevol = icechangevoltmp
+    total_ice_mass_change = total_ice_mass_change + icechangevol*rho_ice
+    if(myrank.eq.0)then
+      write(*,'(a,g0.6)')'  --> Change in ice mass to occur: ', icechangevol*rho_ice
+      write(*,'(a,g0.6)')'  --> Total ice change so far    : ', total_ice_mass_change
+      if(devel_nondim)then
+        write(*,*)'    - Dimensionalised values: '
+        write(*,'(a,g0.6)')'  --> Change in ice mass to occur: ', icechangevol*rho_ice * DIM_M
+        write(*,'(a,g0.6)')'  --> Total ice change so far    : ', total_ice_mass_change* DIM_M
+      endif 
+      write(*,*)
+    endif   
+end subroutine
 
-    write(ICElogunit,*)' * Applying nondimensionalisation to ice'
-    
-    nodalice        = nodalice     * NONDIM_L
-    nodalicerate    = nodalicerate * NONDIM_L
-
-
-    write(ICElogunit,*)'  -->  NONDIM length value         : ', minval(nodalice)
-    write(ICElogunit,*)'  -->  Min ice level               : ', minval(nodalice)
-    write(ICElogunit,*)'  -->  Max ice level               : ', maxval(nodalice)
-    flush(ICElogunit)
-
-end subroutine nondimensionalise_ice
 
 
 end module

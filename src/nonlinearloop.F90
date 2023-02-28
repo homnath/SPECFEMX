@@ -98,13 +98,10 @@ use solver_petsc
         call petsc_set_vector(resload)
         log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0(logunit)
 
-        write(logunit,*)'About to run solver'
-        !call petsc_print_vector()
-        !write(*,*)'MATRIX:'
-        !if(myrank.eq.0)then
-        !  call petsc_print_matrix()
-        !endif 
+        call sync_process()
 
+        !call petsc_print_vector()
+        !call petsc_print_matrix()
 
         call petsc_solve(du(1:), ksp_iter, ksp_convreason)
         log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0(logunit)
@@ -219,10 +216,6 @@ subroutine update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
       enddo !i_gll 
     enddo
 
-    if(myrank.eq.0)then
-      write(SLlogunit,*)
-      write(SLlogunit,*)'Max nodal sea level rate value: ', maxval(nodalslrate)
-    endif 
   endif
 
 
@@ -510,7 +503,7 @@ real(kind=kreal) :: scale_ang_freq2, dt_vp, f, dt
 
 ! Local variables
 integer :: ksp_convreason   ! KSP convergence reason
-integer :: i_nliter,imatve
+integer :: i_nliter,imatve,i
 real(kind=kreal)  :: fmax, jacw, dq1,dq2,dq3,dsbar,lode_theta,sigm, sigma(nst)
 real(kind=kreal)  :: maxresload,maxbodyload
 real(kind=kreal)  :: cpu_tstart,cpu_tend, telap,max_telap,mean_telap
@@ -528,10 +521,6 @@ character(len=250) :: errtag ! error message
 integer :: errcode
 errtag=""; errcode=-1
 
-
-
-
-
 ! ===================== RUN NON LINEAR ITERATIONS ====================
 
 nonlinear: do i_nliter=1,NL_MAXITER
@@ -548,11 +537,10 @@ nonlinear: do i_nliter=1,NL_MAXITER
   maxresload=maxscal(maxval(abs(resload)))
   maxbodyload=maxscal(maxval(abs(bodyload)))
   
-  if(myrank==0)then
-    write(logunit,'(a,i0,1x,e12.5,1x,e12.5)')' Residual NL: ',i_nliter,&
-    maxresload,maxbodyload
-    flush(logunit)
-  endif
+  !if(myrank==0)then
+  !  write(logunit,'(a,i0,1x,e12.5,1x,e12.5)')' Residual NL: ',i_nliter,&
+  !  maxresload,maxbodyload
+  !endif
 
   ! starting timer
   call cpu_time(cpu_tstart)
@@ -572,6 +560,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
   du(0)=ZERO
   maxdu=maxscal(maxval(abs(du)))
   call log_ksp_iteration(maxdu, ksp_iter, ksp_convreason)
+
 
   ! Update the u array with du 
   ! time steps are not incremental!!

@@ -160,8 +160,7 @@ real(kind=kreal),allocatable :: nodalslrate(:)  ! Nodal theta values
 real(kind=kreal),allocatable :: nodalice(:) ! Nodal I values
 real(kind=kreal),allocatable :: nodalicerate(:) ! Nodal rate of I values
 real(kind=kreal),allocatable :: iceload(:)  ! load term due to ice.
-real(kind=kreal)             :: minnodalsl, maxnodalsl
-
+real(kind=kreal):: maxnodalsl,minnodalsl
 ! magnetization
 real(kind=kreal),allocatable :: nodalB(:,:)
 !,psigma(:,:),psigma0(:,:),taumax(:),nsigma(:)
@@ -258,11 +257,12 @@ call sync_process()
 
 ! prepare fault - Only for Fault-based simulations 
 if( iseqsource .and. (eqsource_type.eq.3 .or. eqsource_type.eq.4) )then
-  log_msg='preparing split fault...';   call write_ifproc0(logunit)
   call prepare_fault(errcode,errtag)
   call sync_process
   call control_error(errcode,errtag,stdout,myrank)
-  log_msg='Complete!...';  call write_ifproc0(logunit) 
+  if(myrank.eq.0)then 
+    write(*,*)'Created split fault'
+  endif 
 endif
 
 
@@ -315,15 +315,19 @@ if(solver_type.eq.petsc_solver)then
   call prepare_sparse() 
   ! petsc solver
   call petsc_initialize() 
-  log_msg='petsc_initialize: SUCCESS!'; call write_ifproc0(logunit)
-  
+  if(myrank.eq.0)then 
+    write(*,*)'- PETSC initialisation        : Successful'
+  endif 
   ! Create sparse vector, matrix, and preallocate                                                         
   ! TODO: following call is not necessary for RECYCLE         
-    call petsc_create_vector()                                                     
-    call petsc_matrix_preallocate_size()                                           
-    call petsc_create_matrix()                                                     
-    call petsc_create_solver()                           
-    log_msg='petsc_preallocate_matrix_size: SUCCESS!'; call write_ifproc0(logunit)
+  call petsc_create_vector()                                                     
+  call petsc_matrix_preallocate_size()                                           
+  call petsc_create_matrix()                                                     
+  call petsc_create_solver()                           
+  if(myrank.eq.0)then 
+    write(*,*)'- PETSC matrix/vector creation: Successful'
+    write(*,*)
+  endif
 endif 
 
 
@@ -421,7 +425,7 @@ if(is_ICE)then
 endif 
 
 
-! -------------------- Initialise Sea Level --------------------
+! Initialise Sea Level 
 if(is_SL)then 
   call prepare_sea_level(nodalsl, nodalslrate)
   call set_original_sea_level(nodalsl)
@@ -429,20 +433,17 @@ if(is_SL)then
   ! Calc ocean func using initial SL and output if desired
   call update_ocean_function(nodalice, nodalsl, errcode, errtag)  
 
-  call sync_process()
-  totaloceannodes = sumscal(oceannodes) 
-
-  if(myrank.eq.0)then 
-    write(*,*)'  Total ocean nodes: ',totaloceannodes
-    write(*,*)'  ✓ Updated ocean function'
-  endif                             
+  ! Output summary of initial setup to user
+  call sync_process()   
+  call summarise_SL_input(nodalsl)                       
 endif 
-! ----------------- FINISHED INITIALISING SEA LEVEL--------------------
-
 
 
 
 ! Write initial (pre-looping) values to istep = 0
+if(myrank.eq.0)then
+  write(*,*)' Saving initial values to ensight: '
+endif   
 if(savedata%ice)then 
   call write_ice_to_ensight(nodalice, i_step=istep0-1)
 endif 
@@ -459,19 +460,6 @@ call save_displacement_variables(strain_elmt, strain_nodal, &
 
 
 
-call sync_process()
-allnodesfs      = sumscal(nnode_fs) 
-
-minnodalsl = minscal(minval(DIM_L*nodalsl))
-maxnodalsl = maxscal(maxval(DIM_L*nodalsl))
-if(myrank.eq.0)then 
-  write(*,*)'Initial values:'
-  write(*,'(a,f10.6)')'  --> Min sea level: ', minnodalsl
-  write(*,'(a,f10.6)')'  --> Max sea level: ', maxnodalsl
-  write(*,*)
-  write(*,*)
-  write(*,*)'Total nodes on FS: ', allnodesfs
-endif
 
 
 
@@ -509,7 +497,8 @@ loop_step: do i_step=istep0,nstep
   endif
 
 
-  ! Calculate the change in ice for this timestep:
+  ! Calculate the change in ice for this timestep
+  ! and save icerate to ensight
   if(is_ICE)then 
       call sync_process()
       nodalicerate = ZERO
@@ -517,15 +506,8 @@ loop_step: do i_step=istep0,nstep
 
       ! Calculate change in Ice mass expected
       call calculate_ice_change_volume(nodalicerate)
-
-      ! Update the total mass change to date 
-      icechangevoltmp = sumscal(icechangevol) 
-      icechangevol = icechangevoltmp
-      total_ice_mass_change = total_ice_mass_change + icechangevol*rho_ice
-      if(myrank.eq.0)then
-        write(*,*)'Change in ice mass to occur: ', icechangevol*rho_ice
-        write(*,*)'Total ice change so far    : ', total_ice_mass_change
-      endif   
+      call sync_process()
+      call summarise_ice_vol_change()
 
       ! Save the Icerate 
       if(savedata%icerate)then 
@@ -537,7 +519,6 @@ loop_step: do i_step=istep0,nstep
           call write_icerate_to_ensight(nodalicerate*zero, i_step=i_step)
         endif 
       endif 
-
   endif 
 
  
@@ -613,7 +594,6 @@ loop_step: do i_step=istep0,nstep
   ! RESETTING OF U AND DU 
   du = ZERO
   u  = ZERO
-  
 
   call run_nonlinear_solver(u, du, olddu, storekmat, ndscale,           &
                             dprecon, resload, isscale_ang_freq,         &
@@ -625,6 +605,8 @@ loop_step: do i_step=istep0,nstep
                             visco_q0, elas_e0, vload,nelmt_viscoelas,   &
                             relaxtime, muratio, i_step, tratio,         &
                             eid_viscoelas, dt, q0)
+
+
 
 
   ! WE: Update our vectors with a timestep: 
@@ -645,21 +627,26 @@ loop_step: do i_step=istep0,nstep
     ! Update ocean function and ocean area/volume 
     call update_ocean_function(nodalice, nodalsl, errcode, errtag)  
     call sync_process()
-    
+
     ! Evaluate the ocean nodes as proportion of overall FS nodes
     totaloceannodes = sumscal(oceannodes);     allnodesfs      = sumscal(nnode_fs) 
     if(myrank.eq.0)then 
       write(*,'(a, i0, a, i0)')'Total ocean nodes: ', totaloceannodes,'/', allnodesfs
+      write(*,*)
     endif
   endif 
-  
 
   ! Print warning if not converging
   if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
     if(myrank==0)then
-      write(logunit,*)'WARNING: nonconvergence in nonlinear iterations!'
-      write(logunit,*)'desired tolerance:', NL_TOL,' achieved tolerance:',uerr
-      flush(logunit)
+      write(*,*)
+      write(*,*)'************************************************'
+      write(*,'(a)')'WARNING: NON-CONVERGENCE IN NL ITERATIONS!'
+      write(*,'(a, g0.4)')' --> Desired tolerance : ', NL_TOL
+      write(*,'(a, g0.4)')' --> Achieved tolerance: ',uerr
+      write(*,*)'************************************************'
+
+      write(*,*)
     endif
   endif
 
@@ -672,29 +659,20 @@ loop_step: do i_step=istep0,nstep
                                     nodalustore, node_valency, i_step=i_step)
   endif
 
+
   ! Save potential variables to Ensight
   if(ISPOT_DOF)then
-    if(myrank.eq.0)then 
-      write(*,*)' * saving potential variables'
-    endif 
     call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=i_step)
   endif
 
   ! Save the ice and water to Ensight
   if(ISSL_DOF)then 
-    minnodalsl = minscal(minval(DIM_L*nodalsl))
-    maxnodalsl = maxscal(maxval(DIM_L*nodalsl))
-    if(myrank.eq.0)then 
-      write(*,*)'Saving SL to free surface'
-      write(*,*)'Saving the current SL values'
-      write(*,'(a,f10.6)')'  --> Min sea level: ', minnodalsl
-      write(*,'(a,f10.6)')'  --> Max sea level: ', maxnodalsl
-    endif
+    ! Output min/max SL to stdout
+    call write_min_max_SL(nodalsl)
 
     if(savedata%sl)then
       call write_SL_to_ensight(nodalsl, i_step)
     endif 
-      ! Save the ocean function
     if(savedata%oceanf)then
       call write_OF_to_ensight(i_step=i_step)
     endif   
@@ -702,9 +680,6 @@ loop_step: do i_step=istep0,nstep
       call write_ice_to_ensight(nodalice, i_step)
     endif 
   endif 
-
-
-
 
   ! Update number of non-linear iterations
   nl_tot=nl_tot+nl_iter

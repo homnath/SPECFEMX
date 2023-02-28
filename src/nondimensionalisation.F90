@@ -30,72 +30,76 @@ implicit none
 ! minimum, maximum density
 ! density can be negative for gravity anomaly calculation
 ! massdens_elmt is not allocated for the magnetic anomaly computation
+
+    if(myrank.eq.0)then 
+      write(*,*)'---------- Nondimensionalisation parameters: ----------'
+    endif 
+
     if(allocated(massdens_elmt))then
-        if(infbc)then
-          mindensity=minscal(minval(massdens_elmt(:,elmt_finite)))
-          maxdensity=maxscal(maxval(massdens_elmt(:,elmt_finite)))
-        else
-          mindensity=minscal(minval(massdens_elmt))
-          maxdensity=maxscal(maxval(massdens_elmt))
-        endif
-
-        ! Always use positive value for nondimensionalizing
-        ! It may be that water is the largest density value
-        maxdensity=max(abs(mindensity),abs(maxdensity))
-
-        if(myrank.eq.0)then 
-          write(logunit, '(a,g0.6)')'Min. density from model  : ', mindensity
-          write(logunit, '(a,g0.6)')'Max. density from model  : ', maxdensity
-        endif 
-
-        
-        if(ISSL_DOF)then
-          maxdensity=max(maxdensity, rho_water_dim)
-
-          if(myrank==0)then
-            write(logunit, '(a,g0.6)')'Water density            : ', rho_water_dim
-            write(logunit, '(a,g0.6)')'Using max density        : ', maxdensity
-            write(logunit, *)
-          endif 
-        endif 
-
-        flush(logunit)
-
+      if(infbc)then
+        mindensity=minscal(minval(massdens_elmt(:,elmt_finite)))
+        maxdensity=maxscal(maxval(massdens_elmt(:,elmt_finite)))
+      else
+        mindensity=minscal(minval(massdens_elmt))
+        maxdensity=maxscal(maxval(massdens_elmt))
       endif
-      ! minimum, maximum bulk modulus
-      ! bulkmod_elmt is not allocated for the magnetic anomaly computation
-      if(allocated(bulkmod_elmt))then
-        if(infbc)then
-          minbulkmod=minscal(minval(bulkmod_elmt(:,elmt_finite)))
-          maxbulkmod=maxscal(maxval(bulkmod_elmt(:,elmt_finite)))
-        else
-          minbulkmod=minscal(minval(bulkmod_elmt))
-          maxbulkmod=maxscal(maxval(bulkmod_elmt))
-        endif
-        if(myrank==0)then
-          write(logunit,'(a,g0.6,1x,g0.6)')'Bulk modulus range (N/m2): ',minbulkmod,maxbulkmod
-          flush(logunit)
-        endif
-      endif
-      ! minimum, maximum shear modulus
-      ! shearmod_elmt is not allocated for the magnetic anomaly computation
-      if(allocated(shearmod_elmt))then
-        if(infbc)then
-          minshearmod=minscal(minval(shearmod_elmt(:,elmt_finite)))
-          maxshearmod=maxscal(maxval(shearmod_elmt(:,elmt_finite)))
-        else
-          minshearmod=minscal(minval(shearmod_elmt))
-          maxshearmod=maxscal(maxval(shearmod_elmt))
-        endif
-        if(myrank==0)then
-          write(logunit,'(a,g0.6,1x,g0.6)')'Shear modulus range (N/m2): ',minshearmod,maxshearmod
-        endif
-      endif
+
+      ! Always use positive value for nondimensionalizing
+      ! It may be that water is the largest density value
+      maxdensity=max(abs(mindensity),abs(maxdensity))
+
+      if(myrank.eq.0)then 
+        write(*, '(a,g0.6)')'* Min. density from model  : ', mindensity
+        write(*, '(a,g0.6)')'* Max. density from model  : ', maxdensity
+      endif 
+
       
-      write(logunit,*)
-      flush(logunit)
+      if(ISSL_DOF)then
+        maxdensity=max(maxdensity, rho_water_dim)
+        if(myrank==0)then
+          write(*, '(a,g0.6)')'* Water density            : ', rho_water_dim
+          write(*, '(a,g0.6)')'  ----> Using max density  : ', maxdensity
+          write(*,*)
+        endif 
+      endif 
+    endif
 
-      return 
+
+    ! minimum, maximum bulk modulus
+    ! bulkmod_elmt is not allocated for the magnetic anomaly computation
+    if(allocated(bulkmod_elmt))then
+      if(infbc)then
+        minbulkmod=minscal(minval(bulkmod_elmt(:,elmt_finite)))
+        maxbulkmod=maxscal(maxval(bulkmod_elmt(:,elmt_finite)))
+      else
+        minbulkmod=minscal(minval(bulkmod_elmt))
+        maxbulkmod=maxscal(maxval(bulkmod_elmt))
+      endif
+      if(myrank==0)then
+        write(*,'(a,g0.6,1x,g0.6)')'* Bulk modulus range (N/m2): ',minbulkmod,maxbulkmod
+      endif
+    endif
+    ! minimum, maximum shear modulus
+    ! shearmod_elmt is not allocated for the magnetic anomaly computation
+    if(allocated(shearmod_elmt))then
+      if(infbc)then
+        minshearmod=minscal(minval(shearmod_elmt(:,elmt_finite)))
+        maxshearmod=maxscal(maxval(shearmod_elmt(:,elmt_finite)))
+      else
+        minshearmod=minscal(minval(shearmod_elmt))
+        maxshearmod=maxscal(maxval(shearmod_elmt))
+      endif
+      if(myrank==0)then
+        write(logunit,'(a,g0.6,1x,g0.6)')'* Shear modulus range (N/m2): ',minshearmod,maxshearmod
+      endif
+    endif
+
+    ! Add empty line for clarity 
+    if(myrank==0)then 
+      write(*,*)
+    endif
+    
+    return 
 end subroutine set_nondimensional_params 
 
 
@@ -114,8 +118,7 @@ subroutine calc_nondimensionalisation_vals
   if(.not.devel_nondim)then
     ! DO NOT nondimensionalize
     if(myrank==0)then
-      write(logunit,*)'* Nondimensionalize: NO'
-      flush(logunit)
+      write(*,*)'*****   Nondimensionalise: NO  *****'
     endif
     DIM_DENSITY=ONE
     NONDIM_DENSITY=ONE
@@ -146,10 +149,6 @@ subroutine calc_nondimensionalisation_vals
     DIM_B=ONE
   else
     ! nondimensionalize
-    if(myrank==0)then
-      write(logunit,*)'* Nondimensionalize: YES'
-      flush(logunit)
-    endif
     DIM_DENSITY=maxdensity                               
     NONDIM_DENSITY=ONE/DIM_DENSITY                               
   
@@ -175,10 +174,38 @@ subroutine calc_nondimensionalisation_vals
   
     DIM_GPOT=PI*GRAV_CONS*maxdensity*DIM_L*DIM_L
     DIM_G=PI*GRAV_CONS*maxdensity*DIM_L
+  
+    if(myrank.eq.0)then
+      write(*,*)'*****   Nondimensionalise: YES  *****'
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL MASS         : ', DIM_M
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL DENSITY      : ', DIM_DENSITY
+      write(*,'(a,g0.6,1x,g0.6)')'* NON-DIMENSONAL DENSITY      : ', NONDIM_DENSITY
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL LENGTH       : ', DIM_L
+      write(*,'(a,g0.6,1x,g0.6)')'* NON-DIMENSONAL LENGTH       : ', NONDIM_DENSITY
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL TIME         : ', DIM_T
+      write(*,'(a,g0.6,1x,g0.6)')'* NON-DIMENSONAL TIME         : ', NONDIM_T
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL VELOCITY     : ', DIM_VEL
+      write(*,'(a,g0.6,1x,g0.6)')'* NON-DIMENSONAL VELOCITY     : ', NONDIM_VEL
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL ACCELERATION : ', DIM_ACCEL
+      write(*,'(a,g0.6,1x,g0.6)')'* NON-DIMENSONAL ACCELERATION : ', NONDIM_ACCEL
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL ELASTIC MOD  : ', DIM_MOD
+      write(*,'(a,g0.6,1x,g0.6)')'* NON-DIMENSONAL ELASTIC MOD  : ', NONDIM_MOD
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL GRAVITY POT. : ', DIM_GPOT
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSIONAL GRAVITY     : ', DIM_G
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL MOMENT TENSOR: ', DIM_MTENS
+      write(*,'(a,g0.6,1x,g0.6)')'* NON-DIMENSONAL MOMENT TENSOR: ', NONDIM_MTENS
+      write(*,*)
+    endif
   endif
-
-  write(logunit,*)
-  flush(logunit)
 
   end subroutine calc_nondimensionalisation_vals
 
@@ -195,6 +222,7 @@ subroutine calc_nondimensionalisation_vals
 
     ! Nondimensionlize
     g_coord=g_coord*NONDIM_L
+
     if(ISDISP_DOF)then
       massdens_elmt = massdens_elmt * NONDIM_DENSITY
       bulkmod_elmt  = bulkmod_elmt  * NONDIM_MOD
@@ -208,10 +236,17 @@ subroutine calc_nondimensionalisation_vals
 
     if(IS_SL)then
       rho_water    = rho_water_dim*NONDIM_DENSITY
+      if(myrank.eq.0)then
+        write(*, '(a,g0.6)')'  ----> Using water density   : ', rho_water
+      endif
     endif 
 
     if(IS_ICE)then
       rho_ice    = rho_ice_dim*NONDIM_DENSITY
+      if(myrank.eq.0)then
+        write(*, '(a,g0.6)')'  ----> Using ice density     : ', rho_ice
+        write(*,*)
+      endif
     endif 
     
     pole_coord0=pole_coord0*NONDIM_L

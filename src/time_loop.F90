@@ -119,11 +119,8 @@ if(steptype.eq.FREQSTEP)then
         
     ! Set Petsc stiffness matrix
     if(solver_type.eq.petsc_solver)then
-        write(kmatunit,*)'SETTING PETSC KMAT (FREQ)...'
         call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
         ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.true.)  
-        write(kmatunit,*)'  DONE!'
-
     endif
 
     else ! TIMESTEPPING

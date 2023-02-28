@@ -299,7 +299,7 @@ end subroutine activate_dof
 ! This subroutine finalizes the global degrees of freedom IDs.
 subroutine finalize_gdof(errcode,errtag)
 use global, only:gdof,neq,nndof,nnode,g_num,part_path,proc_str,file_head, logunit
-use global, only:myrank,nedof, ISSL_DOF, SLlogunit
+use global, only:myrank,nedof, ISSL_DOF
 use free_surface
 implicit none
 integer,intent(out) :: errcode

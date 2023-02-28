@@ -504,7 +504,7 @@ character(len=20) :: tstep_sformat
 ! Log file all information
 character(len=250) :: log_file, SL_log_file, ICE_log_file, kmat_log_file, debug_file
 ! file unit ID for log file
-integer :: logunit=7, ICElogunit=8, kmatunit=9, debugunit=10,  SLlogunit=11, mySLlogunit
+integer :: logunit=7
 integer :: stdout=6
 
 character(len=250) :: log_msg
@@ -567,6 +567,10 @@ real(kind=kreal)     :: icechangevoltmp        ! Volume of ice change temporary
 real(kind=kreal)     :: total_ice_mass_change  = 0.0_kreal       ! Over all timesteps
 
 real(kind=kreal) icerateval ! constant value of ice change 
+
+! Arrays for saving different contributions of the ice load: 
+real(kind=kreal), allocatable  :: nodal_iceload_u(:,:), nodal_iceload_phi(:), nodal_iceload_sl(:) ! dim nnode_fs
+
 
 ! Sea level contribution test functions: 
 real(kind=kreal) :: theta_tf    = ONE
