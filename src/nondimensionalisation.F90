@@ -147,6 +147,8 @@ subroutine calc_nondimensionalisation_vals
   
     DIM_MPOT=ONE
     DIM_B=ONE
+
+    DIM_ICELOAD = ONE
   else
     ! nondimensionalize
     DIM_DENSITY=maxdensity                               
@@ -175,6 +177,11 @@ subroutine calc_nondimensionalisation_vals
     DIM_GPOT=PI*GRAV_CONS*maxdensity*DIM_L*DIM_L
     DIM_G=PI*GRAV_CONS*maxdensity*DIM_L
   
+    ! F = ma so mass * acceleration?
+    DIM_ICELOAD = DIM_M*DIM_ACCEL 
+
+
+
     if(myrank.eq.0)then
       write(*,*)'*****   Nondimensionalise: YES  *****'
       write(*,*)
@@ -203,6 +210,8 @@ subroutine calc_nondimensionalisation_vals
       write(*,*)
       write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL MOMENT TENSOR: ', DIM_MTENS
       write(*,'(a,g0.6,1x,g0.6)')'* NON-DIMENSONAL MOMENT TENSOR: ', NONDIM_MTENS
+      write(*,*)
+      write(*,'(a,g0.6,1x,g0.6)')'*     DIMENSONAL ICE LOAD     : ', DIM_ICELOAD
       write(*,*)
     endif
   endif

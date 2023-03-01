@@ -105,7 +105,7 @@ subroutine prepare_ice(nodalice, nodalicerate)
     use free_surface
     use set_precision
     use math_constants
-
+    use dimensionless
     implicit none 
 
     integer :: istattemp, istat
@@ -160,8 +160,13 @@ subroutine prepare_ice(nodalice, nodalicerate)
     endif
 
 
+    ! Apply non-dimensionalisaiton: 
+    icerateval = icerateval*NONDIM_L
+
 
     if(myrank.eq.0)then
+        write(*,*)
+        write(*,*)'-  Using icerateval: ', icerateval
         write(*,*)'  ✓ Prepared ice '
         write(*,*)
     endif 
@@ -211,6 +216,10 @@ subroutine set_original_ice_level(nodalice)
         elseif (iceobjtype.eq.3)then 
             ! Gaussian - args: x, y, amp, sigma
             call add_ice_gaussian(params, nodalice)
+        elseif (iceobjtype.eq.4)then 
+            ! Rectangle - args: x, y, len, height
+            ! Assumes square base: xlen = y len
+            call add_ice_sqcuboid(params, nodalice)
 
         else
             ! Invalid entry
@@ -346,6 +355,84 @@ end subroutine add_ice_cylinder
 
 
 
+
+subroutine add_ice_sqcuboid(params, nodalice)
+    ! Adds a square-based cuboid of ice in the required location
+    ! Uses
+    use set_precision
+    use global 
+    use dimensionless
+    use integration
+    use free_surface
+    use math_constants
+
+    ! IO vars: 
+    real(kind=kreal) :: params(4), nodalice(:) ! x, y, len, height
+
+    ! Local vars: 
+    integer :: i_obj,i_elmtfs,i_gll, iface,nfgll ,node_ctr
+    integer :: iceobjtype
+    integer :: ios, errcode
+
+    real(kind=kreal):: x, y, r,r2, h, disx, disy, x_coord, y_coord, coord(3)
+
+
+    ! Cylinder params 
+    x = params(1)
+    y = params(2)
+    r = params(3)
+    h = params(4)
+
+    r2=r/two
+
+    ! Add to log file: 
+    if(myrank.eq.0)then
+        write(*,*)' --  Creating square-based cuboid '
+        write(*,'(a,g0.6,1x,g0.6)')'      ->  centre (x,y): ', x, y
+        write(*,'(a,g0.6)')'      ->  height      : ', h
+        write(*,'(a,g0.6)')'      ->  sq. length  : ', r
+
+        if(devel_nondim)then
+            write(*,*)' --  Dimensionalised values '
+            write(*,'(a,g0.6,1x,g0.6)')'      ->  centre (x,y): ', x*DIM_L, y*DIM_L
+            write(*,'(a,g0.6)')'      ->  height      : ', h*DIM_L
+            write(*,'(a,g0.6)')'      ->  sq. length  : ', r*DIM_L
+        endif 
+    endif 
+    
+    ! Searches for nodes on FS that are within the domain of the square based
+    ! Loop through each face on the free surface
+    node_ctr = 0
+    do i_elmtfs=1, nelmt_fs  
+
+        ! For each GLL point get the coordinates
+        call get_fs_details_noweights(i_elmtfs, iface, nfgll)
+        do i_gll = 1, nfgll 
+            ! Get X, Y, Z coordinates for the face 
+            coord   = g_coord(:,  gnum_fs(i_gll,i_elmtfs))
+            x_coord = coord(1)
+            y_coord = coord(2)
+
+            ! Cartesian distance to the point: 
+            disx = ABS(x - x_coord) 
+            disy = ABS(y - y_coord) 
+            
+
+            if (disx.LE.r2.and.disy.LE.r2)then 
+                ! Add ice height to nodal point: 
+                nodalice(rgnum_fs(i_gll, i_elmtfs)) = h
+                node_ctr = node_ctr + 1 
+            endif 
+        enddo 
+    enddo 
+
+    if(myrank.eq.0)then
+        write(*,*)' ✓ Injected square-based cuboid at ', node_ctr, 'nodal points'
+    endif
+end subroutine add_ice_sqcuboid
+
+
+
 subroutine add_ice_gaussian(params, nodalice)
     ! Adds a gaussian of ice in the required location
     ! Uses 2D gaussian: (Amp/2 pi sigma^2) * exp(- (x^2 + y^2)/(2sigma^2) ) 
@@ -447,9 +534,6 @@ subroutine set_ice_rate(nodalice, nodalicerate)
     integer :: iface, nfgll, i_elmtfs, i_gll, gid
     ! Code
 
-
-    icerateval = icerateval*NONDIM_L
-
     if(myrank.eq.0)then
         write(*,*)'-----------------------------------------------------'
         write(*,*)'             Setting ice rate/change                '
@@ -458,7 +542,7 @@ subroutine set_ice_rate(nodalice, nodalicerate)
         write(*,*)
         write(*,'(a,g0.6)')'* Using fixed ice rate value        : ', icerateval
         if(devel_nondim)then 
-            write(*,*)'  --> dimensionalised ice rate value: ', icerateval*NONDIM_L
+            write(*,*)'  --> dimensionalised ice rate value: ', icerateval*DIM_L
         endif 
         write(*,*)'* If larger than height of ice, just removes all ice.'
         write(*,*)
@@ -542,12 +626,9 @@ use serial_library
    ! Get maxvalue of current ice: 
     maxice=maxscal(maxval(nodalice))
 
-    ! Nondimensionalise the ice rate val
-    icerateval = icerateval*NONDIM_L
 
     ! Threshold for slice
     threshold = maxice + icerateval
-    
 
     if(myrank.eq.0)then
         write(*,*)'-----------------------------------------------------'
@@ -830,19 +911,25 @@ use serial_library
     miniceload = minscal(minval(iceload))
     maxiceload = maxscal(maxval(iceload))
 
+
     if(myrank.eq.0)then
         write(*,*)
         write(*,*)'✓ Calculated ice load:'
         write(*,'(a, g0.6)')'  -->  Min value of iceload     : ', miniceload
         write(*,'(a, g0.6)')'  -->  Max value of iceload     : ', maxiceload
+        if(devel_nondim)then
+            write(*,'(a)')' --  Dimensionalised values '
+            write(*,'(a, g0.6)')'  -->  Min value of iceload     : ', miniceload * DIM_ICELOAD
+            write(*,'(a, g0.6)')'  -->  Max value of iceload     : ', maxiceload * DIM_ICELOAD
+        endif 
         write(*,*)
     endif 
 
     ! Save iceload to file: 
     if (savedata%iceload)then 
-        nodal_iceload_u   =   -nodal_iceload_u   * rho_ice
-        nodal_iceload_phi =   -nodal_iceload_phi * rho_ice
-        nodal_iceload_sl  =   -nodal_iceload_sl  * rho_ice
+        nodal_iceload_u   =   -nodal_iceload_u   * rho_ice * DIM_ICELOAD
+        nodal_iceload_phi =   -nodal_iceload_phi * rho_ice * DIM_ICELOAD
+        nodal_iceload_sl  =   -nodal_iceload_sl  * rho_ice * DIM_ICELOAD
 
         call write_iceload_to_ensight(nodalu, i_step=i_step-1)
 

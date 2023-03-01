@@ -111,6 +111,8 @@ real(kind=kreal) :: DIM_G
 real(kind=kreal) :: DIM_MPOT
 ! magnetic field or induction
 real(kind=kreal) :: DIM_B
+! ice load 
+real(kind=kreal) :: DIM_ICELOAD
 end module dimensionless
 !===============================================================================
 

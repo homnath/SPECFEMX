@@ -47,10 +47,11 @@ do i_elmt=1,nelmt
 enddo
 
 
-
 ! Calculating grad phi (gravity) in local vertical direction only (g)
+! Magnitude of gravity in vertical 
 allocate(g0_nodal(nnode))
 
+! Note that gravity has already been nondimensionalsied above 
 if(IS_SL)then 
   if(IS_CART_SIM)then 
     ! For cartesian we take the z direction to be the local vertical
