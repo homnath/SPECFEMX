@@ -220,6 +220,9 @@ module matrix_vector
    
 
     ! CALCULATE THE REST OF MATRIX
+    if(myrank.eq.0)then 
+      write(*,*)' --> Calculating normal stiffness matrix'
+    endif 
     !storekmat=zero
     rhoload=zero
     ! Purely elastic elements

@@ -230,6 +230,12 @@ call calc_nondimensionalisation_vals
 ! of the source point and to plot the free surface files.
 call prepare_free_surface(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
+call sync_process()
+! Calculate all of the nodes 
+allnodesfs = sumscal(nnode_fs)
+if(myrank.eq.0)then 
+  write(*,*)'Number of FS nodes: ', allnodesfs
+endif 
 
 ! Prepare SEA LEVEL IF NECESSARY
 ! Must be called after initialisation of Free Surface

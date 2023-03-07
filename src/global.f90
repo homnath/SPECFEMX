@@ -545,7 +545,7 @@ real(kind=kreal), allocatable     :: icnodalSL(:,:)  ! Initial condition for SL 
 real(kind=kreal), allocatable     :: nodalsl0(:),  nodalsldisp(:)   ! Store of nodal initial SL 
 real(kind=kreal), allocatable     :: nodalice0(:)   ! Store of nodal initial ice 
 
-
+integer :: allnodesfs ! Number of Nodes on the free surface 
 
 ! Sea level degrees of freedom 
 logical :: ISSL_DOF   ! Activates SL or not
@@ -568,7 +568,7 @@ real(kind=kreal)     :: icechangevoltmp        ! Volume of ice change temporary
 
 real(kind=kreal)     :: total_ice_mass_change  = 0.0_kreal       ! Over all timesteps
 
-real(kind=kreal) icerateval ! constant value of ice change 
+real(kind=kreal), allocatable ::  icerate(:) ! constant value of ice change 
 
 ! Arrays for saving different contributions of the ice load: 
 real(kind=kreal), allocatable  :: nodal_iceload_u(:,:), nodal_iceload_phi(:), nodal_iceload_sl(:) ! dim nnode_fs

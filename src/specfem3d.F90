@@ -78,7 +78,7 @@ character(len=500) :: errsrc
 
 
 ! istat: status indicator for allocation (can be used in other contexts)
-integer :: istat, numberproc, myproc, allnodesfs
+integer :: istat, numberproc, myproc
 
 ! do-loop indices
 integer :: i_dof,i_elmt,i_eq,i_gll,i_mat,i_nliter,i_node,i_comp,j_dof,j_node
@@ -502,8 +502,9 @@ loop_step: do i_step=istep0,nstep
   if(is_ICE)then 
       call sync_process()
       nodalicerate = ZERO
-      call set_ice_rate_slice(nodalice, nodalicerate)
+      call set_ice_rate(nodalice, nodalicerate, i_step)
 
+      
       ! Calculate change in Ice mass expected
       call calculate_ice_change_volume(nodalicerate)
       call sync_process()
@@ -629,7 +630,7 @@ loop_step: do i_step=istep0,nstep
     call sync_process()
 
     ! Evaluate the ocean nodes as proportion of overall FS nodes
-    totaloceannodes = sumscal(oceannodes);     allnodesfs      = sumscal(nnode_fs) 
+    totaloceannodes = sumscal(oceannodes);  
     if(myrank.eq.0)then 
       write(*,'(a, i0, a, i0)')'Total ocean nodes: ', totaloceannodes,'/', allnodesfs
       write(*,*)

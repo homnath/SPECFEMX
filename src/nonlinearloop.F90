@@ -548,6 +548,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
   ! Run NL solver for this timestep 
   ! For our purpose all this does is sets the RHS vector to be resload 
   ! And then calls the 'run' command from petsc
+  ! This is one single NL iteration
   call run_solver(resload, dprecon, ndscale, storekmat, du, &
                   scale_ang_freq2, ksp_iter, errcode, ksp_convreason,&
                   errtag, isscale_ang_freq)
@@ -589,7 +590,9 @@ nonlinear: do i_nliter=1,NL_MAXITER
   ! Reset bodyload to ZERO for Viscoelastic iteration.
   ! We need to reconcile platic and viscoelastic iterations.
   if(.not.isplastic)then
-    write(logunit,*)'  --> set bodyload to 0'
+    if(myrank.eq.0)then
+      write(*,*)'  --> set bodyload to 0'
+    endif
     bodyload=ZERO; !viscoload=ZERO
   endif 
 

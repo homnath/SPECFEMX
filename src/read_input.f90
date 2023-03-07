@@ -76,7 +76,8 @@ logical,allocatable :: ismat(:)
 integer :: sl_read_ctr, nline
 ! Ice variables: 
 integer :: ice_read_ctr, ice_stat, t1, t2 ,t3 , k, kold
-
+real(kind=kreal)icerateval_tmp
+integer :: icerate_ind, n_iceratevals, iirate, iceratetype
 
 ! Magnetization
 ! Inclination (0) or latitude (1). If latitude, the inclination is obtained
@@ -1456,7 +1457,6 @@ if(is_ICE)then
       ! Error reading line  
       write(*,*)'ERROR READING LINE OF SEA LEVEL FILE '    
     endif 
-
   enddo 
 
 
@@ -1468,8 +1468,37 @@ if(is_ICE)then
     return
   endif
 
-  read(11,*,IOSTAT=read_stat)icerateval 
-endif 
+  ! Read in icerate values: 
+  if(myrank.eq.0)then
+    write(*,*)'Reading the icerate values...'
+  endif
+
+  allocate(icerate(nstep))
+
+
+  ! Get user-specified type of input: 
+  ! 0 is equal for all timesteps
+  read(11,*)iceratetype
+  if(iceratetype.eq.0)then ! specify each timestep 
+      ! Get total number of entries in iceratefile
+      read(11,*)n_iceratevals
+
+      ! Load each one and store in element of array that 
+      ! corresponds to timestep e.g. 5th timestep in 5th element
+      do iirate = 1, n_iceratevals
+        read(11,*)icerate_ind, icerateval_tmp
+        icerate(icerate_ind) = icerateval_tmp
+      enddo
+  elseif(iceratetype.eq.1)then! uniform across timesteps
+    read(11,*)icerateval_tmp
+    icerate = icerateval_tmp
+  else 
+    write(*,*)'ERROR: Icerate first line must specify type of input - currently 0 or 1'
+    stop
+  endif
+
+
+endif
 
 
 

@@ -193,10 +193,8 @@ use math_library_serial
 
     real(kind=kreal) :: nodalsl(:)
     ! Local: 
-    integer :: allnodesfs
 
     ! Collect total number of nodes on free surface and total ocean nodes
-    allnodesfs = sumscal(nnode_fs) 
     totaloceannodes = sumscal(oceannodes) 
 
 

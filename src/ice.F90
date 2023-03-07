@@ -161,12 +161,12 @@ subroutine prepare_ice(nodalice, nodalicerate)
 
 
     ! Apply non-dimensionalisaiton: 
-    icerateval = icerateval*NONDIM_L
+    icerate = icerate*NONDIM_L
 
 
     if(myrank.eq.0)then
         write(*,*)
-        write(*,*)'-  Using icerateval: ', icerateval
+        write(*,*)'-  Using ice rate: ', icerate
         write(*,*)'  ✓ Prepared ice '
         write(*,*)
     endif 
@@ -519,7 +519,7 @@ end subroutine add_ice_gaussian
 
 
 
-subroutine set_ice_rate(nodalice, nodalicerate)
+subroutine set_ice_rate(nodalice, nodalicerate, i_step)
     ! Uses:
     ! Removes a constant amount from anywhere with ice
     ! if less than that amount of ice present, removes all of it 
@@ -528,11 +528,23 @@ subroutine set_ice_rate(nodalice, nodalicerate)
     use free_surface
     use dimensionless
     use math_constants 
+#if(USE_MPI)
+use math_library_mpi
+use mpi_library
+use mpi
+#else
+use math_library_serial
+use serial_library
+#endif
     ! IO variables: 
-    real(kind=kreal) :: nodalice(:), nodalicerate(:),z_coord, current_ice, residual, coord(3)
+    real(kind=kreal) :: nodalice(:), nodalicerate(:),z_coord, current_ice, residual, coord(3), icerateval
     ! Local variables: 
-    integer :: iface, nfgll, i_elmtfs, i_gll, gid
+    integer :: iface, nfgll, i_elmtfs, i_gll, gid, i_step
     ! Code
+
+
+    ! Get icerateval for this timestep: 
+    icerateval = icerate(i_step)
 
     if(myrank.eq.0)then
         write(*,*)'-----------------------------------------------------'
@@ -565,25 +577,12 @@ subroutine set_ice_rate(nodalice, nodalicerate)
             if (current_ice.gt.zero) then 
                 residual  = (current_ice+icerateval)
                 
-                !if(current_ice.ge.ONE)then
-                !        write(*,*)'current ice: ',current_ice
-                !        write(*,*)'icerateval: ',icerateval
-                !        write(*,*)'residual: ',residual
-                !endif 
 
                 if(residual.le.zero)then 
-                    !if(current_ice.ge.ONE)then
-                    !    write(*,*)'remove1: ',-current_ice*NONDIM_L
-                    !    write(*,*) 
-                    !endif 
                     !Just remove all of what is present currently
                     nodalicerate(gid) = -current_ice
                 else
                     ! Trim a bit off the top!
-                    !if(current_ice.ge.ONE)then
-                    !    write(*,*)'remove2: ',icerateval*NONDIM_L
-                    !    write(*,*) 
-                    !endif 
                     nodalicerate(gid) = icerateval
                 endif
             endif ! If some ice exists
@@ -600,7 +599,7 @@ end subroutine set_ice_rate
 
 
 
-subroutine set_ice_rate_slice(nodalice, nodalicerate)
+subroutine set_ice_rate_slice(nodalice, nodalicerate, i_step)
     ! Uses:
     ! Removes a slice of ice from the top
     use set_precision
@@ -618,7 +617,8 @@ use serial_library
 #endif
 
     ! IO variables: 
-    real(kind=kreal) :: nodalice(:), nodalicerate(:),z_coord, current_ice, residual, threshold, coord(3),maxice
+    real(kind=kreal) :: nodalice(:), nodalicerate(:),z_coord, current_ice, residual, threshold, coord(3),maxice, icerateval
+    integer :: i_step 
     ! Local variables: 
     integer :: iface, nfgll, i_elmtfs, i_gll, gid
     ! Code
@@ -626,6 +626,8 @@ use serial_library
    ! Get maxvalue of current ice: 
     maxice=maxscal(maxval(nodalice))
 
+    ! Get icerate for this timestep
+    icerateval = icerate(i_step)
 
     ! Threshold for slice
     threshold = maxice + icerateval
