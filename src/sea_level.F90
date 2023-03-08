@@ -147,7 +147,7 @@ use serial_library
 implicit none 
 
 ! Write summary of SL inputs: 
-if(myrank.eq.0)then
+if(myrank.eq.0.and.verbose_bool)then
     write(*,*)'-----------------------------------------------------'
     write(*,*)'Sea level data read from:  ', trim(slfile)
     write(*,*)'-----------------------------------------------------'
@@ -198,7 +198,7 @@ use math_library_serial
     totaloceannodes = sumscal(oceannodes) 
 
 
-    if(myrank.eq.0)then 
+    if(myrank.eq.0.and.verbose_bool)then 
         ! Model setup: 
         if(IS_CART_SIM)then 
             write(*,*)'*  Model setup                        :  Cartesian'
@@ -212,7 +212,7 @@ use math_library_serial
 
     call write_min_max_SL(nodalsl)
 
-    if(myrank.eq.0)then 
+    if(myrank.eq.0.and.verbose_bool)then 
         write(*,*)'-------------------------------------------------'
         write(*,*)
     endif 
@@ -284,7 +284,7 @@ implicit none
       ext='sl', istep=i_step,plane=.true.) 
     endif
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,'(a,i6)')'  ✓ Saved nodal sea level for step ', i_step
         write(*,*)
     endif 
@@ -315,7 +315,7 @@ subroutine write_OF_to_ensight(i_step)
     endif
 
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,'(a,i6)')'  ✓ Saved ocean function for step ', i_step
         write(*,*)
     endif 
@@ -328,7 +328,7 @@ end subroutine write_OF_to_ensight
 
 
 ! #################    INITIAL SETUP FUNCTIONS    #####################
-subroutine prepare_sea_level(nodalsl, nodalslrate)
+subroutine prepare_sea_level(nodalsl, nodalslrate, storekmatSL, kSL)
     use global 
     use free_surface
     use set_precision
@@ -337,15 +337,15 @@ subroutine prepare_sea_level(nodalsl, nodalslrate)
     implicit none 
 
     integer :: istattemp, istat
-    real(kind=kreal), allocatable :: nodalsl(:), nodalslrate(:)
+    real(kind=kreal), allocatable :: nodalsl(:), nodalslrate(:), storekmatSL(:,:,:), kSL(:,:)
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)'Preparing sea level variables...'
     endif 
 
     istat = 0
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)'  + number of unique FS nodes: ', nnode_fs
     endif 
 
@@ -355,13 +355,17 @@ subroutine prepare_sea_level(nodalsl, nodalslrate)
     oceanf=ZERO 
 
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)'  --> Created ocean function'
     endif 
 
     ! Allocate nodal sea level 
     allocate(nodalsl(nnode_fs), nodalslrate(nnode_fs), stat=istattemp)
     istat=istat+istattemp
+
+    allocate(storekmatSL(nedof,nedof,nelmt), kSL(nedof,nedof), stat=istattemp)
+    istat=istat+istattemp
+
 
     ! Check allocations 
     if(istat/=0)then
@@ -370,14 +374,16 @@ subroutine prepare_sea_level(nodalsl, nodalslrate)
     else 
         nodalsl = ZERO
         nodalslrate = ZERO
+        storekmatSL = ZERO
 
-        if(myrank.eq.0)then
+        if(myrank.eq.0.and.verbose_bool)then
             write(*,*)'  --> Initialised nodalsl '
             write(*,*)'  --> Initialised nodalslrate '
+            write(*,*)'  --> Initialised storekmatSL '
         endif
     endif
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)'  ✓ Prepared sea level.'
         write(*,*)
     endif 
@@ -407,7 +413,7 @@ subroutine set_original_sea_level(nodalsl)
 
 
     ! Code:
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)'-----------------------------------------------------'
         write(*,*)'       Setting original water distribution          '
         write(*,*)
@@ -481,7 +487,7 @@ subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
         enddo 
     enddo 
     ! Log output
-    if(myrank.eq.0)then 
+    if(myrank.eq.0.and.verbose_bool)then 
         write(*,*)' -- Added water at constant Z value'
         write(*,*)'   --> value      : ', sl_zcoord
         if(devel_nondim)then 
@@ -521,7 +527,7 @@ subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
         stop 
     endif 
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)
         write(*,*)' --  Adding sea level at point '
         write(*,'(a,i6)')'     -->  FS Elmt ID             : ', i_elmtfs
@@ -540,7 +546,7 @@ subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
      nodalsl(rgnum_fs(i_gll, i_elmtfs)) = nodalsl(rgnum_fs(i_gll, i_elmtfs)) + height
     endif 
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)' ✓ Injected at GLL point'
     endif 
 
@@ -603,7 +609,7 @@ do i_elmt=1, nelmt_fs
     enddo 
 enddo
 
-if(myrank.eq.0)then 
+if(myrank.eq.0.and.verbose_bool)then 
     write(*,*)'  ✓ Updated ocean function'
     write(*,*)
 endif 
@@ -645,7 +651,7 @@ use serial_library
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)'Calculating ocean area and volume'
     endif 
 
@@ -679,14 +685,15 @@ use serial_library
             ! not the actual area (which requires projection of the normal into the local vertical)
             detjac2d=sqrt(dot_product(face_normal,face_normal))       
             SLarea   = SLarea + oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d
-            ocean_height = nodalsl(rgnum_fs(i_gll, i_elmtfs)) - nodalu(3, rgnum_fs(i_gll, i_elmtfs))
-            
+
             ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
             face_normal(1) = zero
             face_normal(2) = zero
             detjac2d=sqrt(dot_product(face_normal,face_normal))       
+            ocean_height = nodalsl(rgnum_fs(i_gll, i_elmtfs)) - nodalu(3, rgnum_fs(i_gll, i_elmtfs))
+            
 
-            SLvolume     = SLvolume +  oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d*ocean_height
+            SLvolume  = SLvolume +  oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d*ocean_height
         enddo ! i_gll
     enddo   ! i_elmtfs
 
@@ -710,10 +717,11 @@ use math_constants
 use set_precision_mpi
 #if (USE_MPI)
 use mpi_library
+use math_library_mpi
 use mpi
-
 #else
 use serial_library
+use math_library_serial
 #endif
     real(kind=kreal), allocatable  :: nodalsl(:), nodalu(:,:) 
     integer :: errcode
@@ -724,8 +732,8 @@ use serial_library
     
   
     ! Sum up Area over all of the nodes: 
-    call MPI_Allreduce(SLarea, totalSLA, 1, MPI_KREAL, MPI_SUM, MPI_COMM_WORLD, errcode) 
-    call MPI_Allreduce(SLmasschange, SLsummasschange, 1, MPI_KREAL, MPI_SUM, MPI_COMM_WORLD, errcode) 
+    totalSLA        = sumscal(SLarea)
+    SLsummasschange = sumscal(SLmasschange)
     SLarea = totalSLA
     SLmasschange = SLsummasschange
 
@@ -748,7 +756,6 @@ use serial_library
           endif 
         write(*,*) 
     endif 
-
 end subroutine update_SL_area
 
 

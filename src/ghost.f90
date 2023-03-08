@@ -34,27 +34,24 @@ module ghost
         bmat(nst,nedofu),eld(nedofu),bload(nedofu),vload(nedofu),eload(nedofu),        &
         nodalu(nndofu,nnode),egdof(nedof),egdofu(nedofu),stat=istat)
         if (istat/=0)then
-            write(logunit,*)'ERROR: cannot allocate memory!'
-            flush(logunit)
+            write(*,*)'ERROR: cannot allocate memory!'
             stop
         endif
 
 
         if(ISSL_DOF)then
-            allocate(nodalustore(nndofu,nnode), nodalphistore(nnode), stat=istat)
+            allocate(nodalustore(nndofu,nnode), stat=istat)
             if(istat/=0)then
-                write(logunit,*)'ERROR: cannot allocate memory!'
-                flush(logunit)
+                write(*,*)'ERROR: cannot allocate memory!'
                 stop
             endif
         endif 
 
 
         if(ISPOT_DOF)then
-            allocate(nodalphi(nnode),nodalg(ndim,nnode),nodalB(ndim,nnode),stat=istat)
+            allocate(nodalphi(nnode),nodalg(ndim,nnode), nodalphistore(nnode),nodalB(ndim,nnode),stat=istat)
             if(istat/=0)then
-            write(logunit,*)'ERROR: cannot allocate memory!'
-            flush(logunit)
+            write(*,*)'ERROR: cannot allocate memory!'
             stop
             endif
         endif

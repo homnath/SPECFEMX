@@ -1148,7 +1148,7 @@ use output_to_user
             log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ; 
         endif 
 
-        if(myrank.eq.0)then
+        if(myrank.eq.0.and.verbose_bool)then
           write(*,*)trim(log_msg)
         endif 
 

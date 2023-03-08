@@ -1474,6 +1474,7 @@ if(is_ICE)then
   endif
 
   allocate(icerate(nstep))
+  icerate = zero 
 
 
   ! Get user-specified type of input: 

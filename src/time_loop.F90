@@ -78,7 +78,7 @@ end subroutine reset_nodal_arrays_loads
 
 subroutine set_elasto_visco_stiffness_matrix(i_step, dt, storekmat, storemmat, rhoload, isscale_ang_freq, & 
                                                 ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
-                                                eid_viscoelas, relaxtime)
+                                                eid_viscoelas, relaxtime, storekmatSL, kSL, istep0)
 use global 
 use matrix_vector
 #if (USE_MPI)
@@ -96,8 +96,8 @@ use solver_petsc
 #endif
         
 ! IO variables: 
-integer :: i_step ,i 
-real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:),  rhoload(:)
+integer :: i_step ,i , istep0
+real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:),  rhoload(:), storekmatSL(:,:,:), kSL(:,:)
 logical            :: isscale_ang_freq
 real(kind=kreal)   :: ang_freq, scale_ang_freq2, dt
 real(kind=kreal), allocatable :: relaxtime(:,:) 
@@ -125,27 +125,41 @@ if(steptype.eq.FREQSTEP)then
 
     else ! TIMESTEPPING
 
-        if(i_step.eq.1.or.i_step.eq.nstep)then
-            if(myrank.eq.0)then
-                write(*,*)
-                write(*,*)'CALCULATING KMAT AT EVERY TIMESTEP!'
+        ! If it is the first timestep we need the elastic stiffness matrix (storekmat)
+        ! It should be constant so we dont need to change it
+        if(i_step.eq.istep0)then
+            if(myrank.eq.0.and.verbose_bool)then
+                write(*,*)'Calculating elastic stiffness matrix...'
+            endif
+            call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+            if(myrank.eq.0.and.verbose_bool)then
+                write(*,*)' ✓ Done'
                 write(*,*)
             endif
         endif 
-
-
-
-        if(myrank.eq.0)then
-            write(*,*)'Calculating elastic stiffness matrix...'
-        endif
-                
-        call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
-        if(myrank.eq.0)then
-            write(*,*)' ✓ Done'
-            write(*,*)
-        endif
         
-        if(myrank.eq.0)then
+        ! At all timesteps we need the SL contribution to the kmat: 
+        ! Combine with the main storekmat
+        ! At the end of the timestep we will then remove this so that
+        ! we recover the original storekmat
+        ! I dont think we will have the memory to store two kmats
+        ! we may even need to get rid of the storekmatSL at some point
+        ! And directly add/remove
+        if (ISSL_DOF) then
+            if(myrank.eq.0.and.verbose_bool)then 
+                write(*,*)' --> Calculating sea-level stiffness matrix'
+              endif 
+            call compute_storekmatSL(storekmatSL, kSL)
+            storekmat = storekmat + storekmatSL
+            if(myrank.eq.0.and.verbose_bool)then
+                write(*,*)' --> Combined SL and normal Kmats'
+              endif
+        endif
+
+                
+    
+        ! Add the matrix to petsc: 
+        if(myrank.eq.0.and.verbose_bool)then
             write(*,*)'Setting PETSC stiffness matrix...'
         endif
 
@@ -154,7 +168,7 @@ if(steptype.eq.FREQSTEP)then
             ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
         endif
 
-        if(myrank.eq.0)then
+        if(myrank.eq.0.and.verbose_bool)then
             write(*,*)' ✓ Done'
             write(*,*)
         endif
@@ -163,7 +177,7 @@ if(steptype.eq.FREQSTEP)then
 
 
 
-
+        ! DO NOT DELETE - HAS VISCOELASTIC CONTENT
         ! ORIGINAL VERSION - BUT FOR SL WE NEED ADAPTIVE KMAT 
     !if(i_step==1)then 
     !    if(myrank.eq.0)then

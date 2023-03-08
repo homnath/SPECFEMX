@@ -119,7 +119,7 @@ real(kind=kreal),allocatable :: bmat(:,:),coord(:,:),deriv(:,:),    &
 jac(:,:)
 !kmat: stiffness matrix for each element
 !storekmat: stiffness matrix for all elements
-real(kind=kreal),allocatable :: kmat(:,:),storekmat(:,:,:)
+real(kind=kreal),allocatable :: kmat(:,:),storekmat(:,:,:), storekmatSL(:,:,:), kSL(:,:)
 !storemmat: mass matrix for all elements
 real(kind=kreal),allocatable :: storemmat(:,:)
 
@@ -427,7 +427,7 @@ endif
 
 ! Initialise Sea Level 
 if(is_SL)then 
-  call prepare_sea_level(nodalsl, nodalslrate)
+  call prepare_sea_level(nodalsl, nodalslrate, storekmatSL, kSL)
   call set_original_sea_level(nodalsl)
 
   ! Calc ocean func using initial SL and output if desired
@@ -524,10 +524,9 @@ loop_step: do i_step=istep0,nstep
 
  
   ! Set the stiffness matrix
-  call set_elasto_visco_stiffness_matrix(i_step, dt, storekmat, storemmat,& 
-                                         rhoload, isscale_ang_freq, & 
-                                         ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
-                                         eid_viscoelas, relaxtime)
+  call set_elasto_visco_stiffness_matrix(i_step, dt, storekmat, storemmat, rhoload, isscale_ang_freq, & 
+  ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
+  eid_viscoelas, relaxtime, storekmatSL, kSL,istep0)
                                          
 
 
@@ -608,6 +607,14 @@ loop_step: do i_step=istep0,nstep
                             eid_viscoelas, dt, q0)
 
 
+  ! Now need to remove the sea level contribution to the kmat so we can reuse it 
+  if(ISSL_DOF)then
+    storekmat = storekmat - storekmatSL
+    if(myrank.eq.0)then
+      write(*,*)'* Removed SL contribution to KMAT'
+    endif 
+  endif 
+
 
 
   ! WE: Update our vectors with a timestep: 
@@ -616,7 +623,6 @@ loop_step: do i_step=istep0,nstep
   ! WE: These time derivatives are stored in nodalu, nodalphi, nodalsl 
 
   if (ISSL_DOF)then
-    
     ! TODO: MAKE FLEXIBLE DT FOR UPDATE
     dt = 1.0_kreal
 
@@ -681,6 +687,15 @@ loop_step: do i_step=istep0,nstep
       call write_ice_to_ensight(nodalice, i_step)
     endif 
   endif 
+
+
+  
+  maxnodalsl = maxscal(maxval(nodalsl))
+  call sync_process()
+  if(myrank.eq.0)then 
+    write(outunit,'(g0.6,1x, g0.6,1x, g0.6)') maxnodalsl, total_ice_mass_change, SLmasschange
+  endif 
+
 
   ! Update number of non-linear iterations
   nl_tot=nl_tot+nl_iter

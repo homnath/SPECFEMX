@@ -59,7 +59,7 @@ subroutine write_ice_to_ensight(nodalice, i_step)
         ext='ice', istep=i_step, plane=.true.) 
     endif
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,'(a,i6)')'  ✓ Saved nodal ice for step ', i_step
         write(*,*)
     endif 
@@ -88,7 +88,7 @@ subroutine write_icerate_to_ensight(nodalicerate, i_step)
     endif
 
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,'(a,i6)')'  ✓ Saved ice rate for step ', i_step
         write(*,*)
     endif 
@@ -111,7 +111,7 @@ subroutine prepare_ice(nodalice, nodalicerate)
     integer :: istattemp, istat
     real(kind=kreal), allocatable :: nodalice(:), nodalicerate(:)
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)'Preparing ice variables...'
     endif
     istat = 0
@@ -132,7 +132,7 @@ subroutine prepare_ice(nodalice, nodalicerate)
     else 
         nodalice = ZERO
         ! Output confirmation to log. 
-        if(myrank.eq.0)then
+        if(myrank.eq.0.and.verbose_bool)then
             write(*, *)'  --> Created initial ICE (nodal)'
             write(*, *)'  --> Created ICE (nodal)'
         endif 
@@ -154,7 +154,7 @@ subroutine prepare_ice(nodalice, nodalicerate)
         write(*,*)'ERROR: cannot allocate memory for saving iceload!'
         stop
     else 
-        if(myrank.eq.0)then
+        if(myrank.eq.0.and.verbose_bool)then
             write(*, *)'  --> Created iceload_save arrays'
         endif 
     endif
@@ -184,13 +184,20 @@ subroutine set_original_ice_level(nodalice)
     use free_surface
     use math_constants
     use dimensionless
-
+#if(USE_MPI)
+use math_library_mpi
+use mpi_library
+use mpi
+#else
+use math_library_serial
+use serial_library
+#endif
     real(kind=kreal) :: nodalice(:)
     
     ! Local vars: 
     integer :: i_obj ! loop var
     integer :: iceobjtype
-    real(kind=kreal) :: params(4)
+    real(kind=kreal) :: params(4), maxvalue, minvalue
 
     ! Code: 
     if(myrank.eq.0)then
@@ -228,16 +235,19 @@ subroutine set_original_ice_level(nodalice)
         endif 
     enddo 
     
+
+    maxvalue = maxscal(maxval(nodalice))
+    minvalue = minscal(minval(nodalice))
     ! update log file with results: 
     if(myrank.eq.0)then 
         write(*,*)
         write(*,*)'✓ Finished setting original ice level '
         write(*,'(a,i6)')'  -->  Number of ice objects added   : ', nice_obj
-        write(*,'(a,g0.6)')'  -->  Min ice level                 : ', minval(nodalice)
-        write(*,'(a,g0.6)')'  -->  Max ice level                 : ', maxval(nodalice)
+        write(*,'(a,g0.6)')'  -->  Min ice level                 : ', minvalue
+        write(*,'(a,g0.6)')'  -->  Max ice level                 : ', maxvalue
         if(devel_nondim)then
-            write(*,'(a,g0.6)')'  -->  Dimensionalised min ice level : ', minval(nodalice)*DIM_L
-            write(*,'(a,g0.6)')'  -->  Dimensionalised ice level     : ',  maxval(nodalice)*DIM_L
+            write(*,'(a,g0.6)')'  -->  Dimensionalised min ice level : ', minvalue*DIM_L
+            write(*,'(a,g0.6)')'  -->  Dimensionalised ice level     : ', maxvalue*DIM_L
         endif 
         write(*,*)'-----------------------------------------------------'
         write(*,*)
@@ -273,7 +283,7 @@ subroutine add_ice_gll(i_elmtfs, i_gll, height, nodalice)
     ! Add ice height to nodal point: 
     nodalice(rgnum_fs(i_gll, i_elmtfs)) = height
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)' ✓ Injected at GLL point'
         write(*,*)
     endif 
@@ -348,7 +358,7 @@ subroutine add_ice_cylinder(params, nodalice)
         enddo 
     enddo 
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)' ✓ Injected cylinder at ', node_ctr, 'nodal points'
     endif
 end subroutine add_ice_cylinder
@@ -499,7 +509,7 @@ subroutine add_ice_gaussian(params, nodalice)
             y_coord = coord(2)
 
             ! Add ice height to nodal point: 
-            nodalice(rgnum_fs(i_gll, i_elmtfs)) =  coeff* EXP(- ( (x_coord**2) + (y_coord**2))/(2 * sigma**2) ) 
+            nodalice(rgnum_fs(i_gll, i_elmtfs)) =  coeff* EXP(- ( ( (x_coord-x)**2) + ((y_coord-y)**2))/(2 * sigma**2) ) 
         enddo 
     enddo 
 
@@ -632,7 +642,7 @@ use serial_library
     ! Threshold for slice
     threshold = maxice + icerateval
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)'-----------------------------------------------------'
         write(*,*)'             Setting ice rate/change                '
         write(*,'(a,g0.6)')'* Using fixed ice rate value   : ', icerateval
@@ -678,7 +688,7 @@ use serial_library
 
 
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)' ✓ Finished setting ice rate/change'
         write(*,*)'-----------------------------------------------------'
         write(*,*)
@@ -720,7 +730,7 @@ subroutine calculate_ice_change_volume(nodalicerate)
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
-    if(myrank.eq.0)then 
+    if(myrank.eq.0.and.verbose_bool)then 
         write(*,*)'* Calculating change in ice volume'
         write(*,*)' --> WARNING: USING PROJECTION OF AREA TO THE Z direction'
     endif 
@@ -793,7 +803,7 @@ use serial_library
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)
         write(*,*)'-----------------------------------------------------'
         write(*,*)'             Calculating iceload (RHS)               '
@@ -817,7 +827,7 @@ use serial_library
     sumepsilon = sumscal(epsilon)
     epsilon    = sumepsilon
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,'(a,g0.8)')'  * ε value                 : ', epsilon
         if(devel_nondim)then
             write(*,'(a,g0.8)')'  * ε value dimensionalised : ', epsilon*DIM_L*DIM_L*DIM_L
@@ -914,7 +924,7 @@ use serial_library
     maxiceload = maxscal(maxval(iceload))
 
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,*)
         write(*,*)'✓ Calculated ice load:'
         write(*,'(a, g0.6)')'  -->  Min value of iceload     : ', miniceload
@@ -994,7 +1004,7 @@ subroutine write_iceload_to_ensight(nodalu, i_step)
       ext='iceload_u',istep=i_step,plane=.true.)
     endif
 
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
         write(*,'(a,i6)')'  ✓ Saved ice load for step ', i_step
         write(*,*)
     endif 
@@ -1065,7 +1075,7 @@ use math_library_serial
     icechangevoltmp = sumscal(icechangevol) 
     icechangevol = icechangevoltmp
     total_ice_mass_change = total_ice_mass_change + icechangevol*rho_ice
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_bool)then
       write(*,'(a,g0.6)')'  --> Change in ice mass to occur: ', icechangevol*rho_ice
       write(*,'(a,g0.6)')'  --> Total ice change so far    : ', total_ice_mass_change
       if(devel_nondim)then

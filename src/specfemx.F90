@@ -233,7 +233,7 @@ call control_error(errcode,errtag,stdout,myrank)
 call sync_process()
 ! Calculate all of the nodes 
 allnodesfs = sumscal(nnode_fs)
-if(myrank.eq.0)then 
+if(myrank.eq.0.and.verbose_bool)then 
   write(*,*)'Number of FS nodes: ', allnodesfs
 endif 
 
@@ -287,12 +287,24 @@ call compute_max_elementsize()
 call determine_solver(errcode, errtag)
 
  
+! lets make a separate file: 
+if(myrank.eq.0)then
+out_file = trim(file_head)//'.output'
+  open(unit=outunit,file=trim(out_file),status='replace',action='write',iostat=ios)
+  if(ios.ne.0)then
+    print*,ios,trim(out_file)
+    write(errtag,'(a)')'ERROR: cannot open log file: '//trim(log_file)
+    call control_error(errcode,errtag,stdout,myrank)
+  endif
+endif 
+
+
 ! Now, call main routine...
 if(myrank.eq.0)then 
-  write(logunit,*) 
-  write(logunit,*) '**************** Starting SPECFEM3D  *****************'
-  write(logunit,*) 
-  write(logunit,*) 
+  write(*,*) 
+  write(*,*) '**************** Starting SPECFEM3D  *****************'
+  write(*,*) 
+  write(*,*) 
 endif 
 
 call specfem3d()

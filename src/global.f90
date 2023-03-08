@@ -504,9 +504,10 @@ character(len=1),parameter :: CR=achar(13) ! carriage return to overwrite
 ! format string for time step
 character(len=20) :: tstep_sformat
 ! Log file all information
-character(len=250) :: log_file, SL_log_file, ICE_log_file, kmat_log_file, debug_file
+character(len=250) :: log_file,out_file, SL_log_file, ICE_log_file, kmat_log_file, debug_file
 ! file unit ID for log file
 integer :: logunit=7
+integer :: outunit=8
 integer :: stdout=6
 
 character(len=250) :: log_msg
@@ -573,6 +574,7 @@ real(kind=kreal), allocatable ::  icerate(:) ! constant value of ice change
 ! Arrays for saving different contributions of the ice load: 
 real(kind=kreal), allocatable  :: nodal_iceload_u(:,:), nodal_iceload_phi(:), nodal_iceload_sl(:) ! dim nnode_fs
 
+logical :: verbose_bool = .false.
 
 ! Sea level contribution test functions: 
 real(kind=kreal) :: theta_tf    = ONE

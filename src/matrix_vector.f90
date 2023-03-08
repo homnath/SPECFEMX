@@ -110,6 +110,37 @@ module matrix_vector
     end subroutine compute_bodyload
     !===============================================================================
     
+
+    subroutine compute_storekmatSL(storekmatSL, kSL)
+      ! This subroutine computes the contribution to the stiffness matrix from the SL 
+      ! and stores it in storekmatSL
+      use math_constants
+      use free_surface
+      ! IO variables: 
+      real(kind=kreal) :: storekmatSL(:,:,:), kSL(:,:)
+
+      ! local variables: 
+      integer :: i_elmtfs
+
+    ! Sea level free surface contributions to stiffness matrix:
+      ! Initialise
+      storekmatSL = zero
+      ! Loop for each face on the free surface (note some elements, those with more than one face on the FS)
+      ! will be considered multiple times, but for different dofs.
+      do i_elmtfs = 1, nelmt_fs
+        kSL = zero 
+        call calc_SL_stiffness(i_elmtfs, kSL)
+        storekmatSL(:,:,id_elem_fs(i_elmtfs)) = storekmatSL(:,:,id_elem_fs(i_elmtfs)) +  kSL
+      enddo 
+
+      end subroutine compute_storekmatSL
+
+
+
+
+
+
+
     ! This subrotine computes the stiffness matrix, and
     ! body loads contributed by mass density or magnetiztion.
     ! TODO: optional precoditioner,optional assembly of stiffness
@@ -185,7 +216,6 @@ module matrix_vector
     ! Sea level variables: 
     real(kind=kreal), allocatable :: kSL(:,:)!  SL contribution to kmat
     integer :: i_elmtfs, ios
-    real(kind=kreal) :: storekmatSL(nedof,nedof,nelmt)
 
 
     errtag="ERROR: unknown!"
@@ -194,29 +224,6 @@ module matrix_vector
     
     storekmat=zero
     rhoload=zero
-    
-
-    ! Sea level free surface contributions to stiffness matrix:
-    if (ISSL_DOF) then
-      if(myrank.eq.0)then 
-        write(*,*)' --> Calculating sea-level stiffness matrix'
-      endif 
-
-      ! Initialise
-      allocate(kSL(nedof,nedof))
-
-      storekmatSL = zero
-
-      ! Loop for each face on the free surface (note some elements, those with more than one face on the FS)
-      ! will be considered multiple times, but for different dofs.
-      do i_elmtfs = 1, nelmt_fs
-        ! TO DO: At some point get rid of the storekmatSL intermediate array...too much storage!
-        ! Can do this by moving this whole IS_SLDOF loop to where it is added to storekmat and add it directly
-        kSL = zero 
-        call calc_SL_stiffness(i_elmtfs, kSL)
-        storekmatSL(:,:,id_elem_fs(i_elmtfs)) = storekmatSL(:,:,id_elem_fs(i_elmtfs)) +  kSL
-      enddo ! loop FS elements  
-    endif ! if IS_SLDOF 
    
 
     ! CALCULATE THE REST OF MATRIX
@@ -365,18 +372,9 @@ module matrix_vector
       if(.not.ISDISP_DOF .and. ISPOT_DOF)then
         rhoload(egdof)=rhoload(egdof)+eload
       endif
-
     enddo ! i_elmt
 
-    ! Combine with the sea level contributions!
-    if (ISSL_DOF)then 
-      if(myrank.eq.0)then
-        write(*,*)' --> Combined SL and normal Kmats'
-      endif
-      storekmat = storekmat + storekmatSL
-    endif 
-
-
+   
     ! rhoload is computed if only the ISPOT_DOF is TRUE
     ! multiply rhoload by 4*PI*G
     if(.not.ISDISP_DOF.and.ISPOT_DOF)then
@@ -398,10 +396,15 @@ module matrix_vector
     endif
     
 
-    deallocate(kSL)
 
     end subroutine compute_stiffness_elastic
     !===============================================================================
+    
+
+
+
+
+
     
     ! This subroutine computes the free surafce contribution
     ! on the stiffness matrix.
@@ -1769,6 +1772,7 @@ end subroutine get_fs_details
 
       ! Inverse area
       area_inv = ONE/SLarea
+
 
         ! Get details of element's face that lies on free surface
       call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
