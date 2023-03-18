@@ -153,9 +153,7 @@ if(myrank.eq.0.and.verbose_bool)then
     write(*,*)'-----------------------------------------------------'
     write(*,*)'SL IS_SL                 :  ', IS_SL
     write(*,*)'SL DOF                   :  ', ISSL_DOF
-    write(*,*)'Save original SL         :  ', savedata%sl0
     write(*,*)'Save SL                  :  ', savedata%sl
-    write(*,*)'Save ocean func. initial :  ', savedata%oceanf0
     write(*,*)'Save ocean func.         :  ', savedata%oceanf
     write(*,*)'-----------------------------------------------------'
     write(*,*)
@@ -246,11 +244,11 @@ use math_library_serial
     maxnodalsl = maxscal(maxval(nodalsl))
 
     if(myrank.eq.0)then
-        write(*,'(a,g0.6)')'  -->  Minimum sea level             : ', minnodalsl
-        write(*,'(a,g0.6)')'  -->  Maximum sea level             : ', maxnodalsl
+        write(*,'(a,g0.10)')'  -->  Minimum sea level             : ', minnodalsl
+        write(*,'(a,g0.10)')'  -->  Maximum sea level             : ', maxnodalsl
         if(devel_nondim)then
-            write(*,'(a,g0.6)')'  -->  Dimensionalised min sea level : ', minnodalsl*DIM_L
-            write(*,'(a,g0.6)')'  -->  Dimensionalised max sea level : ', maxnodalsl*DIM_L
+            write(*,'(a,g0.10)')'  -->  Dimensionalised min sea level : ', minnodalsl*DIM_L
+            write(*,'(a,g0.10)')'  -->  Dimensionalised max sea level : ', maxnodalsl*DIM_L
         endif      
         write(*,*)   
     endif     
@@ -408,7 +406,7 @@ subroutine set_original_sea_level(nodalsl)
     real(kind=kreal) :: nodalsl(:)
     ! Local variables 
     integer          :: i_elmt, iface, nfgll, i_gll, i_obj
-    integer          :: slobjtype
+    integer          :: slobjtype, i
     real(kind=kreal) :: params(4)
 
 
@@ -452,26 +450,31 @@ end subroutine set_original_sea_level
 
 
 
+
+
+
+
+
+
 subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
     use global
     use free_surface
     use dimensionless
     use set_precision
+    use math_constants
     ! IO: 
     real(kind=kreal) :: nodalsl(:), sl_zcoord
 
     ! Local: 
-    integer :: i_elmt,i_gll, nfgll, iface
+    integer :: i_elmt,i_gll, nfgll, iface, num4(4)
     real(kind=kreal) :: theta, z_coord
-
+    real(kind=kreal) :: coord(NDIM,4)
     ! SL0 is the z coordinate of the sea surface. We therefore
     ! need to calculate the theta value for each point based on the 
     ! the z coordinate of the face 
 
     ! Store value: 
     SL0_constant = sl_zcoord
-
-
 
     do i_elmt=1, nelmt_fs  
         call get_fs_details_noweights(i_elmt, iface, nfgll)
@@ -481,11 +484,12 @@ subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
             z_coord = g_coord(3,  gnum_fs(i_gll,i_elmt))
             ! SL = value - z_coord on surface
             theta   = sl_zcoord - z_coord 
-            
+
             ! Now storing negative values too. 
-            nodalsl(rgnum_fs(i_gll, i_elmt)) = theta    
-        enddo 
-    enddo 
+            nodalsl(rgnum_fs(i_gll, i_elmt)) = theta
+        enddo !igll
+    enddo !i_elmt
+
     ! Log output
     if(myrank.eq.0.and.verbose_bool)then 
         write(*,*)' -- Added water at constant Z value'
@@ -493,8 +497,9 @@ subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
         if(devel_nondim)then 
             write(*,*)'   --> value (DIM): ', sl_zcoord*DIM_L
         endif 
-        write(*,*)
     endif 
+
+
 end subroutine set_cart_constant_SL0
 
 
@@ -559,7 +564,7 @@ end subroutine add_sl_gll
 
 
 
-subroutine update_ocean_function(nodalice, nodalsl, errcode, errtag)
+subroutine update_ocean_function(nodalice, nodalsl, errcode, errtag, verbose)
 ! Routine checks each GLL point on the surface to see if it is part of the ocean set
 ! see Crawford et al 2018, eqn 31-32.
 ! Set contains any nodes in which rho_w * SL > rho_i * I 
@@ -575,9 +580,9 @@ implicit none
 
 ! IO variables
 character(len=250) :: errtag
-integer :: ios, errcode
+integer :: ios, errcode, cloop
 real(kind=kreal), allocatable :: nodalice(:), nodalsl(:)
-
+logical :: verbose
 
 ! Local variables 
 integer          :: i_elmt, iface, numf(maxngll2d), i_numf, i_node, nfgll
@@ -585,8 +590,10 @@ integer          :: i_gll
 real(kind=kreal) :: SL, I
 
 
+
 ! In this case we can calculate ocean function using nodalsl and nodalice: 
 oceannodes =0 
+
 do i_elmt=1, nelmt_fs  
 
     ! Face number (ie between 1 and 6) and get related properties
@@ -609,7 +616,7 @@ do i_elmt=1, nelmt_fs
     enddo 
 enddo
 
-if(myrank.eq.0.and.verbose_bool)then 
+if(myrank.eq.0.and.verbose)then 
     write(*,*)'  ✓ Updated ocean function'
     write(*,*)
 endif 
@@ -617,7 +624,7 @@ end subroutine update_ocean_function
 
 
 
-subroutine calculate_SL_A_per_proc(nodalsl, nodalu)
+subroutine calculate_SL_A_per_proc(nodalsl, nodalu, overwrite_old, verbose)
     ! Calculates the area covered by ocean (integral of ocean func
     ! over the solid surface)
     use global
@@ -644,27 +651,36 @@ use serial_library
     real(kind=kreal), allocatable  :: gw(:), nodalsl(:), nodalu(:,:) ! GLL weights 2D
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
     real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
-                                    dx_dxi(NDIM), dx_deta(NDIM)
+                                    dx_dxi(NDIM), dx_deta(NDIM), vertical(3), dot_w_vert
     integer :: num4(4)
-
+    logical :: overwrite_old, verbose
     ! Code
     allocate(gw(maxngll2d))
     allocate(dshape4(2,4,maxngll2d))
 
-    if(myrank.eq.0.and.verbose_bool)then
-        write(*,*)'Calculating ocean area and volume'
+
+
+  ! Define the local vertical 
+    vertical(1) = zero
+    vertical(2) = zero
+    vertical(3) = one
+
+    if(myrank.eq.0.and.verbose)then
+        write(*,*)'Calculating ocean area and volume avoiding vertical:'
+        write(*,*)vertical
     endif 
 
     ! Store old values
-    SLarea_old   = SLarea   
-    SLvolume_old = SLvolume
+    if(overwrite_old)then
+        SLarea_old   = SLarea   
+        SLvolume_old = SLvolume
+    endif
 
     SLarea   = ZERO 
     SLvolume = ZERO 
 
-
+    
     do i_elmtfs = 1, nelmt_fs
-
         call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
         
         num4  = gnum4_fs(:, i_elmtfs)
@@ -683,13 +699,19 @@ use serial_library
             
             ! NOTE THAT THE SLAREA is actually the integral of the ocean function, 
             ! not the actual area (which requires projection of the normal into the local vertical)
-            detjac2d=sqrt(dot_product(face_normal,face_normal))       
-            SLarea   = SLarea + oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d
+            detjac2d=sqrt(dot_product(face_normal,face_normal))  
+            
+            ! Avoiding any faces that are vertical cliffs from the sea level area
+            dot_w_vert = dot_product(vertical, face_normal)
+            if(dot_w_vert.ne.zero)then 
+                SLarea   = SLarea + oceanf(i_elmtfs, i_gll)*gw(i_gll)*detjac2d
+            endif 
+
 
             ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
             face_normal(1) = zero
             face_normal(2) = zero
-            detjac2d=sqrt(dot_product(face_normal,face_normal))       
+            detjac2d=sqrt(dot_product(face_normal,face_normal))  
             ocean_height = nodalsl(rgnum_fs(i_gll, i_elmtfs)) - nodalu(3, rgnum_fs(i_gll, i_elmtfs))
             
 
@@ -709,7 +731,7 @@ end subroutine calculate_SL_A_per_proc
 
 
 
-subroutine update_SL_area(nodalsl, nodalu)
+subroutine update_SL_area(nodalsl, nodalu, overwrite_old, verbose)
     
 use set_precision
 use dimensionless
@@ -725,17 +747,18 @@ use math_library_serial
 #endif
     real(kind=kreal), allocatable  :: nodalsl(:), nodalu(:,:) 
     integer :: errcode
+    logical :: overwrite_old, verbose
 
     ! Use ocean function to calculate area of ocean for each processor     
-    call calculate_SL_A_per_proc(nodalsl, nodalu)
+    call calculate_SL_A_per_proc(nodalsl, nodalu, overwrite_old, verbose)
     call sync_process()
     
   
     ! Sum up Area over all of the nodes: 
     totalSLA        = sumscal(SLarea)
     SLsummasschange = sumscal(SLmasschange)
-    SLarea = totalSLA
-    SLmasschange = SLsummasschange
+    SLarea          = totalSLA
+    SLmasschange    = SLsummasschange
 
     ! Escape if no water. 
     if(SLarea.le.ZERO)then 
@@ -746,9 +769,10 @@ use math_library_serial
       stop 
     endif 
 
-    if (myrank.eq.0)then 
+    if (myrank.eq.0.and.verbose)then 
         write(*,'(a,g0.6)')'Integrated ocean function (A)    :   ', SLarea
         write(*,'(a,g0.6)')'Total SL mass change across nodes:   ', SLmasschange
+        write(*,'(a,g0.6)')'Using initial mass of            :   ', SLvolume_old*rho_water
         if(devel_nondim)then
             write(*,*)'    - Dimensionalised values: '
             write(*,'(a,g0.6)')'  --> Integrated ocean function (A): ', SLarea*DIM_L*DIM_L

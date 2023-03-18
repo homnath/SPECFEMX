@@ -155,12 +155,12 @@ real(kind=kreal),allocatable :: bcnodalv(:,:),nodalu(:,:), nodalustore(:,:)
 real(kind=kreal),allocatable :: nodalphi(:),nodalphistore(:),nodalg(:,:)
 
 ! Sea level edit - WE 
-real(kind=kreal),allocatable :: nodalsl(:)  ! Nodal theta values
+real(kind=kreal),allocatable :: nodalsl(:)  ! Nodal theta values,
 real(kind=kreal),allocatable :: nodalslrate(:)  ! Nodal theta values
 real(kind=kreal),allocatable :: nodalice(:) ! Nodal I values
 real(kind=kreal),allocatable :: nodalicerate(:) ! Nodal rate of I values
 real(kind=kreal),allocatable :: iceload(:)  ! load term due to ice.
-real(kind=kreal):: maxnodalsl,minnodalsl
+real(kind=kreal):: maxnodalsl,minnodalsl, mass_imbalance
 ! magnetization
 real(kind=kreal),allocatable :: nodalB(:,:)
 !,psigma(:,:),psigma0(:,:),taumax(:),nsigma(:)
@@ -208,6 +208,8 @@ real(kind=kreal),allocatable :: relaxtime(:,:),muratio(:),tratio(:)
 ! q0: initial state variable for viscoelastic rheology
 real(kind=kreal),allocatable :: visco_q0(:,:,:,:),q0(:,:),elas_e0(:,:,:)
 
+integer :: cloop,ncloop
+real(kind=kreal) :: mass_imbalance_0
 
 real(kind=kreal) :: trace_vsigma0
 real(kind=kreal) :: esigma0_dev(nst),esigma_dev(nst)
@@ -431,7 +433,14 @@ if(is_SL)then
   call set_original_sea_level(nodalsl)
 
   ! Calc ocean func using initial SL and output if desired
-  call update_ocean_function(nodalice, nodalsl, errcode, errtag)  
+  call update_ocean_function(nodalice, nodalsl, errcode, errtag, verbose=.true.) 
+  
+  ! Evaluate the ocean nodes as proportion of overall FS nodes
+  totaloceannodes = sumscal(oceannodes);  
+  if(myrank.eq.0)then 
+    write(*,'(a, i0, a, i0)')'Total ocean nodes: ', totaloceannodes,'/', allnodesfs
+    write(*,*)
+  endif
 
   ! Output summary of initial setup to user
   call sync_process()   
@@ -461,9 +470,7 @@ call save_displacement_variables(strain_elmt, strain_nodal, &
 
 
 
-
-
-
+    
 
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
@@ -486,6 +493,9 @@ loop_step: do i_step=istep0,nstep
     write(*,'(a,i0,a)')' ~~~~~~~~~~~~~~~~~~~~ TIMESTEP ', i_step, ' ~~~~~~~~~~~~~~~~~~~~'
   endif 
 
+
+  call  write_min_max_SL(nodalsl)
+
   ! determine time (dt) or freq (df) step and current time/freq
   call calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
   call reset_nodal_arrays_loads(nodalu,ubcload,rhoload,nodalphi,nodalslrate)
@@ -493,7 +503,7 @@ loop_step: do i_step=istep0,nstep
 
   ! Update SL area if necessary 
   if(ISSL_DOF)then
-      call update_SL_area(nodalsl, nodalu)
+      call update_SL_area(nodalsl, nodalu, overwrite_old=.true., verbose=.true.)
   endif
 
 
@@ -503,7 +513,6 @@ loop_step: do i_step=istep0,nstep
       call sync_process()
       nodalicerate = ZERO
       call set_ice_rate(nodalice, nodalicerate, i_step)
-
       
       ! Calculate change in Ice mass expected
       call calculate_ice_change_volume(nodalicerate)
@@ -523,11 +532,8 @@ loop_step: do i_step=istep0,nstep
   endif 
 
  
-  ! Set the stiffness matrix
-  call set_elasto_visco_stiffness_matrix(i_step, dt, storekmat, storemmat, rhoload, isscale_ang_freq, & 
-  ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
-  eid_viscoelas, relaxtime, storekmatSL, kSL,istep0)
-                                         
+
+          
 
 
   !apply traction boundary conditions for first timestep
@@ -551,24 +557,32 @@ loop_step: do i_step=istep0,nstep
     call compute_cmt_load(extload, freq)
   endif 
 
+  
+
 
   ! Calculate ice load: 
   if (is_ICE)then 
     call calc_ice_load(iceload, nodalicerate, nodalu, i_step=i_step)
-  endif 
+  endif   
+
+
+  ! Set the stiffness matrix
+  call set_elasto_visco_stiffness_matrix(i_step, dt, storekmat, storemmat, rhoload, isscale_ang_freq, & 
+  ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
+  eid_viscoelas, relaxtime, storekmatSL, kSL,istep0)  
 
 
   ! Apply non-zero boundary conditions to the bcnodalv array 
   ! Note this is NOT applying the loading terms (e.g. extload)
   call apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload,&
-                        nodalu, nodalphi)
+                        nodalustore, nodalphi)
 
 
   ! PREPARE BUILT IN SOLVER
   if(solver_type.eq.builtin_solver)then
     call prep_inbuilt_solver(dprecon, egdof, storekmat, ndscale, &
-                             nzero_dprecon, nelmt_elas, eid_elas,&
-                             nelmt_viscoelas, eid_viscoelas)
+                            nzero_dprecon, nelmt_elas, eid_elas,&
+                            nelmt_viscoelas, eid_viscoelas)
   endif
 
 
@@ -613,49 +627,106 @@ loop_step: do i_step=istep0,nstep
     if(myrank.eq.0)then
       write(*,*)'* Removed SL contribution to KMAT'
     endif 
-  endif 
 
 
-
-  ! WE: Update our vectors with a timestep: 
-  ! WE: For sea level we solve for the time derivatives of the system so then we use
-  ! WE: u(t + dt) = u(t) + dt * f(t) where f is the time derivative
-  ! WE: These time derivatives are stored in nodalu, nodalphi, nodalsl 
-
-  if (ISSL_DOF)then
-    ! TODO: MAKE FLEXIBLE DT FOR UPDATE
+    
     dt = 1.0_kreal
+    ncloop=5000
 
-    nodalustore   = nodalustore   +  dt*nodalu
-    nodalphistore = nodalphistore +  dt*nodalphi
-    nodalsl       = nodalsl       + (dt*nodalslrate)
-    nodalice      = nodalice      + (dt*nodalicerate)
+    ! here I think we need to loop? 
+    do cloop=1,ncloop 
 
-    ! Update ocean function and ocean area/volume 
-    call update_ocean_function(nodalice, nodalsl, errcode, errtag)  
-    call sync_process()
+      ! WE: Update our vectors with a timestep: 
+      ! WE: For sea level we solve for the time derivatives of the system so then we use
+      ! WE: u(t + dt) = u(t) + dt * f(t) where f is the time derivative
+      ! WE: These time derivatives are stored in nodalu, nodalphi, nodalsl 
+      nodalustore   = nodalustore   +  dt*nodalu
+      nodalphistore = nodalphistore +  dt*nodalphi
+      nodalsl       = nodalsl       + (dt*nodalslrate)
+      nodalice      = nodalice      +  nodalicerate
 
-    ! Evaluate the ocean nodes as proportion of overall FS nodes
-    totaloceannodes = sumscal(oceannodes);  
-    if(myrank.eq.0)then 
-      write(*,'(a, i0, a, i0)')'Total ocean nodes: ', totaloceannodes,'/', allnodesfs
-      write(*,*)
-    endif
-  endif 
+      ! Update ocean function and ocean area/volume 
+      call update_ocean_function(nodalice, nodalsl, errcode, errtag, verbose=.false.)  
+
+      if(cloop.eq.1)then
+        call update_SL_area(nodalsl, nodalu, overwrite_old=.true., verbose=.false.)
+      else 
+        call update_SL_area(nodalsl, nodalu, overwrite_old=.false., verbose=.false.)
+      endif 
+
+      ! Update the mass imbalance
+      mass_imbalance = SLsummasschange + icemasschange_per_ts
+
+      ! store initial value
+      if(cloop.eq.1)then 
+        if(icemasschange_per_ts.ne.zero)then 
+          mass_imbalance_0 = (mass_imbalance/ABS(icemasschange_per_ts))*100
+        else
+          mass_imbalance_0=zero
+        endif 
+      endif 
+
+
+      ! Evaluate the ocean nodes as proportion of overall FS nodes
+      totaloceannodes = sumscal(oceannodes);  
+      ! Output to user if final timestep 
+      if(myrank.eq.0.and.cloop.eq.ncloop)then 
+        write(*,*)'                    COMPLETED CLOOPING:'
+        write(*,*)'------------------------------------------------------------'
+        write(*,*)' Number of loops             :', ncloop
+        write(*,*)' Timestep                    : ',  dt
+        write(*,'(a, i0, a, i0)')'  Total ocean nodes           : ', totaloceannodes,'/', allnodesfs
+        write(*,*)' Mass of ice (kg)           : ',  icemasschange_per_ts
+        write(*,*)' Mass of water (kg)         : ',  SLsummasschange
+        write(*,*)' Mass imbalance (kg)        : ',  mass_imbalance
+        write(*,'(a, g0.4)')'  Original mass imbalance (%) : ', mass_imbalance_0
+
+        if (icemasschange_per_ts.ne.zero)then
+          write(*,'(a, g0.4)')'  Mass imbalance          (%) : ', (mass_imbalance/ABS(icemasschange_per_ts))*100
+        else
+          write(*,'(a, g0.4)')'  Mass imbalance          (%) : 0 since no ice change'
+        endif 
+      endif 
+
+
+      ! Recover original values for next cloop; update dt
+      if(cloop.ne.ncloop)then
+        nodalustore   = nodalustore   -  dt*nodalu
+        nodalphistore = nodalphistore -  dt*nodalphi
+        nodalsl       = nodalsl       - (dt*nodalslrate)
+        nodalice      = nodalice      - nodalicerate
+
+        ! I THINK THIS NEEDS TO CHANGE TO icemasschange_per_ts
+        if (icemasschange_per_ts.ne.zero)then
+          dt = dt + mass_imbalance/icemasschange_per_ts
+        endif
+      endif 
+
+    enddo ! cloop
+    
+    call write_min_max_SL(nodalsl)
+  endif ! IF_SL 
+
+
+
+  
+
+
+
+
 
   ! Print warning if not converging
-  if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
-    if(myrank==0)then
-      write(*,*)
-      write(*,*)'************************************************'
-      write(*,'(a)')'WARNING: NON-CONVERGENCE IN NL ITERATIONS!'
-      write(*,'(a, g0.4)')' --> Desired tolerance : ', NL_TOL
-      write(*,'(a, g0.4)')' --> Achieved tolerance: ',uerr
-      write(*,*)'************************************************'
-
-      write(*,*)
-    endif
-  endif
+  !if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
+  !  if(myrank==0)then
+  !    write(*,*)
+  !    write(*,*)'************************************************'
+  !    write(*,'(a)')'WARNING: NON-CONVERGENCE IN NL ITERATIONS!'
+  !    write(*,'(a, g0.4)')' --> Desired tolerance : ', NL_TOL
+  !    write(*,'(a, g0.4)')' --> Achieved tolerance: ',uerr
+  !    write(*,*)'************************************************'
+  !    write(*,*)
+  !  endif
+  !endif
 
 
 
@@ -688,13 +759,12 @@ loop_step: do i_step=istep0,nstep
     endif 
   endif 
 
-
-  
   maxnodalsl = maxscal(maxval(nodalsl))
   call sync_process()
   if(myrank.eq.0)then 
     write(outunit,'(g0.6,1x, g0.6,1x, g0.6)') maxnodalsl, total_ice_mass_change, SLmasschange
   endif 
+
 
 
   ! Update number of non-linear iterations

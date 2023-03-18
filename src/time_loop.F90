@@ -123,7 +123,7 @@ if(steptype.eq.FREQSTEP)then
         ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.true.)  
     endif
 
-    else ! TIMESTEPPING
+else ! TIMESTEPPING
 
         ! If it is the first timestep we need the elastic stiffness matrix (storekmat)
         ! It should be constant so we dont need to change it

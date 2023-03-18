@@ -176,23 +176,13 @@ if(savedata%gpot)then
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.gpot'
 endif
 
-if(savedata%sl0)then
-  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','sea_level0',' ', &
-  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.sl0'
-endif
+
 
 if(savedata%oceanf)then
   write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','oceanf',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.oceanf'
 endif
-if(savedata%oceanf0)then
-  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','oceanf0',' ', &
-  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.oceanf0'
-endif
-if(savedata%ice0)then
-  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','ice0',' ', &
-  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.ice0'
-endif
+
 
 ! Iceload save
 if(savedata%iceload)then

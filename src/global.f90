@@ -565,6 +565,7 @@ real(kind=kreal)     ::  SLarea_old      = 0.0_kreal
 real(kind=kreal)     ::  SLvolume_old    = 0.0_kreal
 
 real(kind=kreal)     :: icechangevol           ! Volume of ice change
+real(kind=kreal)     :: icemasschange_per_ts   ! mass change per timestep
 real(kind=kreal)     :: icechangevoltmp        ! Volume of ice change temporary
 
 real(kind=kreal)     :: total_ice_mass_change  = 0.0_kreal       ! Over all timesteps
@@ -574,7 +575,7 @@ real(kind=kreal), allocatable ::  icerate(:) ! constant value of ice change
 ! Arrays for saving different contributions of the ice load: 
 real(kind=kreal), allocatable  :: nodal_iceload_u(:,:), nodal_iceload_phi(:), nodal_iceload_sl(:) ! dim nnode_fs
 
-logical :: verbose_bool = .false.
+logical :: verbose_bool = .true.
 
 ! Sea level contribution test functions: 
 real(kind=kreal) :: theta_tf    = ONE

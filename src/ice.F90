@@ -798,6 +798,10 @@ use serial_library
     real(kind=kreal)               :: epsilon, sumepsilon, pi_2d, ctr, val
     integer                        :: fgdof(nndof, maxngll2d), errcode ! face global degrees of freedom
 
+    ! for projection to face normal: 
+    real(kind=kreal) :: vertical(3), unit_normal(3),face_normal_len, cos_theta
+
+
 
     ! Code: 
     allocate(gw(maxngll2d))
@@ -868,10 +872,22 @@ use serial_library
             face_normal(3) = dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
             pi_2d          = gw(i_gll) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jac
 
+            !face_normal_len =  sqrt(dot_product(face_normal,face_normal))
+
+            ! We need the dot product of the vertical with the normal to the surface 
+            ! The sign is not relevant becaause the water is always pushing down from the top surface
+            !vertical    = zero
+            !vertical(3) = one
+
+            ! Normalise the length of the face normal to get unit normal to the free surface
+            !unit_normal = face_normal/face_normal_len
+            !cos_theta   = ABS(dot_product(unit_normal,vertical) ) 
+
+
             ! Calculate the coefficient for phi and u that is shared
             ! Note that u values also need to be multiplied by background gravity
             val =( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - eps_area*oceanf(i_elmtfs, i_gll) 
-            val = val * pi_2d
+            val = val * pi_2d !* cos_theta
 
             ! Displacement for direction j: + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi * \nabla\Phi_j
             do j = 1, NDIM    
@@ -1074,13 +1090,14 @@ use math_library_serial
     ! Update the total mass change to date 
     icechangevoltmp = sumscal(icechangevol) 
     icechangevol = icechangevoltmp
-    total_ice_mass_change = total_ice_mass_change + icechangevol*rho_ice
+    icemasschange_per_ts = icechangevol*rho_ice
+    total_ice_mass_change = total_ice_mass_change + icemasschange_per_ts
     if(myrank.eq.0.and.verbose_bool)then
-      write(*,'(a,g0.6)')'  --> Change in ice mass to occur: ', icechangevol*rho_ice
+      write(*,'(a,g0.6)')'  --> Change in ice mass to occur: ', icemasschange_per_ts
       write(*,'(a,g0.6)')'  --> Total ice change so far    : ', total_ice_mass_change
       if(devel_nondim)then
         write(*,*)'    - Dimensionalised values: '
-        write(*,'(a,g0.6)')'  --> Change in ice mass to occur: ', icechangevol*rho_ice * DIM_M
+        write(*,'(a,g0.6)')'  --> Change in ice mass to occur: ', icemasschange_per_ts * DIM_M
         write(*,'(a,g0.6)')'  --> Total ice change so far    : ', total_ice_mass_change* DIM_M
       endif 
       write(*,*)

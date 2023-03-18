@@ -1728,247 +1728,191 @@ end subroutine get_fs_details
 
 
 
-    subroutine calc_SL_stiffness(i_elmtfs,kmatSL)
-      ! Uses 
-      use global
-      use set_precision
-      use element
-      use free_surface
-      use integration
-      use math_constants
-      implicit none  
+subroutine calc_SL_stiffness(i_elmtfs,kmatSL)
+    ! Uses 
+    use global
+    use set_precision
+    use element
+    use free_surface
+    use integration
+    use math_constants
+    implicit none  
+    
+    ! IO 
+    integer                        :: i_elmtfs        ! loops
+    real(kind=kreal)               :: kmatSL(nedof,nedof)
+
+    ! Local
+    real(kind=kreal)               :: detjac2d        ! 2d jacobian
+    integer                        :: iface           ! face ID for elmt 
+    integer                        :: i_elmt          ! face ID for elmt 
+    integer                        :: nfgll           ! ngll on 2D face
+    real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
+    real(kind=kreal), allocatable  :: dshape4(:,:,:)
+    real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
+                                    dx_dxi(NDIM), dx_deta(NDIM)
+    integer :: num4(4), gid, phi_ind, u_ind, j,k, abg, xyg, gid_abg, gid_xyg, i_dim, i
+    real(kind=kreal) ::   pi_2d_abg, pi_2d_xyg, area_inv, &
+                        ival, iival, rho_over_g ,face_normal_len, cos_theta
+
+    real(kind=kreal) :: g0abg, grav_abgj, Cabg, utfj, g0xyg, Cxyg, v1,rho_Ag, vertical(3), unit_normal(3)
+    integer :: num(nenode)
+
+
+    integer :: abgdof(5), xygdof(5), iloop, gidloc(maxngll2d)
+    integer :: face_nodes(maxngll2d),  ggdof_elmt_fs(5,maxngll2d), & 
+                dof_u(NDIM, maxngll2d), dof_u_tmp(NDIM,ngll), dof_phi(maxngll2d), dof_sl(maxngll2d)
+
+    integer :: fgdof(nndof*maxngll2d)    , nfdof        
+
+    ! Code
+    allocate(gw(maxngll2d))
+    allocate(dshape4(2,4,maxngll2d))
+    
+
+    ! Inverse area
+    area_inv = ONE/SLarea
+
+
+      ! Get details of element's face that lies on free surface
+    call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
+    num4   = gnum4_fs(:, i_elmtfs)
+    coord  = g_coord(:,num4)
+    
+
+    ! Node values within the element (1-27) - returns 9 points
+    face_nodes = hexface(iface)%node
+
+    ! The global IDs of the nodes? array of length maxngll2d
+    gidloc =  gnum_fs(:, i_elmtfs)
+
+    ! The GLOBAL DOFs values of the entire element  (5,maxngll2d)
+    ggdof_elmt_fs(:,:) = ggdof(:, gnum_fs(:, i_elmtfs))
+    !nfdof = nfgll * NNDOF
+
+    ! Get the element-scale degrees of freedom  
+    dof_u_tmp = reshape(edofu, (/NDIM, ngll/)) 
+    dof_u     = dof_u_tmp(:,face_nodes)  !(NDIM, maxngll2d)
+    dof_phi   = edofphi(face_nodes)      !(maxngll2d)
+    dof_sl    = edofsl(face_nodes)       !(maxngll2d)
+
+
+
+    do abg = 1, nfgll ! ABG
+      gid_abg = gidloc(abg)            ! Global ID of node ABG
+      g0abg   = ABS(g0_nodal(gid_abg)) ! g0 abg - in SL equation, this scalar g is positive
+
+      ! Get Jacobian_2d x weights for ABG 
+      dx_dxi  = matmul(coord,dshape4(1,:,abg))
+      dx_deta = matmul(coord,dshape4(2,:,abg))
+      face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
+      face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+      face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+
+      face_normal_len =  sqrt(dot_product(face_normal,face_normal))
+      pi_2d_abg     = gw(abg) * face_normal_len ! Weights*jacw
+
+      ! Get the values here because they are repeated lots 
+      Cabg       = oceanf(i_elmtfs, abg)  ! Ocean func abg
+
+
+      ! We need the dot product of the vertical with the normal to the surface 
+      ! The sign is not relevant becaause the water is always pushing down from the top surface
+      !vertical    = zero
+      !vertical(3) = one
+
+      ! Normalise the length of the face normal to get unit normal to the free surface
+      !unit_normal = face_normal/face_normal_len
+      !cos_theta   = ABS(dot_product(unit_normal,vertical) ) 
+
+      ! Factor of rho/g outside of integral 
+      rho_over_g =  (rho_water/g0abg)       ! rho/g
+      rho_Ag     =  (rho_over_g/SLarea)     ! rho/(g*Area)
+
+      ! DIAGONAL theta_tilde theta_dot
+      kmatSL(dof_sl(abg), dof_sl(abg)) = kmatSL(dof_sl(abg), dof_sl(abg)) - (theta_tf * pi_2d_abg * g0abg * rho_water)
+
+      ! COUPLING TERMS: 
+      ! theta_tilde Phi_dot 
+      kmatSL(dof_sl(abg), dof_phi(abg)) = kmatSL(dof_sl(abg), dof_phi(abg)) - (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
+
+      ! phi_tilde Phi_dot 
+      kmatSL(dof_phi(abg), dof_phi(abg)) = kmatSL(dof_phi(abg), dof_phi(abg)) - (phi_tf * Cabg * pi_2d_abg  * rho_over_g)!*cos_theta
       
-      ! IO 
-      integer                        :: i_elmtfs        ! loops
-      real(kind=kreal)               :: kmatSL(nedof,nedof)
+ 
+      do j=1,NDIM
+          ! Grav0_nodal is defined as a negative vector (i.e. -9.8), but grad Phi is positive
+          ! g = - nabla Phi 
+          grav_abgj = -grav0_nodal(j, gid_abg)
 
-      ! Local
-      real(kind=kreal)               :: detjac2d        ! 2d jacobian
-      integer                        :: iface           ! face ID for elmt 
-      integer                        :: i_elmt          ! face ID for elmt 
-      integer                        :: nfgll           ! ngll on 2D face
-      real(kind=kreal), allocatable  :: gw(:)           ! GLL weights 2D
-      real(kind=kreal), allocatable  :: dshape4(:,:,:)
-      real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
-                                      dx_dxi(NDIM), dx_deta(NDIM)
-      integer :: num4(4), gid, phi_ind, u_ind, j,k, abg, xyg, gid_abg, gid_xyg, i_dim, i
-      real(kind=kreal) ::   pi_2d_abg, pi_2d_xyg, area_inv, &
-                          ival, iival, rho_over_g 
-  
-      real(kind=kreal) :: g0abg, grav_abgj, Cabg, utfj, g0xyg, Cxyg, v1,rho_Ag
-      integer :: num(nenode)
+          ! u_tilde Phi_dot 
+          kmatSL(dof_u(j, abg), dof_phi(abg)) = kmatSL(dof_u(j, abg), dof_phi(abg)) - (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g)!*cos_theta 
 
-  
-      integer :: abgdof(5), xygdof(5), iloop, gidloc(maxngll2d)
-      integer :: face_nodes(maxngll2d),  ggdof_elmt_fs(5,maxngll2d), & 
-                 dof_u(NDIM, maxngll2d), dof_u_tmp(NDIM,ngll), dof_phi(maxngll2d), dof_sl(maxngll2d)
+          ! theta_tilde u_dot 
+          kmatSL(dof_sl(abg), dof_u(j, abg))  = kmatSL(dof_sl(abg), dof_u(j, abg)) - (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)!*cos_theta
 
-      integer :: fgdof(nndof*maxngll2d)    , nfdof        
+          ! phi_tilde u_dot 
+          kmatSL(dof_phi(abg), dof_u(j,abg)) = kmatSL(dof_phi(abg), dof_u(j,abg)) - (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)!*cos_theta
 
-      ! Code
-      allocate(gw(maxngll2d))
-      allocate(dshape4(2,4,maxngll2d))
-      
+          do k=1,NDIM
+            ! u_tilde u_dot  
+            ! NOTE THE NEGATIVE in grav0_nodal is needed for same reason as above 
+            kmatSL(dof_u(k,abg),dof_u(j,abg)) = kmatSL(dof_u(k,abg),dof_u(j,abg))  - (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * (-grav0_nodal(k, gid_abg)) * rho_over_g)
+          !write(*,*)'v6     : ', (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
+          enddo !k
 
-      ! Inverse area
-      area_inv = ONE/SLarea
+      enddo  ! j 
 
 
-        ! Get details of element's face that lies on free surface
-      call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4)
-      num4   = gnum4_fs(:, i_elmtfs)
-      coord  = g_coord(:,num4)
-      
-      ! Alt attempt:
-      !num=g_num(:,id_elem_fs(i_elmtfs))
-      !coord=g_coord(:,num(hexface(iface)%gnode))
+      ! Diagonal+non-diagonal components of Kmat coupling SL 
+      ! Note here that ABG is the index of the variable
+      ! and XYG is the test function so when we assemble the 
+      ! matrix, ABG should be the column index 
 
+      do xyg = 1, nfgll !XYG
+        gid_xyg = gidloc(xyg)  
+        g0xyg   =  ABS(g0_nodal(gid_xyg))      ! g0 abg 
 
-      !write(*,*)'iface: ',iface
-      !write(*,*)'num4 : ',num4
-      !write(*,*)'coord: ',coord
-
-
-      ! Node values within the element (1-27) - returns 9 points
-      face_nodes = hexface(iface)%node
-
-      !write(*,*)'facenode: ',face_nodes
-
-      ! The global IDs of the nodes? array of length maxngll2d
-      gidloc =  gnum_fs(:, i_elmtfs)
-
-      !write(*,*)'gidloc: ',gidloc
-
-      ! The GLOBAL DOFs values of the entire element  (5,maxngll2d)
-      ggdof_elmt_fs(:,:) = ggdof(:, gnum_fs(:, i_elmtfs))
-      !do i=1,maxngll2d
-      !  write(*,*)'  * : ',ggdof_elmt_fs(:,i)
-      !enddo 
-
-      nfdof = nfgll * NNDOF
-      !write(*,*)'nfdof: ',nfdof
-
-      ! Alt attempt: 
-      fgdof(1:nfdof)=reshape(gdof(idofu,g_num(hexface(iface)%node,id_elem_fs(i_elmtfs))), (/nfdof/))
-
-      !write(*,*)'fgdof: ',fgdof
-
-
-
-      ! Get the element-scale degrees of freedom  
-      dof_u_tmp = reshape(edofu, (/NDIM, ngll/)) 
-      dof_u     = dof_u_tmp(:,face_nodes)  !(NDIM, maxngll2d)
-      dof_phi   = edofphi(face_nodes)      !(maxngll2d)
-      dof_sl    = edofsl(face_nodes)       !(maxngll2d)
-
-
-      !write(*,*)'dof_phi: ',dof_phi
-      !write(*,*)'dof_sl: ',dof_sl
-
-
-
-      do abg = 1, nfgll ! ABG
-        gid_abg = gidloc(abg)            ! Global ID of node ABG
-        g0abg   = ABS(g0_nodal(gid_abg)) ! g0 abg - in SL equation, this scalar g is positive
-
-
-        ! Get Jacobian_2d x weights for ABG 
-        dx_dxi  = matmul(coord,dshape4(1,:,abg))
-        dx_deta = matmul(coord,dshape4(2,:,abg))
+        ! Get Jacobian_2d x weights for XYG 
+        dx_dxi  = matmul(coord,dshape4(1,:,xyg))
+        dx_deta = matmul(coord,dshape4(2,:,xyg))
         face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
         face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
         face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-        pi_2d_abg     = gw(abg) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
-
-        ! Get the values here because they are repeated lots 
-        Cabg       = oceanf(i_elmtfs, abg)  ! Ocean func abg
-
-        !write(*,*)'gid_abg  : ',gid_abg
-        !write(*,*)'g0abg    : ',g0abg
-        !write(*,*)'gw(abg)  : ',gw(abg)
-        !write(*,*)'pi_2d_abg: ',pi_2d_abg
-        !write(*,*)'Cabg     : ',Cabg
-
-
-
-        ! Factor of rho/g outside of integral 
-        rho_over_g =  (rho_water/g0abg)       ! rho/g
-        rho_Ag     =  (rho_over_g/SLarea)    ! rho/(g*Area)
-
-
-        !write(*,*)' ------ ABGDOF:  -----'
-        !write(*,*)'u_dof     : ',dof_u(1, abg)
-        !write(*,*)'u_dof     : ',dof_u(2, abg)
-        !write(*,*)'u_dof     : ',dof_u(3, abg)
-        !write(*,*)'u_phi     : ',dof_phi(abg)
-        !write(*,*)'u_sl      : ',dof_sl(abg)
-        !write(*,*)
-
-
-
-        ! DIAGONAL theta_tilde theta_dot
-        kmatSL(dof_sl(abg), dof_sl(abg)) = kmatSL(dof_sl(abg), dof_sl(abg)) - (theta_tf * pi_2d_abg * g0abg * rho_water)
-        !write(*,*)'v1     : ',(theta_tf * pi_2d_abg * g0abg * rho_water)
-
-
-
-
+        pi_2d_xyg  =  gw(xyg)*sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
         
-        
-        ! theta_tilde Phi_dot 
-        kmatSL(dof_sl(abg), dof_phi(abg)) = kmatSL(dof_sl(abg), dof_phi(abg)) - (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
+        Cxyg       =  oceanf(i_elmtfs, xyg)  ! Ocean func abg
 
-        !write(*,*)'v2     : ',(phi_tf * Cabg * pi_2d_abg  * rho_over_g)
+        ! SL_tilde, Phi_dot coupling 
+        kmatSL(dof_sl(xyg), dof_phi(abg)) = kmatSL(dof_sl(xyg), dof_phi(abg)) + (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
 
-        ! phi_tilde Phi_dot 
-        kmatSL(dof_phi(abg), dof_phi(abg)) = kmatSL(dof_phi(abg), dof_phi(abg)) - (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
-        
+        ! Phi_tilde, Phi_dot coupling 
+        kmatSL(dof_phi(xyg),dof_phi(abg)) = kmatSL(dof_phi(xyg),dof_phi(abg)) + (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)!*cos_theta
 
         do j=1,NDIM
-            ! Grav0_nodal is defined as a negative vector (i.e. -9.8), but grad Phi is positive
-            ! g = - nabla Phi 
-            grav_abgj = -grav0_nodal(j, gid_abg)
+          v1 = pi_2d_abg * Cabg * (-grav0_nodal(j, gid_abg)) * pi_2d_xyg 
 
-            !if(abg.eq.1)then 
-            !  write(*,*)'grav_abgj: ', grav_abgj
-            !endif 
+          ! U_tilde, Phi_dot coupling  
+          kmatSL(dof_u(j, xyg), dof_phi(abg)) = kmatSL(dof_u(j, xyg), dof_phi(abg)) + (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  (-grav0_nodal(j, gid_xyg)) * rho_Ag)!*cos_theta
 
+          ! SL_tilde, U_dot coupling
+          kmatSL(dof_sl(xyg), dof_u(j, abg)) = kmatSL(dof_sl(xyg), dof_u(j, abg)) + (v1 * g0xyg * theta_tf * rho_Ag) 
 
-            ! u_tilde Phi_dot 
-            kmatSL(dof_u(j, abg), dof_phi(abg)) = kmatSL(dof_u(j, abg), dof_phi(abg)) - (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g) 
-            
-            !write(*,*)'v3     : ',(Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g)
+          ! Phi_tilde, U_dot coupling  
+          kmatSL(dof_phi(xyg), dof_u(j,abg)) = kmatSL(dof_phi(xyg), dof_u(j,abg)) + (v1 * Cxyg * phi_tf * rho_Ag)!*cos_theta
 
+          do k = 1, NDIM 
+            ! U_tilde, U_dot coupling  
+            kmatSL(dof_u(k,xyg), dof_u(j,abg)) = kmatSL(dof_u(k,xyg), dof_u(j,abg))  + (v1 * Cxyg * u_tf(k) *  (-grav0_nodal(k, gid_xyg)) * rho_Ag)!*cos_theta
+          enddo ! k 
+        enddo ! j
+      enddo! xyg
 
-            ! theta_tilde u_dot 
-            kmatSL(dof_sl(abg), dof_u(j, abg)) = kmatSL(dof_sl(abg), dof_u(j, abg)) - (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)
-            !write(*,*)'v4     : ', (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)
+    enddo! abg
+    deallocate(gw)
+    deallocate(dshape4)
+end subroutine calc_SL_stiffness
 
-
-            ! phi_tilde u_dot 
-            kmatSL(dof_phi(abg), dof_u(j,abg)) = kmatSL(dof_phi(abg), dof_u(j,abg)) - (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
-            !write(*,*)'v5     : ', (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
-
-
-            do k=1,NDIM
-              ! u_tilde u_dot  
-              ! NOTE THE NEGATIVE in grav0_nodal is needed for same reason as above 
-              kmatSL(dof_u(k,abg),dof_u(j,abg)) = kmatSL(dof_u(k,abg),dof_u(j,abg))  - (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * (-grav0_nodal(k, gid_abg)) * rho_over_g)
-            !write(*,*)'v6     : ', (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
-            enddo !k
-
-        enddo  ! j 
-
-
-        ! Diagonal+non-diagonal components of Kmat coupling SL 
-        ! Note here that ABG is the index of the variable
-        ! and XYG is the test function so when we assemble the 
-        ! matrix, ABG should be the column index 
-
-        do xyg = 1, nfgll !XYG
-          gid_xyg = gidloc(xyg)  
-          g0xyg   =  ABS(g0_nodal(gid_xyg))      ! g0 abg 
-
-          ! Get Jacobian_2d x weights for XYG 
-          dx_dxi  = matmul(coord,dshape4(1,:,xyg))
-          dx_deta = matmul(coord,dshape4(2,:,xyg))
-          face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
-          face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
-          face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-          pi_2d_xyg  =  gw(xyg)*sqrt(dot_product(face_normal,face_normal)) ! Weights*jacw
-          
-          Cxyg       =  oceanf(i_elmtfs, xyg)  ! Ocean func abg
-  
-          ! SL_tilde, Phi_dot coupling 
-          kmatSL(dof_sl(xyg), dof_phi(abg)) = kmatSL(dof_sl(xyg), dof_phi(abg)) + (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
-
-          ! Phi_tilde, Phi_dot coupling 
-          kmatSL(dof_phi(xyg),dof_phi(abg)) = kmatSL(dof_phi(xyg),dof_phi(abg)) + (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
-
-          do j=1,NDIM
-            v1 = pi_2d_abg * Cabg * (-grav0_nodal(j, gid_abg)) * pi_2d_xyg 
-
-            ! U_tilde, Phi_dot coupling  
-            kmatSL(dof_u(j, xyg), dof_phi(abg)) = kmatSL(dof_u(j, xyg), dof_phi(abg)) + (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  (-grav0_nodal(j, gid_xyg)) * rho_Ag )
-
-            ! SL_tilde, U_dot coupling
-            kmatSL(dof_sl(xyg), dof_u(j, abg)) = kmatSL(dof_sl(xyg), dof_u(j, abg)) + (v1 * g0xyg * theta_tf * rho_Ag) 
-
-            ! Phi_tilde, U_dot coupling  
-            kmatSL(dof_phi(xyg), dof_u(j,abg)) = kmatSL(dof_phi(xyg), dof_u(j,abg)) + (v1 * Cxyg * phi_tf * rho_Ag)
-
-            do k = 1, NDIM 
-              ! U_tilde, U_dot coupling  
-              kmatSL(dof_u(k,xyg), dof_u(j,abg)) = kmatSL(dof_u(k,xyg), dof_u(j,abg))  + (v1 * Cxyg * u_tf(k) *  (-grav0_nodal(k, gid_xyg)) * rho_Ag)
-            enddo ! k 
-          enddo ! j
-        enddo! xyg
-
-      enddo! abg
-      deallocate(gw)
-      deallocate(dshape4)
-  end subroutine calc_SL_stiffness
-  
   
 
   
