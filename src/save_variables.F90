@@ -38,7 +38,7 @@ use serial_library
         ext='gpot',istep=i_step,plane=.true.) 
       endif
       ! Print confirmation
-      if(myrank.eq.0)then
+      if(myrank.eq.0.and.verbose_save_var)then
         write(*,'(a,i6)')'  ✓ Saved gravity potential for step ', i_step
         write(*,*)
       endif 
@@ -55,7 +55,7 @@ use serial_library
         ext='mpot',istep=i_step,plane=.true.) 
       endif
       ! Print confirmation
-      if(myrank.eq.0)then
+      if(myrank.eq.0.and.verbose_save_var)then
         write(*,'(a,i6)')'  ✓ Saved magnetic potential for step ', i_step
         write(*,*)
       endif 
@@ -86,7 +86,7 @@ use serial_library
         endif
       endif
       ! Print confirmation
-      if(myrank.eq.0)then
+      if(myrank.eq.0.and.verbose_save_var)then
         write(*,'(a,i6)')'  ✓ Saved grav. acceleration for step ', i_step
         write(*,*)
       endif 
@@ -168,7 +168,7 @@ use serial_library
       ext='dis',istep=i_step,plane=.true.)
     endif
     ! Print confirmation
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_save_var)then
       write(*,'(a,i6)')'  ✓ Saved displacement for step ', i_step
       write(*,*)
     endif
@@ -197,7 +197,7 @@ use serial_library
       ext='sig',istep=i_step,plane=.true.)
     endif
     ! Print confirmation
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_save_var)then
       write(*,'(a,i6)')'  ✓ Saved stress for step ', i_step
       write(*,*)
     endif
@@ -226,7 +226,7 @@ use serial_library
       ext='eps',istep=i_step,plane=.true.)
     endif
     ! Print confirmation
-    if(myrank.eq.0)then
+    if(myrank.eq.0.and.verbose_save_var)then
       write(*,'(a,i6)')'  ✓ Saved strain for step ', i_step
       write(*,*)
     endif

@@ -59,7 +59,7 @@ subroutine write_ice_to_ensight(nodalice, i_step)
         ext='ice', istep=i_step, plane=.true.) 
     endif
 
-    if(myrank.eq.0.and.verbose_bool)then
+    if(myrank.eq.0.and.verbose_save_var)then
         write(*,'(a,i6)')'  ✓ Saved nodal ice for step ', i_step
         write(*,*)
     endif 

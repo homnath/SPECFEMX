@@ -244,8 +244,8 @@ use math_library_serial
     maxnodalsl = maxscal(maxval(nodalsl))
 
     if(myrank.eq.0)then
-        write(*,'(a,g0.10)')'  -->  Minimum sea level             : ', minnodalsl
-        write(*,'(a,g0.10)')'  -->  Maximum sea level             : ', maxnodalsl
+        write(*,'(a,g0.10)')'  -->  Minimum sea level      : ', minnodalsl
+        write(*,'(a,g0.10)')'  -->  Maximum sea level      : ', maxnodalsl
         if(devel_nondim)then
             write(*,'(a,g0.10)')'  -->  Dimensionalised min sea level : ', minnodalsl*DIM_L
             write(*,'(a,g0.10)')'  -->  Dimensionalised max sea level : ', maxnodalsl*DIM_L
@@ -282,7 +282,7 @@ implicit none
       ext='sl', istep=i_step,plane=.true.) 
     endif
 
-    if(myrank.eq.0.and.verbose_bool)then
+    if(myrank.eq.0.and.verbose_save_var)then
         write(*,'(a,i6)')'  ✓ Saved nodal sea level for step ', i_step
         write(*,*)
     endif 
@@ -313,7 +313,7 @@ subroutine write_OF_to_ensight(i_step)
     endif
 
 
-    if(myrank.eq.0.and.verbose_bool)then
+    if(myrank.eq.0.and.verbose_save_var)then
         write(*,'(a,i6)')'  ✓ Saved ocean function for step ', i_step
         write(*,*)
     endif 

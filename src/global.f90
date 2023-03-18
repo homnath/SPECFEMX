@@ -575,7 +575,8 @@ real(kind=kreal), allocatable ::  icerate(:) ! constant value of ice change
 ! Arrays for saving different contributions of the ice load: 
 real(kind=kreal), allocatable  :: nodal_iceload_u(:,:), nodal_iceload_phi(:), nodal_iceload_sl(:) ! dim nnode_fs
 
-logical :: verbose_bool = .true.
+logical :: verbose_bool     = .true.
+logical :: verbose_save_var = .false.  ! prints when saved to ensight
 
 ! Sea level contribution test functions: 
 real(kind=kreal) :: theta_tf    = ONE
@@ -583,6 +584,13 @@ real(kind=kreal) :: u_tf(3)     = ONE
 real(kind=kreal) :: phi_tf      = ONE
 
 integer :: oceannodes, totaloceannodes ! counts the number of ocean nodes (C=1)
+
+! Sea level convergence loop (cloop)
+
+integer :: ncloop_MAX = 10000
+real(kind=kreal) :: CLOOP_CONV_THRESH = 1.0e-14_kreal
+logical :: cloop_converged
+
 
 ! developement variables
 ! By default model is nondimensionalized unless the "devel_nondim" is .false. 
@@ -594,5 +602,9 @@ real(kind=kreal) :: devel_gaminf
 real(kind=kreal) :: devel_rtfac
 ! example: axial_rod
 character(len=20) :: devel_example
+
+
+
+
 end module global
 !===============================================================================

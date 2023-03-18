@@ -231,4 +231,120 @@ end subroutine set_elasto_visco_stiffness_matrix
 
 
 
+subroutine run_convergence_loop(nodalustore, nodalu, nodalphistore, nodalphi, nodalsl, nodalslrate, nodalice, nodalicerate)
+    use global 
+    use set_precision
+#if (USE_MPI)
+use math_library_mpi
+use mpi
+#else
+use math_library_serial
+#endif
+
+    ! IO variables: 
+    real(kind=kreal), allocatable :: nodalustore(:,:), nodalu(:,:), nodalphistore(:), nodalphi(:), nodalsl(:)
+    real(kind=kreal), allocatable :: nodalslrate(:), nodalice(:), nodalicerate(:)
+
+    ! Local variables: 
+    real(kind=kreal)   :: mass_imbalance_0, dt_cloop, mass_imbalance
+    integer            :: i_cloop
+    character(len=250) :: errtag 
+    integer            :: errcode
+    errtag=""; errcode=-1
+
+    ! Initialise
+    cloop_converged = .false.
+    dt_cloop = 1.0_kreal
+
+    ! Run a loop to find the best update (dt) that converges towards mass balance
+    cloop: do i_cloop=1,ncloop_MAX
+      ! WE: Update our vectors with a timestep: 
+      ! WE: For sea level we solve for the time derivatives of the system so then we use
+      ! WE: u(t + dt) = u(t) + dt * f(t) where f is the time derivative
+      ! WE: These time derivatives are stored in nodalu, nodalphi, nodalsl 
+      nodalustore   = nodalustore   +  dt_cloop*nodalu
+      nodalphistore = nodalphistore +  dt_cloop*nodalphi
+      nodalsl       = nodalsl       + (dt_cloop*nodalslrate)
+      nodalice      = nodalice      +  nodalicerate
+
+      ! Update ocean function and ocean area/volume 
+      call update_ocean_function(nodalice, nodalsl, errcode, errtag, verbose=.false.)  
+
+      ! Note that for first timestep we need to update the area of the ocean
+      if(i_cloop.eq.1)then
+        call update_SL_area(nodalsl, nodalu, overwrite_old=.true., verbose=.false.)
+      else 
+        call update_SL_area(nodalsl, nodalu, overwrite_old=.false., verbose=.false.)
+      endif 
+
+      ! Update the mass imbalance
+      mass_imbalance = SLsummasschange + icemasschange_per_ts
+
+
+      ! Check convergence 
+      if (ABS(mass_imbalance).lt.CLOOP_CONV_THRESH)then
+        cloop_converged = .true.
+      endif 
+
+
+      ! store initial value for reference, avoiding division by zero
+      if(i_cloop.eq.1)then 
+        if(icemasschange_per_ts.ne.zero)then 
+          mass_imbalance_0 = (mass_imbalance/ABS(icemasschange_per_ts))*100
+        else
+          mass_imbalance_0=zero
+        endif 
+      endif 
+
+
+      ! Evaluate the ocean nodes as proportion of overall FS nodes
+      totaloceannodes = sumscal(oceannodes);
+
+      ! Output to user if final timestep 
+      if(cloop_converged.or.i_cloop.eq.ncloop_MAX)then
+        if(myrank.eq.0)then
+            write(*,*)
+            write(*,*)'                    COMPLETED CLOOPING:'
+            write(*,*)'------------------------------------------------------------'
+            if(i_cloop.eq.ncloop_MAX)then 
+                write(*,*)' WARNING - DIDNT CONVERGE WITHIN THRESHOLD: ', CLOOP_CONV_THRESH
+            endif 
+            write(*,'(a,i0)')' Number of loops              : ', i_cloop
+            write(*,'(a,g0.4)')' Timestep                     : ',  dt_cloop
+            write(*,'(a,i0, a,i0)')'  Total ocean nodes           : ', totaloceannodes,'/', allnodesfs
+            write(*,'(a,g0.4)')' Mass of ice (kg)             : ',  icemasschange_per_ts
+            write(*,'(a,g0.4)')' Mass of water (kg)           : ',  SLsummasschange
+            write(*,'(a,g0.4)')' Mass imbalance (kg)          : ',  mass_imbalance
+            write(*,'(a,g0.4)')'  Original mass imbalance (%) : ', mass_imbalance_0
+
+            if (icemasschange_per_ts.ne.zero)then
+            write(*,'(a,g0.4)')'  Mass imbalance          (%) : ', (mass_imbalance/ABS(icemasschange_per_ts))*100
+            else
+            write(*,'(a,g0.4)')'  Mass imbalance          (%) : 0 since no ice change'
+            endif 
+            write(*,*)
+        endif
+
+        exit cloop
+
+      ! Recover original values for next cloop unless final loopstep
+      else
+        nodalustore   = nodalustore   -  dt_cloop*nodalu
+        nodalphistore = nodalphistore -  dt_cloop*nodalphi
+        nodalsl       = nodalsl       - (dt_cloop*nodalslrate)
+        nodalice      = nodalice      -  nodalicerate
+
+        ! Update the dt for next timestep
+        if (icemasschange_per_ts.ne.zero)then
+          dt_cloop = dt_cloop + mass_imbalance/icemasschange_per_ts
+        endif
+      endif
+
+    enddo cloop
+
+
+end subroutine run_convergence_loop
+
+
+
 end module

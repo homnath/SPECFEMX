@@ -208,7 +208,6 @@ real(kind=kreal),allocatable :: relaxtime(:,:),muratio(:),tratio(:)
 ! q0: initial state variable for viscoelastic rheology
 real(kind=kreal),allocatable :: visco_q0(:,:,:,:),q0(:,:),elas_e0(:,:,:)
 
-integer :: cloop,ncloop
 real(kind=kreal) :: mass_imbalance_0
 
 real(kind=kreal) :: trace_vsigma0
@@ -494,8 +493,6 @@ loop_step: do i_step=istep0,nstep
   endif 
 
 
-  call  write_min_max_SL(nodalsl)
-
   ! determine time (dt) or freq (df) step and current time/freq
   call calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
   call reset_nodal_arrays_loads(nodalu,ubcload,rhoload,nodalphi,nodalslrate)
@@ -626,85 +623,11 @@ loop_step: do i_step=istep0,nstep
     storekmat = storekmat - storekmatSL
     if(myrank.eq.0)then
       write(*,*)'* Removed SL contribution to KMAT'
-    endif 
+    endif  
 
+    call run_convergence_loop(nodalustore, nodalu, nodalphistore, nodalphi,& 
+                              nodalsl, nodalslrate, nodalice, nodalicerate)
 
-    
-    dt = 1.0_kreal
-    ncloop=5000
-
-    ! here I think we need to loop? 
-    do cloop=1,ncloop 
-
-      ! WE: Update our vectors with a timestep: 
-      ! WE: For sea level we solve for the time derivatives of the system so then we use
-      ! WE: u(t + dt) = u(t) + dt * f(t) where f is the time derivative
-      ! WE: These time derivatives are stored in nodalu, nodalphi, nodalsl 
-      nodalustore   = nodalustore   +  dt*nodalu
-      nodalphistore = nodalphistore +  dt*nodalphi
-      nodalsl       = nodalsl       + (dt*nodalslrate)
-      nodalice      = nodalice      +  nodalicerate
-
-      ! Update ocean function and ocean area/volume 
-      call update_ocean_function(nodalice, nodalsl, errcode, errtag, verbose=.false.)  
-
-      if(cloop.eq.1)then
-        call update_SL_area(nodalsl, nodalu, overwrite_old=.true., verbose=.false.)
-      else 
-        call update_SL_area(nodalsl, nodalu, overwrite_old=.false., verbose=.false.)
-      endif 
-
-      ! Update the mass imbalance
-      mass_imbalance = SLsummasschange + icemasschange_per_ts
-
-      ! store initial value
-      if(cloop.eq.1)then 
-        if(icemasschange_per_ts.ne.zero)then 
-          mass_imbalance_0 = (mass_imbalance/ABS(icemasschange_per_ts))*100
-        else
-          mass_imbalance_0=zero
-        endif 
-      endif 
-
-
-      ! Evaluate the ocean nodes as proportion of overall FS nodes
-      totaloceannodes = sumscal(oceannodes);  
-      ! Output to user if final timestep 
-      if(myrank.eq.0.and.cloop.eq.ncloop)then 
-        write(*,*)'                    COMPLETED CLOOPING:'
-        write(*,*)'------------------------------------------------------------'
-        write(*,*)' Number of loops             :', ncloop
-        write(*,*)' Timestep                    : ',  dt
-        write(*,'(a, i0, a, i0)')'  Total ocean nodes           : ', totaloceannodes,'/', allnodesfs
-        write(*,*)' Mass of ice (kg)           : ',  icemasschange_per_ts
-        write(*,*)' Mass of water (kg)         : ',  SLsummasschange
-        write(*,*)' Mass imbalance (kg)        : ',  mass_imbalance
-        write(*,'(a, g0.4)')'  Original mass imbalance (%) : ', mass_imbalance_0
-
-        if (icemasschange_per_ts.ne.zero)then
-          write(*,'(a, g0.4)')'  Mass imbalance          (%) : ', (mass_imbalance/ABS(icemasschange_per_ts))*100
-        else
-          write(*,'(a, g0.4)')'  Mass imbalance          (%) : 0 since no ice change'
-        endif 
-      endif 
-
-
-      ! Recover original values for next cloop; update dt
-      if(cloop.ne.ncloop)then
-        nodalustore   = nodalustore   -  dt*nodalu
-        nodalphistore = nodalphistore -  dt*nodalphi
-        nodalsl       = nodalsl       - (dt*nodalslrate)
-        nodalice      = nodalice      - nodalicerate
-
-        ! I THINK THIS NEEDS TO CHANGE TO icemasschange_per_ts
-        if (icemasschange_per_ts.ne.zero)then
-          dt = dt + mass_imbalance/icemasschange_per_ts
-        endif
-      endif 
-
-    enddo ! cloop
-    
-    call write_min_max_SL(nodalsl)
   endif ! IF_SL 
 
 
