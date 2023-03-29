@@ -1430,6 +1430,18 @@ loop_step: do i_step=istep0,nstep
             ext='mpot',istep=0,plane=.true.) 
           endif
         endif
+        if(savedata%epot)then
+          call write_scalar_to_file(nnode,DIM_EPOT*nodalphi,ext='epot',istep=0)
+          ! On the free surface
+          if(savedata%fsplot)then
+            call write_scalar_to_file_freesurf(nnode_fs,DIM_EPOT*nodalphi(gnode_fs), &
+            ext='epot',istep=0) 
+          endif
+          if(savedata%fsplot_plane)then
+            call write_scalar_to_file_freesurf(nnode_fs,DIM_EPOT*nodalphi(gnode_fs), &
+            ext='epot',istep=0,plane=.true.) 
+          endif
+        endif
         ! gravitational
         if(savedata%agrav)then
           ! compute acceleration due to gravity
@@ -1612,6 +1624,18 @@ loop_step: do i_step=istep0,nstep
       endif
     endif
     
+    if(savedata%epot)then
+      call write_scalar_to_file(nnode,DIM_EPOT*nodalphi,ext='epot',istep=i_step) 
+      ! On the free surface
+      if(savedata%fsplot)then
+        call write_scalar_to_file_freesurf(nnode_fs,DIM_EPOT*nodalphi(gnode_fs), &
+        ext='epot',istep=i_step) 
+      endif
+      if(savedata%fsplot_plane)then
+        call write_scalar_to_file_freesurf(nnode_fs,DIM_EPOT*nodalphi(gnode_fs), &
+        ext='epot',istep=i_step,plane=.true.) 
+      endif
+    endif
     ! Gravitational
     if(savedata%agrav)then
       ! Compute acceleration due to gravity

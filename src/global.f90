@@ -111,6 +111,8 @@ real(kind=kreal) :: DIM_G
 real(kind=kreal) :: DIM_MPOT
 ! magnetic field or induction
 real(kind=kreal) :: DIM_B
+! electric potential
+real(kind=kreal) :: DIM_EPOT
 end module dimensionless
 !===============================================================================
 

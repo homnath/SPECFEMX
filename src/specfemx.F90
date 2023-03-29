@@ -591,6 +591,8 @@ if(.not.devel_nondim)then
 
   DIM_MPOT=ONE
   DIM_B=ONE
+  
+  DIM_EPOT=ONE
 else
   ! nondimensionalize
   if(myrank==0)then

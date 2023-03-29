@@ -322,7 +322,8 @@ do i_elmt=1,nelmt
               eload(edofphi)=eload(edofphi)+lagrange_gll(i,:)*divM*jacw
             endif
           endif
-        else !if(POT_TYPE==PMAGNETIC)
+        endif
+        if(POT_TYPE==PGRAVITY)then
           eload(edofphi)=eload(edofphi)+lagrange_gll(i,:)*massdens_elmt(i,ielmt)*jacw
         endif
       endif

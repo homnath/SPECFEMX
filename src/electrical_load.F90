@@ -99,7 +99,6 @@ errcode=-1
 data_path=trim(inp_path)
 
 ! Read electrical current
-
 ! open electrical current file
 fname=trim(data_path)//trim(ecfile)
 open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
@@ -108,6 +107,7 @@ if( ios /= 0 ) then
   return
 endif
 
+read(11,*) ! Skip a line
 read(11,*)npoint_ecurrent
 allocate(ecurrent_coord(3,npoint_ecurrent),ecurrent(npoint_ecurrent))
 read(11,*) ! Skip a line
