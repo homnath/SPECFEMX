@@ -18,9 +18,10 @@ contains
 
 subroutine initialize_model(errcode,errtag)
 use global,only:NDIM,ngll,nelmt,ISDISP_DOF,ISPOT_DOF, &
-                POT_TYPE,PGRAVITY,PMAGNETIC, &
-                isbulkmod,isshearmod,ismassdens,ismagnetization, &
-                bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt
+                POT_TYPE,PGRAVITY,PMAGNETIC,PELECTRIC, &
+                isbulkmod,isshearmod,ismassdens,ismagnetization,iselectric, &
+                bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt,&
+                econductivity_elmt
 use math_constants,only:ZERO
 implicit none
 integer,intent(out) :: errcode
@@ -33,6 +34,7 @@ isbulkmod=.false.
 isshearmod=.false.
 ismassdens=.false.
 ismagnetization=.false.
+iselectric=.false.
 if(ISDISP_DOF)then
   isbulkmod=.true.
   isshearmod=.true.
@@ -52,6 +54,12 @@ if(ISPOT_DOF.and.POT_TYPE==PMAGNETIC)then
   allocate(magnetization_elmt(NDIM,ngll,nelmt))
   magnetization_elmt=ZERO
 endif
+! Elctrical conductivity
+if(ISPOT_DOF.and.POT_TYPE==PELECTRIC)then
+  iselectric=.true.
+  allocate(econductivity_elmt(ngll,nelmt))
+  econductivity_elmt=ZERO
+endif
 errcode=0
 end subroutine initialize_model
 !===============================================================================
@@ -59,8 +67,9 @@ end subroutine initialize_model
 subroutine cleanup_model(errcode,errtag)
 use global,only:NDIM,ngll,nelmt,ISDISP_DOF,ISPOT_DOF, &
                 POT_TYPE,PGRAVITY,PMAGNETIC, &
-                isbulkmod,isshearmod,ismassdens,ismagnetization, &
-                bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt
+                isbulkmod,isshearmod,ismassdens,ismagnetization,iselectric, &
+                bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt, &
+                econductivity_elmt
 use math_constants,only:ZERO
 
 implicit none
@@ -74,6 +83,7 @@ if(isbulkmod)deallocate(bulkmod_elmt)
 if(isshearmod)deallocate(shearmod_elmt)
 if(ismassdens)deallocate(massdens_elmt)
 if(ismagnetization)deallocate(magnetization_elmt)
+if(iselectric)deallocate(econductivity_elmt)
 errcode=0
 end subroutine cleanup_model
 !===============================================================================
@@ -99,7 +109,7 @@ character(len=80),allocatable :: spart(:) ! this must be 80 characters long
 character(len=250) :: out_fname
 
 integer :: i
-real(kind=kreal),allocatable :: rho_elmt(:),M_elmt(:,:),Mmag_elmt(:)
+real(kind=kreal),allocatable :: rho_elmt(:),M_elmt(:,:),Mmag_elmt(:),econd_elmt(:)
 
 errtag="ERROR: unknown!"
 errcode=-1
@@ -130,6 +140,18 @@ if(ismagnetization)then
   enddo
 endif
 
+! Electrical Conductivity
+if(iselectric)then
+  allocate(econd_elmt(nelmt))
+  econd_elmt=ZERO
+
+  do i_elmt=1,nelmt
+    iblk=mat_id(i_elmt)
+    if(iselectric_blk(iblk))then
+      econd_elmt(i_elmt)=econductivity_blk(iblk)
+    endif
+  enddo
+endif
 ! save model
 if(infbc)then
   npart=2
@@ -179,6 +201,19 @@ if(ismagnetization)then
   !  NDIM,nelmt,real(M_elmt))
   !endif
   !deallocate(M_elmt)
+endif
+! Electrical Conductivity
+if(iselectric)then
+  if(infbc)then
+    write(out_fname,'(a)')trim(out_path)//trim(file_head)//'_original'//trim(ptail)//'.econ'
+    call write_ensight_perelementSCALAS_part1(out_fname,ensight_hex8,ipart,spart,1, &
+    nelmt_finite,elmt_finite,nelmt,real(econd_elmt))
+  else
+    write(out_fname,'(a)')trim(out_path)//trim(file_head)//'_original'//trim(ptail)//'.econ'
+    call write_ensight_perelementSCALAS(out_fname,ensight_hex8,ipart,spart, &
+    nelmt,real(econd_elmt))
+  endif
+  deallocate(econd_elmt)
 endif
 errcode=0
 end subroutine write_model_cell
@@ -330,6 +365,12 @@ matblock: do i_blk=1,nmatblk
               magnetization_blk(i_dim,imatmag)
           enddo ! i_dim
         enddo ! i_gll
+      endif
+    endif
+    ! electrial conductivity
+    if(ISPOT_DOF.and.POT_TYPE==PELECTRIC)then
+      if(iselectric_blk(i_blk))then
+        econductivity_elmt(:,block(i_blk)%elmt)= econductivity_blk(i_blk)
       endif
     endif
 

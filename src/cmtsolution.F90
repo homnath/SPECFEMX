@@ -5,6 +5,7 @@ implicit none
 integer,parameter :: nline_cmtsolution=13
 ! Number of CMT sources in a CMTSOLUTION file
 integer :: ncmt_source
+real(kind=kreal) :: current
 real(kind=kreal),allocatable :: source_tshift(:),source_hdur(:)
 real(kind=kreal),allocatable :: nu_source (:,:,:)
 contains

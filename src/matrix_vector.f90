@@ -18,13 +18,13 @@ use dimensionless
 use global,only:myrank,NDIM,nst,nelmt,ngll,nedof,nedofu,nedofphi,nenode,ngnode,&
 ngllx,nglly,ngllz,ngll,g_coord,gdof_elmt,g_num,mat_domain,mat_id,agrav,massdens_elmt,&
 bulkmod_elmt,shearmod_elmt,isempty_blk,rho_blk,ym_blk,magnetization_elmt,&
-infinite_iface,infinite_face_idir,pole_coord0,pole_coord1,       &
+econductivity_elmt,infinite_iface,infinite_face_idir,pole_coord0,pole_coord1,       &
 pole_type,pole_axis,axis_range,ISDISP_DOF,ISPOT_DOF,storederiv,    &
 POT_TYPE,PGRAVITY,PMAGNETIC,    &
 element_is_infinite,storejw,storeinterpf_infinite,devel_nondim, &
 isdxval,isdyval,isdzval,devel_gaminf,infquad, &
 edofu,edofphi,grav0_nodal,dgrav0_elmt,ISGRAV0,&
-imat_to_imatmag,magnetization_blk,ismagnet_blk,eqkx,eqky,eqkz
+imat_to_imatmag,magnetization_blk,ismagnet_blk,iselectric_blk,eqkx,eqky,eqkz
 use elastic,only:compute_cmat_elastic
 use math_library,only:determinant,invert
 use weakform,only:compute_bmat_stress
@@ -118,13 +118,15 @@ use set_precision
 use global,only:myrank,NDIM,nst,nelmt,ngll,nedof,nedofu,nedofphi,nenode,ngnode,&
 ngllx,nglly,ngllz,ngll,g_coord,gdof_elmt,g_num,mat_domain,mat_id,massdens_elmt,&
 bulkmod_elmt,shearmod_elmt,isempty_blk,rho_blk,ym_blk,magnetization_elmt,&
+econductivity_elmt, &
 infinite_iface,infinite_face_idir,pole_coord0,pole_coord1,       &
 pole_type,pole_axis,axis_range,ISDISP_DOF,ISPOT_DOF,storederiv,    &
-POT_TYPE,PGRAVITY,PMAGNETIC,    &
+POT_TYPE,PGRAVITY,PMAGNETIC,PELECTRIC,    &
 element_is_infinite,storederiv,storejw,storeinterpf_infinite,devel_nondim, &
 isdxval,isdyval,isdzval,devel_gaminf,infquad, &
 edofu,edofphi,grav0_nodal,dgrav0_elmt,ISGRAV0,&
-imat_to_imatmag,magnetization_blk,ismagnet_blk
+imat_to_imatmag,magnetization_blk,ismagnet_blk, &
+econductivity_blk,iselectric_blk
 use element,only:hex8_gnode,map2exodus_hex8
 use elastic,only:compute_cmat_elastic
 use math_constants,only:HALF,ONE,ZERO,FOUR,GRAV_CONS,PI
@@ -161,6 +163,9 @@ real(kind=kreal) :: interpf(NGLL),deriv(NDIM,nenode)
 integer :: imatmag
 real(kind=kreal) :: M(NDIM),Mgll(NDIM,ngll)
 real(kind=kreal) :: divM,dxMx,dyMy,dzMz
+
+! electrical conductivity
+real(kind=kreal) :: econgll(ngll)
 
 real(kind=kreal) :: bmatu(NST,NEDOFU),wmat_gradphi(NEDOFU,NDIM),      &
 rmat_gradphi(NDIM,NEDOFPHI),wmat_sPE(NEDOFPHI,NDIM),rmat_sPE(NDIM,NEDOFU), &
@@ -216,6 +221,15 @@ do i_elmt=1,nelmt
       !enddo
       do i_gll=1,ngll 
         Mgll(:,i_gll)=magnetization_elmt(:,i_gll,ielmt)
+      enddo
+    endif
+  endif
+  ! set electrical conductivity at GLL points
+  econgll=ZERO
+  if(POT_TYPE==PELECTRIC)then
+    if(iselectric_blk(imat))then
+      do i_gll=1,ngll 
+        econgll(i_gll)=econductivity_elmt(i_gll,ielmt)
       enddo
     endif
   endif
@@ -290,7 +304,11 @@ do i_elmt=1,nelmt
     endif
 
     if(ISPOT_DOF)then
-      kmat(edofphi,edofphi)=kmat(edofphi,edofphi)+matmul(transpose(deriv),deriv)*jacw
+      if(POT_TYPE==PELECTRIC)then
+        kmat(edofphi,edofphi)=kmat(edofphi,edofphi)+matmul(transpose(deriv),deriv)*econgll(i)*jacw
+      else
+        kmat(edofphi,edofphi)=kmat(edofphi,edofphi)+matmul(transpose(deriv),deriv)*jacw
+      endif
       if(.not.ISDISP_DOF)then
         if(POT_TYPE==PMAGNETIC)then
           if(ismagnet_blk(imat))then

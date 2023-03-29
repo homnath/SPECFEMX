@@ -28,6 +28,7 @@ use global_dof
 use plastic_library
 use map_location
 use earthquake
+use electrical
 use source_function
 use cmtsolution,only:source_tshift,source_hdur
 #if (USE_MPI)
@@ -888,6 +889,22 @@ loop_step: do i_step=istep0,nstep
       flush(logunit)
     endif
     call earthquake_load(neq,extload,errcode,errtag)
+    call sync_process
+    call control_error(errcode,errtag,stdout,myrank)
+    if(steptype==FREQSTEP)then
+      !WARNING: make it general for nsrc
+      sff=source_frequency_function_complex(freq,source_hdur(1))
+      extload=extload*sff
+    endif
+  endif
+  
+  ! electrical current prescribed at points
+  if(isecurrent.and.i_step==1)then
+    if(myrank==0)then
+      write(logunit,'(a)')'  Electrical current'
+      flush(logunit)
+    endif
+    call electrical_load(neq,extload,errcode,errtag)
     call sync_process
     call control_error(errcode,errtag,stdout,myrank)
     if(steptype==FREQSTEP)then

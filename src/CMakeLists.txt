@@ -82,6 +82,7 @@ SET(srcboth
    model.F90
    cmtsolution.F90
    earthquake_load.F90
+   electrical_load.F90
    station.F90
    benchmark.F90)
 # Compiler preprocessor directives

@@ -146,7 +146,7 @@ integer,parameter :: NDIM2=NDIM*NDIM
 
 ! degrees of freedoms
 logical :: ISPOT_DOF,ISDISP_DOF
-integer,parameter :: PGRAVITY=1,PMAGNETIC=2
+integer,parameter :: PGRAVITY=1,PMAGNETIC=2,PELECTRIC=3
 ! potential type: 1: 'gravity' and 2: 'magnetic'
 integer :: POT_TYPE
 character(len=20) :: POT_STRING
@@ -227,7 +227,7 @@ real(kind=kreal) :: maxsize_elmt,sqmaxsize_elmt ! maximum size of the element ac
 
 ! model properties
 ! bulk modulus, shear modulus, mass density, magnetization
-logical :: isbulkmod,isshearmod,ismassdens,ismagnetization
+logical :: isbulkmod,isshearmod,ismassdens,ismagnetization,iselectric
 ! minimum, maximum value of density
 real(kind=kreal) :: mindensity,maxdensity
 ! minimum, maximum value of bulk modulus
@@ -250,6 +250,8 @@ shearmod_elmt(:,:)
 real(kind=kreal),allocatable :: grav0_nodal(:,:),dgrav0_elmt(:,:,:)
 ! magnetization
 real(kind=kreal),allocatable :: magnetization_elmt(:,:,:)
+! electrical conductivity
+real(kind=kreal),allocatable :: econductivity_elmt(:,:)
 integer :: nwmat
 integer,allocatable :: waterid(:)
 logical,allocatable :: water(:)
@@ -276,6 +278,11 @@ integer :: nmatblk_magnet
 integer,allocatable :: imat_to_imatmag(:),imatmag_to_imat(:)
 real(kind=kreal),allocatable :: magnetization_blk(:,:),Mmag_blk(:)
 logical,allocatable :: ismagnet_blk(:)
+
+integer :: nmatblk_electric
+real(kind=kreal),allocatable :: econductivity_blk(:)
+logical,allocatable :: iselectric_blk(:)
+
 ! model types
 character(len=20) :: model_type
 
@@ -291,7 +298,8 @@ real(kind=kreal),allocatable :: storederiv(:,:,:,:)
 real(kind=kreal),allocatable :: storejw(:,:)
 real(kind=kreal),allocatable :: storeinterpf_infinite(:,:,:)
 
-logical :: allelastic,isselfweight,isbodyload,ispseudoeq,iseqsource,iswater,phinu
+logical :: allelastic,isselfweight,isbodyload,ispseudoeq,iseqsource,isecurrent, &
+iswater,phinu
 ! pseudostatic coefficients for earthquake loading eqkh=ah/g, eqkv=av/g
 real(kind=kreal) :: eqkx,eqky,eqkz
 ! where ah and av are horizontal and vertical pseudostatic accelerations
@@ -436,6 +444,9 @@ logical :: isgsplit,isnoslip
 character(len=250) :: stationfile
 integer :: nstation
 logical :: isstation
+! electrical current
+character(len=250) :: ecfile
+
 !Benchmarking
 ! .TRUE. : Okada benchmark, .FALSE. : no benchmark (Default)
 logical :: benchmark_okada
@@ -470,6 +481,7 @@ type savedata_options
   logical :: strain
   logical :: gpot,agrav
   logical :: mpot,magb
+  logical :: epot
   logical :: infinite
   ! Free surface plot. If this option is .TRUE., and the free surface file is
   ! given, the result will be plotted on the free surface.

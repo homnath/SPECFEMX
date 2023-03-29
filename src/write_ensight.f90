@@ -21,7 +21,7 @@ contains
 !-------------------------------------------------------------------------------
 
 subroutine write_ensight_casefile(case_file,geo_file,add_tag,errcode,errtag)
-use global,only:file_head,ptail,savedata,ismassdens,ismagnetization
+use global,only:file_head,ptail,savedata,ismassdens,ismagnetization,iselectric
 implicit none
 character(len=250),intent(in) :: case_file,geo_file
 character(len=60),intent(in) :: add_tag 
@@ -61,6 +61,10 @@ if(savedata%model_cell)then
   if(ismagnetization)then
     write(11,'(a/)')'scalar per element: magnetization '//trim(file_tag)//   &
     trim(ptail)//'.mag'
+  endif
+  if(iselectric)then
+    write(11,'(a/)')'scalar per element: electrical_conductivity '//trim(file_tag)//   &
+    trim(ptail)//'.econ'
   endif
 endif
 close(11)
@@ -186,6 +190,10 @@ endif
 if(savedata%magb)then
   write(11,'(a,i0,a,a,a,a,/)')'vector per node: ',ts,' ','magnetic_field',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.magb'
+endif
+if(savedata%epot)then
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','electric_potential',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.epot'
 endif
 write(11,'(a)')'TIME'
 write(11,'(a,i0)')'time set: ',ts

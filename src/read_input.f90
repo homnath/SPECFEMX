@@ -55,7 +55,8 @@ integer :: id,ind,ios,narg,slen
 
 integer :: bc_stat,preinfo_stat,mesh_stat,material_stat,step_stat,control_stat,&
 bodyload_stat,stress0_stat,traction_stat,mtraction_stat,water_stat,&
-save_stat,eqsource_stat,benchmark_stat,station_stat,devel_stat,mag_stat
+save_stat,eqsource_stat,ecurrent_stat,benchmark_stat,station_stat,devel_stat,mag_stat, &
+electric_stat
 integer :: mat_count
 integer :: ielmt,i_node,inode,imat,tmp_nelmt,tmp_nnode !,mat_domain
 
@@ -78,6 +79,8 @@ integer :: incORlat
 ! magnitude of the magnetization
 real(kind=kreal) :: M0
 real(kind=kreal) :: inc,dec,azim
+! magnitude of the electrical conductivity
+real(kind=kreal) :: econductivity
 
 errtag="ERROR: unknown!"
 errcode=-1
@@ -110,11 +113,13 @@ stress0_stat=-1
 step_stat=-1
 control_stat=-1
 eqsource_stat=0
+ecurrent_stat=0
 station_stat=0
 save_stat=0
 benchmark_stat=0
 devel_stat=0
 mag_stat=0
+electric_stat=0
 
 ISDISP_DOF=.true.
 ISPOT_DOF=.false.
@@ -133,6 +138,7 @@ isbodyload=.false.
 isselfweight=.false.
 ispseudoeq=.false.
 iseqsource=.false.
+isecurrent=.false.
 iswater=.false.
 isstress0=.false.
 usek0=.false.
@@ -162,6 +168,9 @@ savedata%agrav=.false.
 ! magnetic potential
 savedata%mpot=.false.
 savedata%magb=.false.
+! electric potential
+savedata%epot=.false.
+
 savedata%infinite=.false.
 savedata%fsplot=.false.
 savedata%fsplot_plane=.false.
@@ -329,10 +338,15 @@ do
         POT_TYPE=PGRAVITY
         POT_STRING='gravity'
       elseif(trim(strval).eq.'magnetic' .or. &
-             trim(strval).eq.'Magnetic' .or. &
-             trim(strval).eq.'MAGNETIC')then
+        trim(strval).eq.'Magnetic' .or. &
+        trim(strval).eq.'MAGNETIC')then
         POT_TYPE=PMAGNETIC
         POT_STRING='magnetic'
+      elseif(trim(strval).eq.'electric' .or. &
+        trim(strval).eq.'Electric' .or. &
+        trim(strval).eq.'ELECTRIC')then
+        POT_TYPE=PELECTRIC
+        POT_STRING='electric'
       else
         write(errtag,*)'ERROR: unsupported "pot_type": ',trim(strval)
         return
@@ -757,6 +771,20 @@ do
     cycle
   endif
 
+  ! read electrical current information
+  if (trim(token)=='ecurrent:')then
+    if(ecurrent_stat==1)then
+      write(errtag,*)'ERROR: copy of line type ecurrent: not permitted!'
+      return
+    endif
+    call split_string(tag,',',args,narg)
+    ecfile=get_string('ecfile',args,narg)
+
+    ecurrent_stat=1
+    isecurrent=.true.
+    cycle
+  endif
+  
   !read benchmark information.
   !For now (9/16) only okada benchmarking is supported
   if (trim(token)=='benchmark:')then
@@ -933,6 +961,10 @@ do
         if(istat==0 .and. issave==1)savedata%mpot=.true.
         call seek_integer('magb',issave,args,narg,istat)
         if(istat==0 .and. issave==1)savedata%magb=.true.
+      endif
+      if(POT_TYPE==PELECTRIC)then
+        call seek_integer('epot',issave,args,narg,istat)
+        if(istat==0 .and. issave==1)savedata%epot=.true.
       endif
     endif
     if(infbc)then
@@ -1376,6 +1408,44 @@ if(POT_TYPE==PMAGNETIC)then
   endif
 endif
 
+! read electrical conductivity information
+if(POT_TYPE==PELECTRIC)then
+  do i_line=1,NMAXLINE
+    read(11,'(a)',iostat=ios)line
+    ! This will read a line and proceed to next line
+    if (ios/=0)exit
+    ! check for blank and comment line
+    if (isblank(line) .or. iscomment(line,'#'))cycle
+
+    call first_token(line,token)
+    if (trim(token)=='electrical_conductivity:')then
+      if(mag_stat==1)then
+        write(errtag,*)'ERROR: copy of line type "electrical_conductivity:" not permitted!'
+        return
+      endif
+      read(11,*)nmatblk_electric
+      allocate(econductivity_blk(nmatblk_electric))
+      allocate(iselectric_blk(nmatblk))
+      econductivity_blk=ZERO
+      iselectric_blk=.false.
+      do i=1,nmatblk_electric
+        read(11,*)imat,econductivity
+        econductivity_blk(i)=econductivity
+        iselectric_blk(imat)=.true.
+      enddo
+      
+      electric_stat=1
+      cycle
+    endif
+
+  enddo
+  ! check magnetic status
+  if (electric_stat /= 1)then
+    write(errtag,'(a)')'ERROR: cannot read electrical conductivity information! make sure &
+    &the "electrical_conductivity:" information is added in the material list file.'
+    return
+  endif
+endif
 ! infinite elements 
 if(infbc)then
   if(isfrom_partmesh .or. .not.ismpi .or. (ismpi.and.nproc.eq.1))then

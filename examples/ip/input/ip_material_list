@@ -1,0 +1,10 @@
+# material properties (id,domain,gamma,ym,nu,phi,coh,psi)
+3
+1, 1, 0, 0.0, 5.68e10, 0.26, 0.0, 0.0, 0.0
+2, 1, 0, 0.0, 5.68e10, 0.26, 0.0, 0.0, 0.0
+3, 1000, 0, 0.0, 5.68e10, 0.26, 0.0, 0.0, 0.0
+electrical_conductivity:
+3
+1 10.0
+2 10.0
+3 10.0
