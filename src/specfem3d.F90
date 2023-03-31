@@ -630,6 +630,9 @@ u=ZERO
 !call sync_process
 !call control_error(errcode,errtag,stdout,myrank)
 
+!call apply_traction(extload,errcode,errtag)
+!call control_error(errcode,errtag,stdout,myrank)
+
 if(solver_type.eq.petsc_solver)then
  ! Prepare sparsity of the stiffness matrix
   call prepare_sparse()
