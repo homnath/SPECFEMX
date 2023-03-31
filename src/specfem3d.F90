@@ -310,6 +310,14 @@ dt=dstep
 nl_tot=0
 
 
+
+call apply_traction(extload,errcode,errtag, nodalu, 0)
+call control_error(errcode,errtag,stdout,myrank)
+
+call close_process()
+stop 
+
+
 ! Prepare PETSC solver
 if(solver_type.eq.petsc_solver)then
   ! Prepare sparsity of the stiffness matrix (working out size etc)

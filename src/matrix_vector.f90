@@ -1830,14 +1830,17 @@ subroutine calc_SL_stiffness(i_elmtfs,kmatSL)
       rho_Ag     =  (rho_over_g/SLarea)     ! rho/(g*Area)
 
       ! DIAGONAL theta_tilde theta_dot
-      kmatSL(dof_sl(abg), dof_sl(abg)) = kmatSL(dof_sl(abg), dof_sl(abg)) - (theta_tf * pi_2d_abg * g0abg * rho_water)
+      kmatSL(dof_sl(abg), dof_sl(abg)) = kmatSL(dof_sl(abg), dof_sl(abg)) &
+                                       - (theta_tf * pi_2d_abg * g0abg * rho_water)
 
       ! COUPLING TERMS: 
       ! theta_tilde Phi_dot 
-      kmatSL(dof_sl(abg), dof_phi(abg)) = kmatSL(dof_sl(abg), dof_phi(abg)) - (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
+      kmatSL(dof_sl(abg), dof_phi(abg)) = kmatSL(dof_sl(abg), dof_phi(abg))  &
+                                        - (g0abg * pi_2d_abg * theta_tf  * rho_over_g)
 
       ! phi_tilde Phi_dot 
-      kmatSL(dof_phi(abg), dof_phi(abg)) = kmatSL(dof_phi(abg), dof_phi(abg)) - (phi_tf * Cabg * pi_2d_abg  * rho_over_g)!*cos_theta
+      kmatSL(dof_phi(abg), dof_phi(abg)) = kmatSL(dof_phi(abg), dof_phi(abg)) &
+                                         - (phi_tf * Cabg * pi_2d_abg  * rho_over_g)
       
  
       do j=1,NDIM
@@ -1846,19 +1849,23 @@ subroutine calc_SL_stiffness(i_elmtfs,kmatSL)
           grav_abgj = -grav0_nodal(j, gid_abg)
 
           ! u_tilde Phi_dot 
-          kmatSL(dof_u(j, abg), dof_phi(abg)) = kmatSL(dof_u(j, abg), dof_phi(abg)) - (Cabg * pi_2d_abg *  u_tf(j) * grav_abgj * rho_over_g)!*cos_theta 
+          kmatSL(dof_u(j, abg), dof_phi(abg)) = kmatSL(dof_u(j, abg), dof_phi(abg))& 
+                                              - (Cabg * pi_2d_abg *  u_tf(j)*grav_abgj*rho_over_g) 
 
           ! theta_tilde u_dot 
-          kmatSL(dof_sl(abg), dof_u(j, abg))  = kmatSL(dof_sl(abg), dof_u(j, abg)) - (pi_2d_abg * g0abg * theta_tf * grav_abgj * rho_over_g)!*cos_theta
+          kmatSL(dof_sl(abg), dof_u(j, abg))  = kmatSL(dof_sl(abg), dof_u(j, abg))& 
+                                              - (pi_2d_abg*g0abg*theta_tf*grav_abgj*rho_over_g)
 
           ! phi_tilde u_dot 
-          kmatSL(dof_phi(abg), dof_u(j,abg)) = kmatSL(dof_phi(abg), dof_u(j,abg)) - (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)!*cos_theta
+          kmatSL(dof_phi(abg), dof_u(j,abg)) = kmatSL(dof_phi(abg), dof_u(j,abg)) & 
+                                             - (Cabg * pi_2d_abg * phi_tf * grav_abgj * rho_over_g)
 
           do k=1,NDIM
             ! u_tilde u_dot  
             ! NOTE THE NEGATIVE in grav0_nodal is needed for same reason as above 
-            kmatSL(dof_u(k,abg),dof_u(j,abg)) = kmatSL(dof_u(k,abg),dof_u(j,abg))  - (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * (-grav0_nodal(k, gid_abg)) * rho_over_g)
-          !write(*,*)'v6     : ', (Cabg * pi_2d_abg * grav_abgj *  u_tf(k) * grav0_nodal(k, gid_abg) * rho_over_g)
+            kmatSL(dof_u(k,abg),dof_u(j,abg)) = kmatSL(dof_u(k,abg),dof_u(j,abg))  & 
+                                              - (Cabg * pi_2d_abg * grav_abgj *    & 
+                                                u_tf(k) * (-grav0_nodal(k, gid_abg)) * rho_over_g)
           enddo !k
 
       enddo  ! j 
@@ -1884,26 +1891,31 @@ subroutine calc_SL_stiffness(i_elmtfs,kmatSL)
         Cxyg       =  oceanf(i_elmtfs, xyg)  ! Ocean func abg
 
         ! SL_tilde, Phi_dot coupling 
-        kmatSL(dof_sl(xyg), dof_phi(abg)) = kmatSL(dof_sl(xyg), dof_phi(abg)) + (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
+        kmatSL(dof_sl(xyg), dof_phi(abg)) = kmatSL(dof_sl(xyg), dof_phi(abg)) + & 
+                                            (g0xyg * theta_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
 
         ! Phi_tilde, Phi_dot coupling 
-        kmatSL(dof_phi(xyg),dof_phi(abg)) = kmatSL(dof_phi(xyg),dof_phi(abg)) + (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)!*cos_theta
+        kmatSL(dof_phi(xyg),dof_phi(abg)) = kmatSL(dof_phi(xyg),dof_phi(abg)) + &
+                                            (Cxyg * phi_tf * pi_2d_abg * Cabg * pi_2d_xyg * rho_Ag)
 
         do j=1,NDIM
           v1 = pi_2d_abg * Cabg * (-grav0_nodal(j, gid_abg)) * pi_2d_xyg 
 
           ! U_tilde, Phi_dot coupling  
-          kmatSL(dof_u(j, xyg), dof_phi(abg)) = kmatSL(dof_u(j, xyg), dof_phi(abg)) + (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) *  (-grav0_nodal(j, gid_xyg)) * rho_Ag)!*cos_theta
+          kmatSL(dof_u(j, xyg), dof_phi(abg)) = kmatSL(dof_u(j, xyg), dof_phi(abg)) & 
+                                              + (pi_2d_abg * Cabg * pi_2d_xyg * Cxyg * u_tf(j) & 
+                                                 *  (-grav0_nodal(j, gid_xyg)) * rho_Ag)
 
           ! SL_tilde, U_dot coupling
           kmatSL(dof_sl(xyg), dof_u(j, abg)) = kmatSL(dof_sl(xyg), dof_u(j, abg)) + (v1 * g0xyg * theta_tf * rho_Ag) 
 
           ! Phi_tilde, U_dot coupling  
-          kmatSL(dof_phi(xyg), dof_u(j,abg)) = kmatSL(dof_phi(xyg), dof_u(j,abg)) + (v1 * Cxyg * phi_tf * rho_Ag)!*cos_theta
+          kmatSL(dof_phi(xyg), dof_u(j,abg)) = kmatSL(dof_phi(xyg), dof_u(j,abg)) + (v1 * Cxyg * phi_tf * rho_Ag)
 
           do k = 1, NDIM 
             ! U_tilde, U_dot coupling  
-            kmatSL(dof_u(k,xyg), dof_u(j,abg)) = kmatSL(dof_u(k,xyg), dof_u(j,abg))  + (v1 * Cxyg * u_tf(k) *  (-grav0_nodal(k, gid_xyg)) * rho_Ag)!*cos_theta
+            kmatSL(dof_u(k,xyg), dof_u(j,abg)) = kmatSL(dof_u(k,xyg), dof_u(j,abg))  & 
+                                                 + (v1 * Cxyg * u_tf(k) *  (-grav0_nodal(k, gid_xyg)) * rho_Ag)!*cos_theta
           enddo ! k 
         enddo ! j
       enddo! xyg

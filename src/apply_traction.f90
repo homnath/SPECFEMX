@@ -132,6 +132,8 @@ if(istraction)then
       write(logunit,*)'Traction applied: uniform loading'
       write(logunit,*)
 
+      open(12,file='normal',action='write',status='replace')
+
       read(11,*)q ! vector
       read(11,*)nface
       do i_face=1,nface
@@ -176,6 +178,7 @@ if(istraction)then
           detjac=sqrt(dot_product(face_normal,face_normal))
           face_normal=hexface_sign(iface)*face_normal/detjac
 
+          write(12,*)face_normal
 
                   
           ! TODO:for constant q this can be computed only once!!
@@ -200,6 +203,7 @@ if(istraction)then
 
       enddo
       trac_stat=.true.
+      close(12)
 
     elseif(tractype==2)then ! linearly distributed loading
       read(11,*)iaxis,x1,x2,q1,q2 ! q1 and q2 are vectors, x1 and x2 can be any coordinates
@@ -636,12 +640,12 @@ endif !(isfstraction)
 
       ! Save the traction: 
 if (savedata%traction)then
-  write(logunit,*)' min Traction extload: ', minval(load)
-  write(logunit,*)' max Traction extload: ', maxval(load)
-  write(logunit,*)' min nodaltraction : ',   minval(nodaltraction)
-  write(logunit,*)' max nodaltraction : ',   maxval(nodaltraction)
+  write(*,*)' min Traction extload: ', minval(load)
+  write(*,*)' max Traction extload: ', maxval(load)
+  write(*,*)' min nodaltraction : ',   minval(nodaltraction)
+  write(*,*)' max nodaltraction : ',   maxval(nodaltraction)
 
-  write(logunit,*)'Saving traction - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
+  write(*,*)'Saving traction - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
   call write_vector_to_file(nnode,nodalu,ext='traction',istep=0) 
   ! On the free surface
   if(savedata%fsplot)then

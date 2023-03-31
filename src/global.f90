@@ -250,6 +250,7 @@ logical :: isplastic
 ! Flag to check if the domain is empty
 logical,allocatable :: isempty_blk(:)
 integer,allocatable :: mat_domain(:),type_blk(:), isplastic_blk(:)
+
 real(kind=kreal),allocatable :: gam_blk(:),rho_blk(:),ym_blk(:),nu_blk(:),     &
 coh_blk(:),phi_blk(:),psi_blk(:)
 character(len=60),allocatable :: mfile_blk(:)

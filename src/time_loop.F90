@@ -120,7 +120,7 @@ if(steptype.eq.FREQSTEP)then
     ! Set Petsc stiffness matrix
     if(solver_type.eq.petsc_solver)then
         call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-        ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.true.)  
+        ang_freq, scale_ang_freq2, .false., .true.)  
     endif
 
 else ! TIMESTEPPING
@@ -165,7 +165,7 @@ else ! TIMESTEPPING
 
         if(solver_type.eq.petsc_solver)then
             call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-            ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
+            ang_freq, scale_ang_freq2, .false., .false.)   
         endif
 
         if(myrank.eq.0.and.verbose_bool)then
