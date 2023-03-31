@@ -128,11 +128,11 @@ if(istraction)then
       enddo
       trac_stat=.true.
     elseif(tractype==1)then ! uniform loading
-      write(logunit,*)
-      write(logunit,*)'Traction applied: uniform loading'
-      write(logunit,*)
+      write(*,*)
+      write(*,*)'Traction applied: uniform loading'
+      write(*,*)
 
-      open(12,file='normal',action='write',status='replace')
+      !open(12,file='normal',action='write',status='replace')
 
       read(11,*)q ! vector
       read(11,*)nface
@@ -178,7 +178,7 @@ if(istraction)then
           detjac=sqrt(dot_product(face_normal,face_normal))
           face_normal=hexface_sign(iface)*face_normal/detjac
 
-          write(12,*)face_normal
+          !write(*,*)face_normal
 
                   
           ! TODO:for constant q this can be computed only once!!
@@ -203,7 +203,7 @@ if(istraction)then
 
       enddo
       trac_stat=.true.
-      close(12)
+      !close(12)
 
     elseif(tractype==2)then ! linearly distributed loading
       read(11,*)iaxis,x1,x2,q1,q2 ! q1 and q2 are vectors, x1 and x2 can be any coordinates

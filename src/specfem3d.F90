@@ -37,10 +37,10 @@ use ghost_library_mpi
 use math_library_mpi
 use sparse
 use parsolver
-use count_elements  !WE
-use relaxation_time !WE
-use ghost           !WE
-use other_forces    !WE 
+use count_elements  
+use relaxation_time 
+use ghost           
+use other_forces    
 #if (USE_COMPLEX)
 use parsolver_petsc_complex
 #else
@@ -311,11 +311,7 @@ nl_tot=0
 
 
 
-call apply_traction(extload,errcode,errtag, nodalu, 0)
-call control_error(errcode,errtag,stdout,myrank)
 
-call close_process()
-stop 
 
 
 ! Prepare PETSC solver
@@ -422,16 +418,25 @@ if(isbodyload)then
   call compute_bodyload(selfload,selfweight=isselfweight)
 endif 
 
+
+
 call sync_process()
 
 
 
+call apply_traction(extload,errcode,errtag, nodalu, 0)
+
+
 ! Initialise ice: 
 if(is_ICE)then
+
+  ! Ensure correct normals
+  call check_surface_normals()
   ! Prepare the ice stuff and set the user-inputted initial condition
   call prepare_ice(nodalice, nodalicerate)
   call set_original_ice_level(nodalice)
 endif 
+
 
 
 ! Initialise Sea Level 
