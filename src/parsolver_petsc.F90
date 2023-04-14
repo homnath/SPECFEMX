@@ -512,7 +512,7 @@ PetscCallA(KSPCreate(PETSC_COMM_WORLD,ksp,ierr))
 !PetscCallA(KSPSetInitialGuessNonzero(ksp,PETSC_TRUE,ierr))
 
 ! Diagonally scale the matrix
-! Since the equations are nondimensionalized, the scaling is not necessary?
+! Since the equations are nondimensionalized, the scaling is unnecessary?
 PetscCallA(KSPSetDiagonalScale(ksp,PETSC_TRUE,ierr))
 
 ! Define solver type
