@@ -481,9 +481,6 @@ call save_displacement_variables(strain_elmt, strain_nodal, &
 
 
 
-
-    
-
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
 ! For elastic simulations there is only one timestep. 
