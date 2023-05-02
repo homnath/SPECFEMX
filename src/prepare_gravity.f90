@@ -6,7 +6,8 @@ contains
 subroutine prepare_gravity()
 use dimensionless,only:NONDIM_ACCEL
 use global,only:agrav,logunit,myrank,g_num,ndim,ngll,nelmt,nnode, &
-grav0_nodal,dgrav0_elmt,mat_id,mat_domain,devel_nondim
+grav0_nodal,dgrav0_elmt,mat_id,mat_domain,devel_nondim, g0_nodal, & 
+IS_CART_SIM, IS_GLOB_SIM, IS_SL
 !use global,only:storederiv,dgrav0_elmt
 use math_constants,only:ZERO
 implicit none
@@ -25,8 +26,10 @@ if(myrank==0) then
   write(logunit,'(a)',advance='no') 'preparing gravity...'
 endif
 
+
 allocate(grav0_nodal(ndim,nnode))!,dgrav0_elmt(6,ngll,nelmt))
 grav0_nodal=ZERO
+
 ! set background gravity
 if(devel_nondim)then
   ! gravity acts downward (-Z direction)
@@ -42,6 +45,27 @@ do i_elmt=1,nelmt
   ! ZERO on those elements due to ZERO displacement
   if(mat_domain(mat_id(i_elmt)).eq.1000)grav0_nodal=ZERO
 enddo
+
+
+! Calculating grad phi (gravity) in local vertical direction only (g)
+! Magnitude of gravity in vertical 
+allocate(g0_nodal(nnode))
+
+! Note that gravity has already been nondimensionalsied above 
+if(IS_SL)then 
+  if(IS_CART_SIM)then 
+    ! For cartesian we take the z direction to be the local vertical
+    ! Shouldnt need to apply nondim again since taken value from above. 
+    g0_nodal(:) = grav0_nodal(3,:) 
+  elseif(IS_GLOB_SIM)then 
+    ! Not implemented for global simulations yet 
+    write(*,*)'ERROR: GLOBAL SIMULATION TYPE NOT IMPLEMENTED YET'
+  else
+    write(*,*)'ERROR: SIMULATION TYPE MUST BE CARTESIAN OR GLOBAL'
+    return
+  endif 
+endif 
+
 
 !dgrav0_elmt=ZERO
 !do i_elmt=1,nelmt

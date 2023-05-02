@@ -60,7 +60,7 @@ end subroutine petsc_initialize
 
 subroutine petsc_create_vector()
 implicit none
-IS global_is,local_is
+IS global_is,local_is ! Index sets
 
 errsrc=trim(myfname)//' => petsc_create_vector'
 
@@ -68,15 +68,27 @@ errsrc=trim(myfname)//' => petsc_create_vector'
 PetscCallA(VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,ngdof,xvec,ierr))
 PetscCallA(VecDuplicate(xvec,bvec,ierr))
 
-! local vector
+! local vector, sequential in memory, of length NEQ 
 PetscCallA(VecCreateSeq(PETSC_COMM_SELF,neq,local_vec,ierr))
 
 ! objects needed for global vector scattering to local vector
 ! create local and global IS (index set) objects from the array of local and
 ! global indices
+! Create index set of length NEQ holding vale=ues from l2gdof
+! This is stored in/accessed with global_is
 PetscCallA(ISCreateGeneral(PETSC_COMM_WORLD,neq,l2gdof(1:),PETSC_COPY_VALUES,global_is,ierr))
+! Index set local_is (length neq) contains evenly-spaced integers, starting at 0 and going up by 1
+! ie its just an index set of 0, 1, 2, 3, ... neq-1
 PetscCallA(ISCreateStride(PETSC_COMM_SELF,neq,0,1,local_is,ierr))
 ! create VecScatter object which is needed to scatter PETSc parallel vectors
+! create VecScatter object which is needed to scatter PETSc parallel vectors
+! The scatterer context is stored in/called vscat
+! bvec is an example (structure) of the vector that will be scattered 
+! local_vec defines the shape of what we are scattering too
+! global_is defines the indexes of BVEC to be scattered
+! local_is defines the indexes of local_vec to scatter into 
+! Overall then it is taking the indexes of l2gdof for this process and
+! telling petsc to scatter those bits of BVEC into the local_vec here
 PetscCallA(VecScatterCreate(bvec,global_is,local_vec,local_is,vscat,ierr))
 PetscCallA(ISDestroy(global_is,ierr)) ! no longer necessary
 PetscCallA(ISDestroy(local_is,ierr))  ! no longer necessary
@@ -125,9 +137,11 @@ allocate(nzeros(neq),stat=ierr)
 call check_allocate(ierr,errsrc)
 
 nzeros=0;
+
 do i=1,nsparse
   nzeros(krow_sparse(i))=nzeros(krow_sparse(i))+1
 enddo
+
 nzeros_max=maxscal(maxval(nzeros))
 nzeros_min=minscal(minval(nzeros))
 nzerosoff_max=nzeros_max
@@ -739,14 +753,18 @@ end subroutine petsc_set_ksp_operator
 !===============================================================================
 
 subroutine petsc_set_stiffness_matrix(storekmat)
+  ! WHERE WE ACTUALLY SET THE STIFFNESS MATRIX
+use global
 use math_library_mpi,only:sumscal
 use ieee_arithmetic
 implicit none
 
 real(kind=kreal),intent(in) :: storekmat(:,:,:)                                  
-integer :: i,i_elmt,ielmt,j,n,ndzero                                             
-integer :: ggdof_elmt(NEDOF)                                                     
-                                                                                 
+integer :: i,i_elmt,ielmt,j,n,ndzero ,igll, ictr ,r  , iloop                                         
+integer :: ggdof_elmt(NNDOF, ngll)                                                     
+
+integer :: finaldof(NEDOF), nuphi_dof, theta_dof
+
 PetscInt irow,jcol                                                               
 Vec   vdiag                                                                      
 PetscScalar rval                                                                 
@@ -758,19 +776,33 @@ real(kind=8) :: xval
 !  - Note that MatSetValues() uses 0-based row and column numbers
 !  in Fortran as well as in C (as set here in the array "col").
 
+! set all vals to 0
 PetscCallA(MatZeroEntries(Amat,ierr))
 call sync_process
 rval=1.0
 
 ! entirely in solid                                                              
-do i_elmt=1,nelmt                                                                
+do i_elmt=1, nelmt       
+
+  ! Get global DOF indices for this element
   ielmt=i_elmt                                                                   
-  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))                          
-  ggdof_elmt=ggdof_elmt-1 ! petsc index starts from 0                            
+  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))    
+
+  ! Reorders the u and phi DOFs into a 1D array
+  nuphi_dof = nndofu+nndofphi
+  finaldof = 0 
+  finaldof(1:(nuphi_dof)*ngll) = reshape(ggdof_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
+
+  ! Add the sea level DOFs
+  finaldof((nuphi_dof)*ngll + 1:(nndof)*ngll) = ggdof_elmt(nndof, :)
+  ! petsc index starts from 0   
+  finaldof=finaldof-1 
+
   do i=1,NEDOF                                                                   
     do j=1,NEDOF                                                                 
-    irow=i; jcol=j                                                               
-    if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
+    irow=i; jcol=j 
+
+    if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                      
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
       if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
@@ -779,10 +811,10 @@ do i_elmt=1,nelmt
         flush(logunit)
         stop                                                                     
       endif                                                                     
-      PetscCallA(MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),storekmat(i,j,ielmt),ADD_VALUES,ierr))                                      
+      PetscCallA(MatSetValues(Amat,1,finaldof(irow),1,finaldof(jcol),storekmat(i,j,ielmt),ADD_VALUES,ierr))
     endif                                                                        
     enddo                                                                        
-  enddo                                                                          
+  enddo   
 enddo    
 
 PetscCallA(MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr))
@@ -942,6 +974,99 @@ PetscCallA(VecDestroy(vdiag,ierr))
 end subroutine petsc_set_stiffness_matrix_freq
 !===============================================================================
 
+subroutine petsc_print_vector()
+  use global
+  integer :: ierr
+  PetscInt dim
+  character(len=80) :: outputString
+
+
+  write(*,*)'BVEC: '
+  call VecView(bvec, PETSC_VIEWER_STDOUT_WORLD, ierr)
+
+  call VecGetSize(bvec, dim, ierr)
+
+  write(outputString,*) 'Vector dimension: ', dim,'\n'
+
+  call PetscPrintf(PETSC_COMM_WORLD, outputString, ierr) 
+
+end subroutine
+
+
+subroutine petsc_print_matrix()
+  use global
+  implicit none 
+  integer :: ierr
+  character(len=80) :: outputString
+
+  PetscInt m 
+  PetscInt n
+
+  call MatView(Amat, PETSC_VIEWER_STDOUT_WORLD, ierr)
+
+  !call MatGetSize(Amat, m, n )
+  !write(outputString,*) 'Matrix dimensions: ', m, '  ', n, '\n'
+
+  !call PetscPrintf(PETSC_COMM_WORLD, outputString, ierr) 
+end subroutine petsc_print_matrix
+!===============================================================================
+
+subroutine set_petsc_stiffness(isscale_ang_freq, storekmat, storemmat, &
+   ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)
+
+! USES 
+use global
+use set_precision
+use output_to_user 
+
+  implicit none 
+
+  real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:)
+  real(kind=kreal) :: ang_freq, scale_ang_freq2
+
+  logical reuse_pc_bool, freq_bool, isscale_ang_freq
+
+! CODE: 
+    if (freq_bool)then 
+        ! FREQUENCY SOLVER
+        if(ISSL_DOF)then
+          write(*,*)'ERROR: TRYING TO USE FREQ SOLVER WITH SEA LEVEL'
+          stop
+        endif 
+
+        call petsc_set_stiffness_matrix_freq(storekmat,storemmat,        &
+                                             ang_freq, scale_ang_freq2,  & 
+                                             isscale_ang_freq)
+        log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;  
+        call write_ifproc0(logunit)
+        call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
+    else 
+        ! TIMESTEPPING 
+        if (ISSL_DOF)then 
+            log_msg = trim(' petsc_set_stiffness_matrix WITH SEA LEVEL: SUCCESS!') ;
+            call write_ifproc0(logunit)
+            log_msg = trim(' --> Setting PETSC stiffness symmetry to false') ;
+
+            symmetric_solver =.false.
+        else 
+            log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ; 
+        endif 
+
+        if(myrank.eq.0.and.verbose_bool)then
+          write(*,*)trim(log_msg)
+        endif 
+
+
+        call petsc_set_stiffness_matrix(storekmat)
+
+        call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
+        call petsc_set_solver()
+
+    endif 
+
+end subroutine set_petsc_stiffness
+!===============================================================================
+
 subroutine petsc_set_vector(rload)
 use ieee_arithmetic
 implicit none
@@ -1002,8 +1127,11 @@ PetscInt    ireason
 !TMP !call KSPSetNullSpace(ksp, nullspace,ierr);
 !TMP !call MatNullSpaceDestroy(nullspace,ierr);
 
+
+
 ! Solve the linear system
 PetscCallA(KSPSolve(ksp,bvec,xvec,ierr))
+
 
 ! View solver info; we could instead use the option -ksp_view
 !PetscCallA(KSPView(ksp,PETSC_VIEWER_STDOUT_WORLD,ierr))
@@ -1110,6 +1238,45 @@ PetscCallA(VecScatterDestroy(vscat,ierr))
 PetscCallA(PetscFinalize(ierr))
 
 end subroutine petsc_finalize
+!===============================================================================
+
+subroutine petsc_create_vector_SL()
+  !NOT IN USE
+  use global 
+  use free_surface
+  implicit none
+  IS global_is,local_is
+  
+  errsrc=trim(myfname)//' => petsc_create_vector_SL'
+  
+  ! dimension of vector: 
+
+  ! create vector objects
+  call VecCreateMPI(PETSC_COMM_WORLD,PETSC_DECIDE,ngdof+nnode_fs,xvec,ierr)
+  CHKERRA(ierr)
+  call VecDuplicate(xvec,bvec,ierr)
+  CHKERRA(ierr)
+  
+  ! NOT SURE WHAT TO DO HERE - CHANGE neq? 
+  
+  ! local vector
+  call VecCreateSeq(PETSC_COMM_SELF,neq,local_vec,ierr)
+  CHKERRA(ierr)
+  
+  ! objects needed for global vector scattering to local vector
+  ! create local and global IS (index set) objects from the array of local and
+  ! global indices
+  call ISCreateGeneral(PETSC_COMM_WORLD,neq,l2gdof(1:),PETSC_COPY_VALUES,global_is,ierr)
+  CHKERRA(ierr)
+  call ISCreateStride(PETSC_COMM_SELF,neq,0,1,local_is,ierr);
+  CHKERRA(ierr)
+  ! create VecScatter object which is needed to scatter PETSc parallel vectors
+  call VecScatterCreate(bvec,global_is,local_vec,local_is,vscat,ierr)
+  CHKERRA(ierr)
+  call ISDestroy(global_is,ierr) ! no longer necessary
+  call ISDestroy(local_is,ierr)  ! no longer necessary
+  
+  end subroutine petsc_create_vector_SL
 !===============================================================================
 
 end module parsolver_petsc

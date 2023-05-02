@@ -11,12 +11,21 @@ use global,only:ismpi,myrank,nproc,stdout
 implicit none
 integer :: errcode
 ismpi=.true. ! parallel
+
+
+
 call MPI_INIT(errcode)
 if(errcode /= 0) call mpierror('ERROR: cannot initialize MPI!',errcode,stdout)
 call MPI_COMM_RANK(MPI_COMM_WORLD,myrank,errcode)
 if(errcode /= 0) call mpierror('ERROR: cannot find processor ID (rank)!',errcode,stdout)
 call MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,errcode)
 if(errcode /= 0) call mpierror('ERROR: cannot find number of processors!',errcode,stdout)
+
+if(myrank==0)then
+    write(*,*)'* Running in parallel... '
+    write(*,*)'  --> number of processors: ', nproc
+  endif
+
 return
 end subroutine start_process
 !=======================================================

@@ -9,7 +9,7 @@ character(len=500),private :: errsrc
 contains
 !-------------------------------------------------------------------------------
 
-! This subrotine computes and store elemental derivative and integration
+! This subrotine computes and stores elemental derivative and integration
 ! information.
 subroutine precompute_derivative_integration(errcode,errtag)
 use set_precision
@@ -34,6 +34,7 @@ prepare_integration
 use infinite_element
 !use ieee_arithmetic
 implicit none
+
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 integer :: i,i_gll
@@ -537,12 +538,13 @@ do i_elmt=1,nelmt
 
     storeinterpf_infinite(:,:,ielmt_infinite)=lagrange_gl
     
+    storeinterpf_infinite(:,:,ielmt_infinite)=lagrange_gl
+
   endif
 
   egdof=gdof_elmt(:,i_elmt)
     
   do i=1,nip
-
     if(isinf)then
       ! infinite element
       interpf=lagrange_gl(i,:)

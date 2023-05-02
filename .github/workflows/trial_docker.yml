@@ -1,0 +1,18 @@
+name: trial-docker-1 
+
+on:
+  push:
+    branches: [actions_setup]
+
+jobs: 
+  run_compilers_in_docker:
+    runs-on: ubuntu-latest 
+    container: willeaton/specfemc_ubuntu:latest
+
+  steps:
+    - name: check_compilers_with_helloworld
+      run: | 
+        ls && \ 
+        icc      ./tests/icc_compile_test.c    -o icc_comptest && ./icc_comptest 
+        ifort    ./tests/fortran_comp_test.f90 -o f90comptest  && ./f90comptest
+        mpiifort ./tests/fortran_comp_test.f90 -o mpitest && ./mpitest

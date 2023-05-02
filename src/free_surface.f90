@@ -5,7 +5,7 @@ character(len=250),private :: myfname=' => free_surface.f90'
 character(len=500),private :: errsrc
 
 integer :: nelmt_fs,nnode_fs
-integer,allocatable :: iface_fs(:)
+integer,allocatable :: iface_fs(:), id_elem_fs(:), fs_elem_id(:) !stores faces, element IDs of fs elems
 ! We can store only gnum_fs and gnum4_fs can be later extracted from it.
 integer,allocatable :: gnum4_fs(:,:)
 integer,allocatable :: gnum_fs(:,:)
@@ -21,7 +21,7 @@ contains
 !   HNG, Oct 08, 2018
 subroutine prepare_free_surface(errcode,errtag)
 use global,only:ismpi,nproc,nenode,maxngll2d,g_num, &
-fsfile,inp_path,part_path,ptail_inp,savedata
+fsfile,inp_path,part_path,ptail_inp,savedata, nelmt
 use element,only:hexface
 use math_library,only:i_uniinv
 
@@ -39,6 +39,8 @@ logical,allocatable :: isnode(:)
 character(len=80) :: fname
 character(len=80) :: data_path
 
+
+
 errtag=""
 errcode=0
 ! Set data path
@@ -49,6 +51,8 @@ else
 endif
 
 fname=trim(data_path)//trim(fsfile)//trim(ptail_inp)
+
+
 open(unit=11,file=trim(fname),status='old',action='read',iostat=ios)
 if (ios /= 0)then
   write(errtag,'(a)')'ERROR: input file "'//trim(fname)//'" cannot be opened!'
@@ -64,18 +68,26 @@ if(ios/=0.or.nelmt_fs.eq.0)then
   savedata%fsplot_plane=.false.
   return
 endif
-allocate(iface_fs(nelmt_fs))
+
+allocate(iface_fs(nelmt_fs), id_elem_fs(nelmt_fs), fs_elem_id(nelmt) )
 allocate(gnum4_fs(4,nelmt_fs),gnum_fs(maxngll2d,nelmt_fs))
 nsnode_all=nelmt_fs*maxngll2d
 allocate(nodelist(nsnode_all),inode_order(nsnode_all))
+
+
+fs_elem_id = 0 
+
 n1=1; n2=maxngll2d
 do i_face=1,nelmt_fs
   read(11,*)ielmt,iface
+
   iface_fs(i_face)=iface
   num=g_num(:,ielmt)
   gnum4_fs(:,i_face)=num(hexface(iface)%gnode)
   gnum_fs(:,i_face)=num(hexface(iface)%node)
   
+  id_elem_fs(i_face) = ielmt  ! Input ielmt_fs --> returns global elemnt ID
+  fs_elem_id(ielmt) = i_face  ! Input global element ID --> returns ielmt_fs
   nodelist(n1:n2)=num(hexface(iface)%node)
   n1=n2+1; n2=n1+maxngll2d-1
 enddo

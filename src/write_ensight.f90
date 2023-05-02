@@ -179,6 +179,45 @@ if(savedata%gpot)then
   write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','gravity_potential',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.gpot'
 endif
+
+
+
+if(savedata%oceanf)then
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','oceanf',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.oceanf'
+endif
+
+
+! Iceload save
+if(savedata%iceload)then
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','iceload_phi',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.iceload_phi'
+
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','iceload_sl',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.iceload_sl'
+
+  write(11,'(a,i0,a,a,a,a,/)')'vector per node: ',ts,' ','iceload_u',' ',  &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.iceload_u'
+endif 
+
+if(savedata%traction)then 
+  write(11,'(a,i0,a,a,a,a,/)')'vector per node: ',ts,' ','traction',' ',  &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.traction'
+endif 
+
+
+if(savedata%ice)then
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','ice',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.ice'
+endif
+if(savedata%icerate)then
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','icerate',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.icerate'
+endif
+if(savedata%sl)then
+  write(11,'(a,i0,a,a,a,a,/)')'scalar per node: ',ts,' ','sea_level',' ', &
+  trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.sl'
+endif
 if(savedata%agrav)then
   write(11,'(a,i0,a,a,a,a,/)')'vector per node: ',ts,' ','gravity_acceleration',' ', &
   trim(file_tag)//'_step'//wild_char(1:twidth)//trim(ptail)//'.grav'
