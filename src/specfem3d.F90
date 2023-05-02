@@ -898,6 +898,7 @@ loop_step: do i_step=istep0,nstep
       !WARNING: make it general for nsrc
       sff=source_frequency_function_complex(freq,source_hdur(1))
       extload=extload*sff
+      print*,myrank,maxval(abs(extload)),sff
     endif
   endif
   
