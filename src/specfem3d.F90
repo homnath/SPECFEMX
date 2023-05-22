@@ -6,6 +6,7 @@ subroutine specfem3d()
 ! Import necessary modules
 use dimensionless
 use global
+use local
 use output_to_user
 use string_library,only : parse_file
 use math_constants
@@ -40,7 +41,6 @@ use sparse
 use parsolver
 use count_elements  !WE
 use relaxation_time !WE
-use ghost           !WE
 use other_forces    !WE 
 #if (USE_COMPLEX)
 use parsolver_petsc_complex
@@ -107,42 +107,27 @@ integer :: todalOFNodes
 ! sigma: stress (used in different context than esigma?)
 ! vsigma: viscose stress
 
-! Dynamic arrays
-! num: g_num for particular element.
-! node_valency: number of elements that share each node.
-integer,allocatable::num(:),node_valency(:)
-
 integer :: nzero_dprecon, spareint
-real(kind=kreal),allocatable :: dprecon(:),ndscale(:)
 
-real(kind=kreal),allocatable :: bmat(:,:),coord(:,:),deriv(:,:),    &
-jac(:,:)
 !kmat: stiffness matrix for each element
 !storekmat: stiffness matrix for all elements
-real(kind=kreal),allocatable :: kmat(:,:),storekmat(:,:,:), storekmatSL(:,:,:), kSL(:,:)
 !storemmat: mass matrix for all elements
-real(kind=kreal),allocatable :: storemmat(:,:)
 
 !uerr: used to check convergence
 !umax: max of displacement magnitude
 !uxmax: max of displacement components
 !du: incremental solution
 !u: solution (summed over du)
-real(kind=kreal),allocatable :: du(:),u(:),olddu(:)
 real(kind=kreal) :: uerr
 
 integer :: i
 
 ! Source frequency function
-real(kind=kreal),allocatable :: eld(:),eload(:),bload(:),   &
-vload(:),rhoload(:),resload(:)
 !eld: elastic displacement on all nodes of the element
 !eload: elastic load on element
 !extload: external load
 !ubcload: load contributed by displacement BC
 !load: like resload. Not currently used
-real(kind=kreal),allocatable :: slipload(:),extload(:),bodyload(:),selfload(:), &
-viscoload(:),ubcload(:),load(:)
 
 !strain_elmt: strain for all elements
 !stress_elmt: stress for each element
@@ -151,18 +136,14 @@ real(kind=kreal),allocatable :: strain_elmt(:,:,:),strain_nodal(:,:),      &
 stress_elmt(:,:,:),stress_nodal(:,:),evpt(:,:,:)
 !bcnodalv: prescribed BC nodal variables
 !nodalu: nodal displacement for all nodes (not just BC)
-real(kind=kreal),allocatable :: bcnodalv(:,:),nodalu(:,:), nodalustore(:,:) 
-real(kind=kreal),allocatable :: nodalphi(:),nodalphistore(:),nodalg(:,:)
 
 ! Sea level edit - WE 
 real(kind=kreal),allocatable :: nodalsl(:)  ! Nodal theta values,
 real(kind=kreal),allocatable :: nodalslrate(:)  ! Nodal theta values
 real(kind=kreal),allocatable :: nodalice(:) ! Nodal I values
 real(kind=kreal),allocatable :: nodalicerate(:) ! Nodal rate of I values
-real(kind=kreal),allocatable :: iceload(:)  ! load term due to ice.
 real(kind=kreal):: maxnodalsl,minnodalsl, mass_imbalance
 ! magnetization
-real(kind=kreal),allocatable :: nodalB(:,:)
 !,psigma(:,:),psigma0(:,:),taumax(:),nsigma(:)
 !bodyload: load computed on all nodes of the element
 !selfload: self load computed on all nodes of the element
@@ -177,7 +158,6 @@ real(kind=kreal),allocatable :: nodalB(:,:)
 !ndscale: nondimensionlize scale
 !ubcload: load contributed by displacement BC
 !jac: Jacobian
-integer,allocatable :: egdof(:),egdofu(:)
 ! placeholder array. holds values of gdof_elmt for a given element.
 
 ! Frequency
@@ -206,7 +186,7 @@ integer :: i_maxwell
 integer,allocatable :: eid_elas(:),eid_viscoelas(:)
 real(kind=kreal),allocatable :: relaxtime(:,:),muratio(:),tratio(:)
 ! q0: initial state variable for viscoelastic rheology
-real(kind=kreal),allocatable :: visco_q0(:,:,:,:),q0(:,:),elas_e0(:,:,:)
+real(kind=kreal),allocatable :: q0(:,:)
 
 real(kind=kreal) :: mass_imbalance_0
 
@@ -216,7 +196,6 @@ real(kind=kreal) :: esigma0_dev(nst),esigma_dev(nst)
 integer :: geq,inum,nequ
 logical,allocatable :: iseq(:)
 integer,allocatable :: gdofu(:) 
-integer :: tot_neq,max_neq,min_neq
 ! number of active ghost partitions for a node
 integer,allocatable :: ngpart_node(:)
 character(len=250) :: errtag ! error message
@@ -266,35 +245,35 @@ if( iseqsource .and. (eqsource_type.eq.3 .or. eqsource_type.eq.4) )then
 endif
 
 
+call initialise_global_arrays()
+print*,'Hello sir0!'
+call initialise_local_arrays()
+
+print*,'Hello sir1!'
 ! Use BCs to determine global DOF index etc
-call sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv, &
-                       eld, eload, bload, vload, rhoload, resload, &
-                       jac, bmat, nodalu, nodalg, nodalphi, nodalB,& 
-                       tot_neq, max_neq, min_neq, nodalphistore, nodalustore)
-
-
+call sort_gdofs_and_bc()
+print*,'Hello sir2!'
+call initialise_equation_arrays()
+print*,'Hello sir3!'
 ! Calculate any prestress 
 call calculate_prestress(strain_elmt, strain_nodal,       &
                          stress_elmt, stress_nodal,       & 
-                         extload, du, dprecon, storekmat, &
                          errcode, errtag, ksp_iter, istat)
    
+print*,'Hello sir4!'
 
 ! compute node valency and assemble all node_valency across processors
-call calculate_valency(node_valency, num)
+call calculate_valency()
 call assemble_ghosts_nodal_iscalar(node_valency,node_valency)
 
 ! Update log with KSP details
 call log_KSP_summary()
+print*,'Hello sir5!'
 
 ! Initialise RHS vectors + stiffness matrix/mass matrix 
-call initialise_RHS_vectors(load, bodyload, selfload, viscoload, &
-                            resload, du, u, kmat, storekmat,     &
-                            storemmat, rhoload, ubcload, nodalu, & 
-                            visco_q0, elas_e0, extload, iceload, & 
-                            nodalustore, nodalphistore)
+!call initialise_equation_arrays()
 
-
+print*,'Hello sir6!'
 ! Timestepping only needed for plastic/viscoelastic situations
 if(isplastic)then
   allocate(olddu(0:neq),evpt(nst,ngll,nelmt))
@@ -327,9 +306,6 @@ if(solver_type.eq.petsc_solver)then
   endif
 endif 
 
-
-
-
 ! WE - only for a slipping fault with lobe split?? 
 ! WARNING: TODO
 ! slip gdof for split PC
@@ -359,8 +335,6 @@ if(ISDISP_DOF)then
   deallocate(iseq)
 endif
 
-
-
 ! prepare background gravity data
 call prepare_gravity()
 
@@ -371,7 +345,6 @@ endif
 if(solver_diagscale)then
   allocate(ndscale(0:neq))
 endif
-
 
 ! WE commented out
 !if(trim(devel_example).eq.'axial_rod')then
@@ -418,7 +391,7 @@ endif
 
 ! Initialise Sea Level 
 if(is_SL)then 
-  call prepare_sea_level(nodalsl, nodalslrate, storekmatSL, kSL)
+  call prepare_sea_level(nodalsl, nodalslrate)
   call set_original_sea_level(nodalsl)
 
   ! Calc ocean func using initial SL and output if desired
@@ -451,10 +424,10 @@ endif
 if(savedata%oceanf)then
   call write_OF_to_ensight(i_step=istep0-1)
 endif 
-call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=istep0-1)
+call save_pot_variables(i_step=istep0-1)
 call save_displacement_variables(strain_elmt, strain_nodal, &
                                  stress_elmt, stress_nodal, & 
-                                 nodalustore, node_valency, i_step=istep0-1)
+                                 i_step=istep0-1)
 
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
@@ -464,8 +437,6 @@ if (myrank.eq.0)then
   write(*,*) '----------------------------------------------'
   write(*,*) '------------ Starting time loop! -------------'
 endif 
-
-
 
 loop_step: do i_step=istep0,nstep
 
@@ -480,12 +451,12 @@ loop_step: do i_step=istep0,nstep
 
   ! determine time (dt) or freq (df) step and current time/freq
   call calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
-  call reset_nodal_arrays_loads(nodalu,ubcload,rhoload,nodalphi,nodalslrate)
+  call reset_nodal_arrays_loads(nodalslrate)
 
 
   ! Update SL area if necessary 
   if(ISSL_DOF)then
-      call update_SL_area(nodalsl, nodalu, overwrite_old=.true., verbose=.true.)
+      call update_SL_area(nodalsl, overwrite_old=.true., verbose=.true.)
   endif
 
 
@@ -516,7 +487,7 @@ loop_step: do i_step=istep0,nstep
   !apply traction boundary conditions for first timestep
   !WE Reads and adds the traction to the extload variable
   if((istraction.or.isfstraction).and.i_step==1)then
-    call apply_traction(extload,errcode,errtag, nodalu, i_step)
+    call apply_traction(errcode,errtag,i_step)
     call control_error(errcode,errtag,stdout,myrank)
   endif
   ! Other types of forces: 
@@ -524,42 +495,40 @@ loop_step: do i_step=istep0,nstep
     if(i_step>600)extload=ZERO 
   endif
   if(ismtraction)then
-    call compute_magnetic_traction(errcode, errtag, extload)
+    call compute_magnetic_traction(errcode, errtag)
   endif 
   if(iseqsource.and.eqsource_type.eq.3)then
-    call compute_split_node_load(t, i_step, sfac, slipload, extload, &
-                                 storekmat, errcode, errtag)
+    call compute_split_node_load(t, i_step, sfac, &
+                                  errcode, errtag)
   endif 
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
-    call compute_cmt_load(extload, freq)
+    call compute_cmt_load(freq)
   ! electrical current prescribed at points
   if(isecurrent.and.i_step==1)then
-    call compute_electrical_load(errcode,errtag,extload)
+    call compute_electrical_load(errcode,errtag)
   endif
   endif 
 
   ! Calculate ice load: 
   if (is_ICE)then 
-    call calc_ice_load(iceload, nodalicerate, nodalu, i_step=i_step)
+    call calc_ice_load(nodalicerate, i_step=i_step)
   endif   
 
 
   ! Set the stiffness matrix
-  call set_elasto_visco_stiffness_matrix(i_step, dt, storekmat, storemmat, rhoload, isscale_ang_freq, & 
+  call set_elasto_visco_stiffness_matrix(i_step, dt, isscale_ang_freq, & 
   ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
-  eid_viscoelas, relaxtime, storekmatSL, kSL,istep0)  
+  eid_viscoelas, relaxtime, istep0)  
 
 
   ! Apply non-zero boundary conditions to the bcnodalv array 
   ! Note this is NOT applying the loading terms (e.g. extload)
-  call apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload,&
-                        nodalustore, nodalphi)
+  call apply_nonzero_bc()
 
 
   ! PREPARE BUILT IN SOLVER
   if(solver_type.eq.builtin_solver)then
-    call prep_inbuilt_solver(dprecon, egdof, storekmat, ndscale, &
-                            nzero_dprecon, nelmt_elas, eid_elas,&
+    call prep_inbuilt_solver(nzero_dprecon, nelmt_elas, eid_elas,&
                             nelmt_viscoelas, eid_viscoelas)
   endif
 
@@ -586,16 +555,12 @@ loop_step: do i_step=istep0,nstep
   du = ZERO
   u  = ZERO
 
-  call run_nonlinear_solver(u, du, olddu, storekmat, ndscale,           &
-                            dprecon, resload, isscale_ang_freq,         &
-                            ksp_iter, bodyload, load, scale_ang_freq2,  &
-                            nl_iter, ksp_tot, uerr, nl_isconv, nodalu,  &
-                            nodalphi, nodalslrate, bload, egdofu, dt_vp,& 
-                            nelmt_elas, num, eld, eload, bmat, deriv,   &
-                            eid_elas,strain_elmt, evpt, f, stress_elmt, &
-                            visco_q0, elas_e0, vload,nelmt_viscoelas,   &
-                            relaxtime, muratio, i_step, tratio,         &
-                            eid_viscoelas, dt, q0)
+  call run_nonlinear_solver(isscale_ang_freq,         &
+                            ksp_iter, scale_ang_freq2, nl_iter, ksp_tot, uerr, &
+                            nl_isconv, nodalslrate, dt_vp, &
+                            nelmt_elas, eid_elas,strain_elmt, evpt, &
+                            f, stress_elmt, nelmt_viscoelas, relaxtime, &
+                            muratio, i_step, tratio, eid_viscoelas, dt, q0)
 
 
   ! Now need to remove the sea level contribution to the kmat so we can reuse it 
@@ -605,8 +570,7 @@ loop_step: do i_step=istep0,nstep
       write(*,*)'* Removed SL contribution to KMAT'
     endif  
 
-    call run_convergence_loop(nodalustore, nodalu, nodalphistore, nodalphi,& 
-                              nodalsl, nodalslrate, nodalice, nodalicerate)
+    call run_convergence_loop(nodalsl, nodalslrate, nodalice, nodalicerate)
 
   endif ! IF_SL 
 
@@ -627,13 +591,13 @@ loop_step: do i_step=istep0,nstep
   if(ISDISP_DOF)then
     call save_displacement_variables(strain_elmt, strain_nodal, &
                                     stress_elmt, stress_nodal, & 
-                                    nodalustore, node_valency, i_step=i_step)
+                                    i_step=i_step)
   endif
 
 
   ! Save potential variables to Ensight
   if(ISPOT_DOF)then
-    call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=i_step)
+    call save_pot_variables(i_step=i_step)
   endif
 
   ! Save the ice and water to Ensight

@@ -65,7 +65,9 @@ implicit none
 integer,intent(in) :: ierr
 character(len=500),intent(in) :: errsrc
 if(ierr.ne.0)then
-    write(*,*)'ERROR: insufficient memory!'//trim(errsrc)
+    write(*,*)'ERROR: cannot allocate array/s!'
+    write(*,*)'Code: ',ierr
+    write(*,*)'Source: '//trim(errsrc)
     stop
 endif
 end subroutine check_allocate

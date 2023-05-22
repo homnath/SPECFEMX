@@ -340,7 +340,7 @@ end subroutine plot_fault_slip_vtk
 ! This routine read and applies the fault slip specified in the faultslip file
 ! REVISION
 !   HNG, Jul 12,2011; HNG, Apr 09,2010; HNG, Dec 08,2010
-subroutine compute_fault_slip_load(plus_or_minus,sfac,storekmat,load,          &
+subroutine compute_fault_slip_load(plus_or_minus,sfac,          &
                                      errcode,errtag)
 use global
 use math_constants
@@ -350,8 +350,6 @@ use element,only:hexface,hexface_edge!,hexface_sign
 implicit none
 integer,intent(in) :: plus_or_minus
 real(kind=kreal),intent(in) :: sfac
-real(kind=kreal),intent(in) :: storekmat(:,:,:)
-real(kind=kreal),intent(inout) :: load(0:neq)
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 

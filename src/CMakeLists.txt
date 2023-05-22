@@ -37,6 +37,7 @@ message(NOTICE " -->  Some comments added + allows cleanup function call.")
 # Source files for sem library
 SET(srcsem
   global.f90
+  local.f90
   output_to_user.F90
   package_version.f90
   string_library.f90
@@ -85,7 +86,6 @@ IF(ISPARALLEL)
      math_library_mpi.f90
      relaxation_time.f90
      ghost_library_mpi.f90
-     ghost.f90
      count_elements.f90
      prepare_sparse.f90
      parsolver.f90)

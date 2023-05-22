@@ -193,14 +193,10 @@ end subroutine
 !------------------------------
 !end subroutine calc_prestress
 
-
-
-subroutine calculate_valency(node_valency, num)
+subroutine calculate_valency()
   use global
+  use local
   implicit none 
-
-  ! IO variables 
-  integer,allocatable::num(:),node_valency(:)
 
   ! Local: 
   integer :: i_elmt, ielmt 

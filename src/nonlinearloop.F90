@@ -33,8 +33,7 @@ end subroutine write_cpu_timer
 
 
 !#######################################################################
-subroutine run_solver(resload, dprecon, ndscale, storekmat, du, &
-                      scale_ang_freq2, ksp_iter, errcode,  &
+subroutine run_solver(scale_ang_freq2, ksp_iter, errcode,  &
                       ksp_convreason, errtag, isscale_ang_freq)
     ! USES
     use global 
@@ -64,8 +63,6 @@ use solver_petsc
     implicit none
     
     ! IO 
-    real(kind=kreal),allocatable :: resload(:), ndscale(:),dprecon(:), &
-                                    storekmat(:,:,:), du(:)
     real(kind=kreal) :: scale_ang_freq2
     integer :: ksp_iter, errcode, ksp_convreason
     character(len=250) :: errtag 
@@ -112,8 +109,8 @@ use solver_petsc
 end subroutine run_solver
 !#######################################################################
 
-subroutine check_convergence(uerr, maxu, maxdu, u, & 
-                             olddu, resload, nl_isconv, i_nliter)
+subroutine check_convergence(uerr, maxu, maxdu,  & 
+                             nl_isconv, i_nliter)
 ! USES
 use global 
 use math_constants
@@ -127,7 +124,6 @@ use math_library_serial
 
   ! IO 
   real(kind=kreal) :: uerr,maxu,maxdu
-  real(kind=kreal),allocatable :: u(:),olddu(:), resload(:)
   logical :: nl_isconv ! is there nonlinear convergence bool 
   integer :: i_nliter
   ! Local: none
@@ -160,7 +156,7 @@ end subroutine check_convergence
 
 !#######################################################################
 
-subroutine update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
+subroutine update_nodal_u_vector(nodalslrate)
   ! USES
   use global
   use free_surface
@@ -169,7 +165,7 @@ subroutine update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
 
 
   ! IO 
-  real(kind=kreal),allocatable :: nodalu(:,:), u(:), nodalphi(:), nodalslrate(:)
+  real(kind=kreal),allocatable :: nodalslrate(:)
   ! local: 
   integer :: i_dof, i_node, idof, i, num(maxngll2d), i_elmt, i_gll 
 
@@ -228,16 +224,17 @@ end subroutine update_nodal_u_vector
 
 !#######################################################################
 
-subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
-                             m1, m2, m3, nelmt_elas, nl_isconv, num,   &
-                             eld, eload, bload, nodalu, erate,eid_elas,&
-                             cmat, estrain, bodyload, sigma, effsigma, &
-                             bmat, deriv, jacw, strain_elmt, evpt ,    &
+subroutine calc_stressstrain(nl_iter, devp, dt_vp, evp, flow,  &
+                             m1, m2, m3, nelmt_elas, nl_isconv,  &
+                             erate,eid_elas,&
+                             cmat, estrain, sigma, effsigma, &
+                             jacw, strain_elmt, evpt ,    &
                              stress_elmt, dq1, dq2, dq3, dsbar, f,     &
                              fmax,lode_theta,sigm)
 
   ! USES
   use global
+  use local
   use set_precision
   use plastic_library
   use math_constants
@@ -249,7 +246,7 @@ subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
   ! IO 
   logical :: nl_isconv
   integer :: nelmt_elas, nl_iter
-  integer,allocatable :: egdofu(:), eid_elas(:), num(:)
+  integer,allocatable :: eid_elas(:)
 
 
   real(kind=kreal) :: dq1, dq2, dq3, dsbar, f, fmax, lode_theta, sigm, &
@@ -258,9 +255,7 @@ subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
                       evp(nst), m1(nst,nst), m2(nst,nst), m3(nst,nst), & 
                       flow(nst,nst)
 
-  real(kind=kreal),allocatable :: eld(:),eload(:), bload(:), bmat(:,:),&
-                                  nodalu(:,:), bodyload(:), deriv(:,:),&
-                                  strain_elmt(:,:,:), &
+  real(kind=kreal),allocatable :: strain_elmt(:,:,:), &
                                   stress_elmt(:,:,:), evpt(:,:,:)
 
   ! Local 
@@ -338,22 +333,20 @@ subroutine calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
 
 
 end subroutine calc_stressstrain
-
-
-
-!#######################################################################
+!-------------------------------------------------------------------------------
 
 ! Calculate stress and strain for viscoelastic elements
-subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   & 
-                              elas_e0, e0, i_step, bmat,  deriv, eload,& 
-                              bload, K, G, strain_elmt, i_nliter,      &
+subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma,  & 
+                              e0, i_step,& 
+                              K, G, strain_elmt, i_nliter,      &
                               stress_elmt, estrain,dev_strain, jacw,   &
-                              trace_strain,esigma,vsigma, bodyload,    &
-                              vload, imatve, nelmt_viscoelas,relaxtime,&
-                              egdofu, eld, nodalu, muratio, tratio,    &
-                              eid_viscoelas,dt, num, q0)
+                              trace_strain,esigma,vsigma,    &
+                              imatve, nelmt_viscoelas,relaxtime,&
+                              muratio, tratio,    &
+                              eid_viscoelas,dt, q0)
   ! USES 
   use global
+  use local
   use math_constants
   use weakform,only:compute_bmat_stress
   use viscoelastic
@@ -365,16 +358,14 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
                       dev_strain(nst), esigma(nst), vsigma(nst),       &  
                       e0(nst), vesigma(nst)
 
-  real(kind=kreal),allocatable :: bmat(:,:),deriv(:,:), bodyload(:),   &
-                                  visco_q0(:,:,:,:), q0(:,:),          &
-                                  elas_e0(:,:,:), relaxtime(:,:),      &
-                                  muratio(:), tratio(:), eld(:),       &
-                                  nodalu(:,:), eload(:), bload(:),     &
-                                  strain_elmt(:,:,:), vload(:),        &
+  real(kind=kreal),allocatable :: q0(:,:),          &
+                                  relaxtime(:,:),      &
+                                  muratio(:), tratio(:),      &
+                                  strain_elmt(:,:,:),        &
                                   stress_elmt(:,:,:)
 
   integer :: i_step, i_nliter, imatve, nelmt_viscoelas, nl_iter
-  integer,allocatable :: eid_viscoelas(:), num(:), egdofu(:)
+  integer,allocatable :: eid_viscoelas(:)
 
   logical :: nl_isconv
 
@@ -392,7 +383,7 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
     num=g_num(:,ielmt)
     egdofu=gdof_elmt(edofu,ielmt)
     eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
-    bload=ZERO; vload=ZERO
+    bload=ZERO;! vload=ZERO
     do i_gll=1,ngll ! integration loop
       K=bulkmod_elmt(i_gll,ielmt) 
       G=shearmod_elmt(i_gll,ielmt)
@@ -464,13 +455,14 @@ end subroutine visco_stressstrain
 
 
 
-subroutine run_nonlinear_solver(u, du, olddu, storekmat, ndscale, dprecon, resload, isscale_ang_freq,&
-                                ksp_iter, bodyload, load, scale_ang_freq2, nl_iter, ksp_tot, uerr,&
-                                nl_isconv, nodalu, nodalphi, nodalslrate, bload, egdofu, dt_vp, & 
-                                nelmt_elas, num, eld, eload, bmat, deriv, eid_elas,strain_elmt, evpt,&
-                                f, stress_elmt, visco_q0, elas_e0, vload,nelmt_viscoelas, relaxtime, &
+subroutine run_nonlinear_solver(isscale_ang_freq,&
+                                ksp_iter,scale_ang_freq2, nl_iter, ksp_tot, uerr,&
+                                nl_isconv, nodalslrate, dt_vp, & 
+                                nelmt_elas, eid_elas,strain_elmt, evpt,&
+                                f, stress_elmt, nelmt_viscoelas, relaxtime, &
                                 muratio, i_step, tratio, eid_viscoelas, dt, q0)
-use global 
+use global
+use local
 #if (USE_MPI)
 use mpi_library
 use ghost_library_mpi
@@ -487,14 +479,10 @@ implicit none
 
 ! IO variables: 
 real(kind=kreal),allocatable :: nodalslrate(:), relaxtime(:,:),muratio(:), tratio(:), q0(:,:)
-real(kind=kreal),allocatable :: du(:),u(:),olddu(:),nodalu(:,:),nodalphi(:)
-real(kind=kreal),allocatable :: storekmat(:,:,:), bmat(:,:), deriv(:,:),strain_elmt(:,:,:), evpt(:,:,:), stress_elmt(:,:,:)
-real(kind=kreal),allocatable :: dprecon(:),ndscale(:), eld(:)
-real(kind=kreal),allocatable :: resload(:), bodyload(:), load(:),bload(:), eload(:), vload(:), visco_q0(:,:,:,:), elas_e0(:,:,:)
+real(kind=kreal),allocatable :: strain_elmt(:,:,:), evpt(:,:,:), stress_elmt(:,:,:)
 real(kind=kreal) :: uerr
 integer,allocatable :: eid_viscoelas(:)
-integer,allocatable::num(:)
-integer,allocatable :: egdofu(:),eid_elas(:)
+integer,allocatable :: eid_elas(:)
 
 logical :: isscale_ang_freq,nl_isconv
 integer :: ksp_iter, nl_iter,ksp_tot, nelmt_elas, i_step, nelmt_viscoelas
@@ -549,8 +537,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
   ! For our purpose all this does is sets the RHS vector to be resload 
   ! And then calls the 'run' command from petsc
   ! This is one single NL iteration
-  call run_solver(resload, dprecon, ndscale, storekmat, du, &
-                  scale_ang_freq2, ksp_iter, errcode, ksp_convreason,&
+  call run_solver(scale_ang_freq2, ksp_iter, errcode, ksp_convreason,&
                   errtag, isscale_ang_freq)
 
   ! Log the time taken 
@@ -578,14 +565,13 @@ nonlinear: do i_nliter=1,NL_MAXITER
   maxu=maxscal(maxval(abs(u)))
 
   ! check convergence
-  call check_convergence(uerr, maxu, maxdu, u, olddu,& 
-                         resload, nl_isconv, i_nliter)
+  call check_convergence(uerr, maxu, maxdu, nl_isconv, i_nliter)
 
   ! Update nodal vectors following inversion step 
   call sync_process()
 
   ! Copy values from u --> nodalu, nodalphi etc... 
-  call update_nodal_u_vector(u, nodalu, nodalphi, nodalslrate)
+  call update_nodal_u_vector(nodalslrate)
 
   ! Reset bodyload to ZERO for Viscoelastic iteration.
   ! We need to reconcile platic and viscoelastic iterations.
@@ -604,11 +590,11 @@ nonlinear: do i_nliter=1,NL_MAXITER
     ! We should change this for efficiency.
     if(isplastic)bload=ZERO
     ! Calculate elastic/plastic stress & strain  
-    call calc_stressstrain(egdofu, nl_iter, devp, dt_vp, evp, flow,  &
-                          m1, m2, m3, nelmt_elas, nl_isconv, num,   &
-                          eld, eload, bload, nodalu, erate,eid_elas,&
-                          cmat, estrain, bodyload, sigma, effsigma, &
-                          bmat, deriv, jacw, strain_elmt, evpt ,    &
+    call calc_stressstrain(nl_iter, devp, dt_vp, evp, flow,  &
+                          m1, m2, m3, nelmt_elas, nl_isconv,  &
+                          erate,eid_elas,&
+                          cmat, estrain, sigma, effsigma, &
+                          jacw, strain_elmt, evpt ,    &
                           stress_elmt, dq1, dq2, dq3, dsbar, f,     &
                           fmax,lode_theta,sigm)
     bodyload(0)=ZERO
@@ -622,14 +608,14 @@ nonlinear: do i_nliter=1,NL_MAXITER
 
 
     ! Calculate stress and strain for viscoelastic elements
-    call visco_stressstrain(nl_iter, nl_isconv, vesigma, visco_q0,   &
-                            elas_e0, e0, i_step, bmat, deriv, eload, &
-                            bload, K, G, strain_elmt, i_nliter,      & 
+    call visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
+                            e0, i_step, &
+                            K, G, strain_elmt, i_nliter,      & 
                             stress_elmt, estrain, dev_strain, jacw,  &
-                            trace_strain, esigma, vsigma, bodyload,  &
-                            vload, imatve, nelmt_viscoelas,relaxtime,& 
-                            egdofu, eld, nodalu, muratio, tratio,    &
-                            eid_viscoelas, dt, num, q0)
+                            trace_strain, esigma, vsigma, &
+                            imatve, nelmt_viscoelas,relaxtime,& 
+                            muratio, tratio,    &
+                            eid_viscoelas, dt, q0)
     bodyload(0)=ZERO
     !viscoload(0)=ZERO
   endif !(ISDISP_DOF) 
@@ -663,4 +649,6 @@ return
 
 end subroutine run_nonlinear_solver
 
+
 end module nonlinearloop
+!===============================================================================

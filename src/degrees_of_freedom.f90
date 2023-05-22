@@ -14,7 +14,6 @@ character(len=500),private :: errsrc
 contains
 !-------------------------------------------------------------------------------
 
-
 ! This subroutine sets number of degrees of freedom and IDs of nodal dof  
 subroutine initialize_dof()
 use global
@@ -24,8 +23,6 @@ character(len=80) :: data_path
 character(len=80) :: fname
 integer :: errcode
 character(len=250) :: errtag
-
-
 
 ! total number of degrees of freedom per node
 nndof    = 0
@@ -74,8 +71,6 @@ if(ISPOT_DOF)then
   allocate(edofphi(nedofphi))
 endif
 
-
-
 if(ISSL_DOF)then 
   nndof = nndof + 1 
 
@@ -91,8 +86,6 @@ if(ISSL_DOF)then
   ! For things like kmat 
   nedof = nedof + nenode  
 endif 
-
-
 
 end subroutine initialize_dof
 !===============================================================================
@@ -329,7 +322,6 @@ if (ISSL_DOF)then
     enddo
   enddo
 
-
   write(logunit,*)'    Number of eq. for U, Phi: ', neq
 
   ! Now index the SL ones 
@@ -340,7 +332,6 @@ if (ISSL_DOF)then
         neqsl = neqsl + 1 
       endif
   enddo
-
 
   write(logunit,*)'    Number of eq. for SL    : ', neqsl
   write(logunit,*)'    Total number of eqns    : ', neq
@@ -357,9 +348,6 @@ else
   enddo
 
 endif 
-
-
-
 
 ofname='tmp/'//trim(file_head)//'_gdof'//trim(adjustl(proc_str))
 open(unit=22,file=trim(ofname),access='stream',form='unformatted', &

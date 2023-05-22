@@ -2,7 +2,7 @@ module save_variables
 contains 
 
 
-subroutine save_pot_variables(nodalphi,nodalg, nodalB, node_valency, i_step)
+subroutine save_pot_variables(i_step)
 ! USES
 use global 
 use postprocess
@@ -17,8 +17,6 @@ use serial_library
 #endif 
 
     ! IO variables: 
-    real(kind=kreal),allocatable :: nodalphi(:),nodalg(:,:), nodalB(:,:)
-    integer, allocatable :: node_valency(:)
     integer :: i_step
 
     ! Local variables: 
@@ -132,14 +130,11 @@ use serial_library
     endif
 
 end subroutine save_pot_variables
-
-
-
-
+!===============================================================================
 
 subroutine save_displacement_variables(strain_elmt, strain_nodal, &
                                        stress_elmt, stress_nodal, & 
-                                       nodalu, node_valency, i_step )
+                                       i_step )
 
     ! USES
 use global 
@@ -156,8 +151,6 @@ use serial_library
 
   ! IO variables
   ! Local variables  
-  real(kind=kreal),allocatable :: nodalu(:,:)
-  integer, allocatable :: node_valency(:)
   integer :: i_step, i_comp
   real(kind=kreal),allocatable :: strain_elmt(:,:,:),strain_nodal(:,:),      &
                                   stress_elmt(:,:,:),stress_nodal(:,:)
@@ -249,9 +242,7 @@ use serial_library
   endif
 
 end subroutine save_displacement_variables
-
-
-
-
+!===============================================================================
 
 end module save_variables
+!===============================================================================

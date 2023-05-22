@@ -12,14 +12,13 @@ contains
 ! prescribed displacement field is done during stiffnesss computation.
 ! REVISION
 !   HNG, Jul 12,2011; ; HNG, Apr 09,2010; WE 2022 Jun 18
-subroutine apply_bc(bcnodalv,errcode,errtag)
+subroutine apply_bc(errcode,errtag)
 use global
 use math_constants, only:zero
 use element,only:hexface
 use free_surface,only:nnode_fs,gnode_fs
 use dimensionless,only:NONDIM_L
 implicit none
-real(kind=kreal),dimension(nndof,nnode),intent(inout) :: bcnodalv
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 
@@ -326,17 +325,15 @@ errcode=0
 return
 end subroutine apply_bc
 !===============================================================================
+
 !WE - applies non-zero boundary conditions originally in specfem3d.f90
-subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload, nodalu, nodalphi)
-  use global 
+subroutine apply_nonzero_bc()
+  use global
+  use local
   use set_precision
   use math_constants
   implicit none 
 
-  ! IO 
-  integer,allocatable :: num(:),  egdof(:)
-  real(kind=kreal), allocatable :: kmat(:,:),storekmat(:,:,:), & 
-                                   bcnodalv(:,:), ubcload(:), nodalu(:,:), nodalphi(:)
   ! Local 
   integer :: i_elmt, i,  ielmt, iedof, j_node, i_dof, j_dof, idof
 
@@ -390,11 +387,6 @@ subroutine apply_nonzero_bc(num, egdof, kmat, storekmat, bcnodalv, ubcload, noda
 
 
 end subroutine apply_nonzero_bc
-
-
-
-
-
 !===============================================================================
 
 end module bc

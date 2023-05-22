@@ -767,7 +767,7 @@ subroutine calculate_ice_change_volume(nodalicerate)
 end subroutine calculate_ice_change_volume
 
 
-subroutine calc_ice_load(iceload, nodalicerate,nodalu, i_step)
+subroutine calc_ice_load(nodalicerate,i_step)
 ! Uses 
 use global 
 use postprocess
@@ -786,8 +786,7 @@ use serial_library
 #endif
 
     ! IO vars
-    real(kind=kreal),intent(inout) :: iceload(:)
-    real(kind=kreal)               :: nodalicerate(:), nodalu(:,:)
+    real(kind=kreal)               :: nodalicerate(:)
     integer :: i_step
     ! Local vars
     integer                        :: i_elmtfs,nodeid,dof, gid_elmt, num4(4), num_FS(maxngll2d), gid_abg, gid_xyg, iface, nfgll, abg,xyg, j,k, i_gll, i
@@ -959,7 +958,7 @@ use serial_library
         nodal_iceload_phi =   -nodal_iceload_phi * rho_ice * DIM_ICELOAD
         nodal_iceload_sl  =   -nodal_iceload_sl  * rho_ice * DIM_ICELOAD
 
-        call write_iceload_to_ensight(nodalu, i_step=i_step-1)
+        call write_iceload_to_ensight(i_step=i_step-1)
 
         if(i_step.eq.nstep)then 
             ! Need to save at last timestep for ensight files to be 
@@ -968,7 +967,7 @@ use serial_library
             nodal_iceload_u   = zero 
             nodal_iceload_phi = zero
             nodal_iceload_sl  = zero
-            call write_iceload_to_ensight(nodalu, i_step=i_step)
+            call write_iceload_to_ensight(i_step=i_step)
         endif
     endif
 
@@ -982,12 +981,11 @@ end subroutine calc_ice_load
 
 
 
-subroutine write_iceload_to_ensight(nodalu, i_step)
+subroutine write_iceload_to_ensight(i_step)
     use global
     use postprocess
     use free_surface
     use set_precision
-    real(kind=kreal) :: nodalu(:,:)
     integer :: i_step
 
     ! Sea level iceload

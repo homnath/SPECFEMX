@@ -191,6 +191,10 @@ logical :: ismpi !.true. : MPI, .false. : serial
 integer :: myrank,nproc !myrank is indexed from 0
 integer :: ngdof !Number of nodal degrees of freedom per processor = nndof*nnode
 integer :: neq !number of equations per processor = ngdof - degrees of freedom
+integer :: tot_neq,max_neq,min_neq
+
+real(kind=kreal),allocatable :: dprecon(:),ndscale(:)
+
 ! lost due to constraints
 integer,allocatable :: l2gdof(:)!map from local dof (in processor) to global dof
 ! (in entire system). l2gdof contains the global (system-wide) indices for the 
@@ -218,12 +222,29 @@ integer,allocatable :: gdof_elmt(:,:)
 !gdof_elmt: matrix of elemental degrees of freedom (per processor), e.g.,
 !gdof_elmt(:,1) gives all dof in 1st element in the processsor.
 
+! node_valency: number of elements that share each node.
+integer,allocatable :: node_valency(:)
 ! number of elemental degrees of freedoms for displacement
 integer :: nedofu
-! number of elemental degrees of freedoms for gravity
+! number of elemental degrees of freedoms for potential (gravity, magnetic,
+! electrical, etc.)
 integer :: nedofphi
 
+real(kind=kreal), allocatable :: bcnodalv(:,:)
+real(kind=kreal),allocatable :: nodalu(:,:),nodalphi(:),nodalg(:,:),           &
+nodalB(:,:),nodalphistore(:),nodalustore(:,:)
 
+!storekmat: stiffness matrix for all elements
+real(kind=kreal),allocatable :: storekmat(:,:,:), storekmatSL(:,:,:)
+! Sea level variables: 
+real(kind=kreal), allocatable :: kSL(:,:)!  SL contribution to kmat
+!storemmat: mass matrix for all elements
+real(kind=kreal),allocatable :: storemmat(:,:)
+real(kind=kreal),allocatable :: slipload(:), extload(:), bodyload(:),  &
+                                selfload(:), viscoload(:),ubcload(:),  &
+                                load(:),resload(:),du(:),u(:),olddu(:),&
+                                rhoload(:),iceload(:),                 & 
+                                visco_q0(:,:,:,:), elas_e0(:,:,:)
 
 ! acceleration due to gravity
 ! https://physics.nist.gov/cgi-bin/cuu/Value?gn

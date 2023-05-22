@@ -139,7 +139,7 @@ module matrix_vector
     ! This subrotine computes the stiffness matrix, and
     ! body loads contributed by mass density or magnetiztion.
     ! TODO: optional precoditioner,optional assembly of stiffness
-    subroutine compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+    subroutine compute_stiffness_elastic(errcode,errtag)
     use set_precision
     use global
     use element 
@@ -156,8 +156,6 @@ module matrix_vector
 
     !use ieee_arithmetic
     implicit none
-    real(kind=kreal),intent(out) :: storekmat(:,:,:)
-    real(kind=kreal),intent(out) :: rhoload(0:)
     integer,intent(out) :: errcode
     character(len=250),intent(out) :: errtag
     real(kind=kreal),parameter :: FOUR_PI_G=FOUR*PI*GRAV_CONS
@@ -210,8 +208,6 @@ module matrix_vector
 
     integer :: emp, filled 
     
-    ! Sea level variables: 
-    real(kind=kreal), allocatable :: kSL(:,:)!  SL contribution to kmat
     integer :: i_elmtfs, ios
 
 
@@ -420,7 +416,7 @@ module matrix_vector
     
     ! This subroutine computes the free surafce contribution
     ! on the stiffness matrix.
-    subroutine compute_surface_stiffness(storekmat,errcode,errtag)
+    subroutine compute_surface_stiffness(errcode,errtag)
     use global
     use math_constants
     use element,only:hexface,hexface_sign
@@ -430,7 +426,6 @@ module matrix_vector
     use dof,only:set_face_vecdof,set_face_scaldof
     use weakform,only:compute_rmat_sn
     implicit none
-    real(kind=kreal),intent(inout) :: storekmat(:,:,:)
     integer,intent(out) :: errcode
     character(len=250),intent(out) :: errtag
     
@@ -1922,12 +1917,11 @@ end subroutine calc_SL_stiffness
   
 
   
-  subroutine check_KSL(ksl, contains_empty, start_index)
+  subroutine check_KSL(contains_empty, start_index)
     ! Checks that the local SL stiffness matrix for an element does not have any empty rows 
     use set_precision
     use global 
     ! IO variables: 
-    real(kind=kreal) :: ksl(:,:)
     real(kind=kreal) :: row(nedof)
     logical :: contains_empty
     integer :: start_index

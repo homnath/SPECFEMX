@@ -752,18 +752,15 @@ PetscCallA(KSPSetOperators(ksp,Amat,Amat,ierr)) !version >= 3.5.0
 end subroutine petsc_set_ksp_operator
 !===============================================================================
 
-subroutine petsc_set_stiffness_matrix(storekmat)
+subroutine petsc_set_stiffness_matrix()
   ! WHERE WE ACTUALLY SET THE STIFFNESS MATRIX
 use global
 use math_library_mpi,only:sumscal
 use ieee_arithmetic
 implicit none
 
-real(kind=kreal),intent(in) :: storekmat(:,:,:)                                  
 integer :: i,i_elmt,ielmt,j,n,ndzero ,igll, ictr ,r  , iloop                                         
-integer :: ggdof_elmt(NNDOF, ngll)                                                     
-
-integer :: finaldof(NEDOF), nuphi_dof, theta_dof
+integer :: ggdof_elmt(NEDOF)                                                     
 
 PetscInt irow,jcol                                                               
 Vec   vdiag                                                                      
@@ -786,23 +783,16 @@ do i_elmt=1, nelmt
 
   ! Get global DOF indices for this element
   ielmt=i_elmt                                                                   
-  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))    
+  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))    
 
-  ! Reorders the u and phi DOFs into a 1D array
-  nuphi_dof = nndofu+nndofphi
-  finaldof = 0 
-  finaldof(1:(nuphi_dof)*ngll) = reshape(ggdof_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
-
-  ! Add the sea level DOFs
-  finaldof((nuphi_dof)*ngll + 1:(nndof)*ngll) = ggdof_elmt(nndof, :)
   ! petsc index starts from 0   
-  finaldof=finaldof-1 
+  ggdof_elmt=ggdof_elmt-1 
 
   do i=1,NEDOF                                                                   
     do j=1,NEDOF                                                                 
     irow=i; jcol=j 
 
-    if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                      
+    if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
       if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
@@ -811,7 +801,7 @@ do i_elmt=1, nelmt
         flush(logunit)
         stop                                                                     
       endif                                                                     
-      PetscCallA(MatSetValues(Amat,1,finaldof(irow),1,finaldof(jcol),storekmat(i,j,ielmt),ADD_VALUES,ierr))
+      PetscCallA(MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),storekmat(i,j,ielmt),ADD_VALUES,ierr))
     endif                                                                        
     enddo                                                                        
   enddo   
@@ -858,13 +848,11 @@ PetscCallA(VecDestroy(vdiag,ierr))
 end subroutine petsc_set_stiffness_matrix
 !===============================================================================
 
-subroutine petsc_set_stiffness_matrix_freq(storekmat,storemmat,freq,           &
-scale_freq2,isscale_freq2)
+subroutine petsc_set_stiffness_matrix_freq(freq,scale_freq2,isscale_freq2)
 use math_library_mpi,only:sumscal
 use ieee_arithmetic
 implicit none
 
-real(kind=kreal),intent(in) :: storekmat(:,:,:),storemmat(:,:)
 integer :: i,i_elmt,ielmt,i_gll,i1,i2,j,n,ndzero                                             
 integer :: ggdof_elmt(NEDOF)                                   
 
@@ -1011,7 +999,7 @@ subroutine petsc_print_matrix()
 end subroutine petsc_print_matrix
 !===============================================================================
 
-subroutine set_petsc_stiffness(isscale_ang_freq, storekmat, storemmat, &
+subroutine set_petsc_stiffness(isscale_ang_freq, &
    ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)
 
 ! USES 
@@ -1021,7 +1009,6 @@ use output_to_user
 
   implicit none 
 
-  real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:)
   real(kind=kreal) :: ang_freq, scale_ang_freq2
 
   logical reuse_pc_bool, freq_bool, isscale_ang_freq
@@ -1034,8 +1021,7 @@ use output_to_user
           stop
         endif 
 
-        call petsc_set_stiffness_matrix_freq(storekmat,storemmat,        &
-                                             ang_freq, scale_ang_freq2,  & 
+        call petsc_set_stiffness_matrix_freq(ang_freq, scale_ang_freq2,  & 
                                              isscale_ang_freq)
         log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;  
         call write_ifproc0(logunit)
@@ -1057,7 +1043,7 @@ use output_to_user
         endif 
 
 
-        call petsc_set_stiffness_matrix(storekmat)
+        call petsc_set_stiffness_matrix()
 
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
         call petsc_set_solver()

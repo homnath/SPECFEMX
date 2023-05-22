@@ -29,7 +29,6 @@ module time_loop
             write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' t: ',t
             flush(logunit)
             endif
-
         
         elseif(steptype.eq.FREQSTEP)then
             ! Frequency step.
@@ -48,16 +47,11 @@ module time_loop
         endif
         
     end subroutine calc_time_step
-
  
 
-subroutine reset_nodal_arrays_loads(nodalu,ubcload,rhoload,nodalphi,nodalslrate)
+subroutine reset_nodal_arrays_loads(nodalslrate)
     use global
     use math_constants
-    real(kind=kreal),allocatable :: nodalu(:,:)
-    real(kind=kreal),allocatable :: ubcload(:)
-    real(kind=kreal),allocatable :: rhoload(:)
-    real(kind=kreal),allocatable :: nodalphi(:)
     real(kind=kreal),allocatable :: nodalslrate(:)
 
     nodalu  = ZERO
@@ -76,9 +70,9 @@ end subroutine reset_nodal_arrays_loads
 
 
 
-subroutine set_elasto_visco_stiffness_matrix(i_step, dt, storekmat, storemmat, rhoload, isscale_ang_freq, & 
+subroutine set_elasto_visco_stiffness_matrix(i_step, dt, isscale_ang_freq, & 
                                                 ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
-                                                eid_viscoelas, relaxtime, storekmatSL, kSL, istep0)
+                                                eid_viscoelas, relaxtime, istep0)
 use global 
 use matrix_vector
 #if (USE_MPI)
@@ -97,7 +91,6 @@ use solver_petsc
         
 ! IO variables: 
 integer :: i_step ,i , istep0
-real(kind=kreal), allocatable :: storekmat(:,:,:), storemmat(:,:),  rhoload(:), storekmatSL(:,:,:), kSL(:,:)
 logical            :: isscale_ang_freq
 real(kind=kreal)   :: ang_freq, scale_ang_freq2, dt
 real(kind=kreal), allocatable :: relaxtime(:,:) 
@@ -114,12 +107,12 @@ if(steptype.eq.FREQSTEP)then
     ! FREQUENCY STIFFNESS MATRIX 
 
     if(i_step==0)then
-        call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+        call compute_stiffness_elastic(errcode,errtag)
     endif
         
     ! Set Petsc stiffness matrix
     if(solver_type.eq.petsc_solver)then
-        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+        call set_petsc_stiffness(isscale_ang_freq, &  
         ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.true.)  
     endif
 
@@ -131,7 +124,7 @@ else ! TIMESTEPPING
             if(myrank.eq.0.and.verbose_bool)then
                 write(*,*)'Calculating elastic stiffness matrix...'
             endif
-            call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
+            call compute_stiffness_elastic(errcode,errtag)
             if(myrank.eq.0.and.verbose_bool)then
                 write(*,*)' ✓ Done'
                 write(*,*)
@@ -164,7 +157,7 @@ else ! TIMESTEPPING
         endif
 
         if(solver_type.eq.petsc_solver)then
-            call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+            call set_petsc_stiffness(isscale_ang_freq, &  
             ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
         endif
 
@@ -231,7 +224,7 @@ end subroutine set_elasto_visco_stiffness_matrix
 
 
 
-subroutine run_convergence_loop(nodalustore, nodalu, nodalphistore, nodalphi, nodalsl, nodalslrate, nodalice, nodalicerate)
+subroutine run_convergence_loop(nodalsl, nodalslrate, nodalice, nodalicerate)
     use global 
     use set_precision
 #if (USE_MPI)
@@ -242,7 +235,7 @@ use math_library_serial
 #endif
 
     ! IO variables: 
-    real(kind=kreal), allocatable :: nodalustore(:,:), nodalu(:,:), nodalphistore(:), nodalphi(:), nodalsl(:)
+    real(kind=kreal), allocatable :: nodalsl(:)
     real(kind=kreal), allocatable :: nodalslrate(:), nodalice(:), nodalicerate(:)
 
     ! Local variables: 
@@ -272,9 +265,9 @@ use math_library_serial
 
       ! Note that for first timestep we need to update the area of the ocean
       if(i_cloop.eq.1)then
-        call update_SL_area(nodalsl, nodalu, overwrite_old=.true., verbose=.false.)
+        call update_SL_area(nodalsl, overwrite_old=.true., verbose=.false.)
       else 
-        call update_SL_area(nodalsl, nodalu, overwrite_old=.false., verbose=.false.)
+        call update_SL_area(nodalsl, overwrite_old=.false., verbose=.false.)
       endif 
 
       ! Update the mass imbalance

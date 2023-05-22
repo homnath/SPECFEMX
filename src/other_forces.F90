@@ -10,7 +10,7 @@ contains
 
 
 
-subroutine compute_cmt_load(extload, freq)
+subroutine compute_cmt_load(freq)
 
 use global
 use output_to_user
@@ -28,7 +28,6 @@ use cmtsolution,only:source_tshift,source_hdur
     
 implicit none 
 
-real(kind=kreal),allocatable :: extload(:)
 real(kind=kreal)             :: freq
 integer                      :: errcode
 character(len=250)           :: errtag
@@ -36,7 +35,7 @@ character(len=250)           :: errtag
 log_msg = trim(' Earthquake source type: moment-density tensor')
 call write_ifproc0(logunit)
 
-call earthquake_load(neq,extload,errcode,errtag)
+call earthquake_load(neq,errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
 
@@ -47,7 +46,7 @@ endif
 end subroutine compute_cmt_load
 !===============================================================================    
 
-subroutine compute_magnetic_traction(errcode, errtag, extload)
+subroutine compute_magnetic_traction(errcode, errtag)
 
 use global
 use output_to_user
@@ -56,11 +55,10 @@ use mtraction
 
 integer :: errcode
 character(len=250) :: errtag
-real(kind=kreal),allocatable ::extload(:)
 
 ! apply magnetic traction
 log_msg = trim('applying magnetic traction...') ;   call write_ifproc0(logunit)
-call apply_mtraction(extload,errcode,errtag)
+call apply_mtraction(errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
 if(myrank==0)then
@@ -71,7 +69,7 @@ endif
 end subroutine compute_magnetic_traction
 !===============================================================================    
 
-subroutine compute_electrical_load(errcode, errtag, extload)
+subroutine compute_electrical_load(errcode, errtag)
 
 use global
 use output_to_user
@@ -80,17 +78,16 @@ use electrical
 
 integer :: errcode
 character(len=250) :: errtag
-real(kind=kreal),allocatable ::extload(:)
 
 log_msg = trim('computing electrical load...') ;   call write_ifproc0(logunit)
-call electrical_load(extload,errcode,errtag)
+call electrical_load(errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
 
 end subroutine compute_electrical_load
 !===============================================================================    
 
-subroutine compute_split_node_load(t, i_step, sfac, slipload, extload, storekmat, errcode, errtag)
+subroutine compute_split_node_load(t, i_step, sfac, errcode, errtag)
     ! uses 
     use global ! itaper_slip, divide_slip, iseqsource, eqsource_type, srate
     use fault 
@@ -104,8 +101,6 @@ subroutine compute_split_node_load(t, i_step, sfac, slipload, extload, storekmat
     real(kind=kreal)              :: t
     integer                       :: i_step 
     real(kind=kreal)              :: sfac
-    real(kind=kreal), allocatable :: slipload(:),extload(:)
-    real(kind=kreal), allocatable :: storekmat(:,:,:)
     character(len=250) :: errtag ! error message
     integer :: errcode
 
@@ -122,13 +117,13 @@ subroutine compute_split_node_load(t, i_step, sfac, slipload, extload, storekmat
         if(divide_slip)then
           sfac=HALF
           ! Plus side
-          call compute_fault_slip_load(-1,sfac,storekmat,slipload,errcode,errtag)
+          call compute_fault_slip_load(-1,sfac,errcode,errtag)
           ! Minus side
-          call compute_fault_slip_load(1,sfac,storekmat,slipload,errcode,errtag)
+          call compute_fault_slip_load(1,sfac,errcode,errtag)
         else
           sfac=ONE
           ! Plus side
-          call compute_fault_slip_load(1,sfac,storekmat,slipload,errcode,errtag)
+          call compute_fault_slip_load(1,sfac,errcode,errtag)
         endif
         ! The "sync" here is very important because some processors arrive this 
         ! stage faster than other. This may hang going to control_error routine!

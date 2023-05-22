@@ -228,10 +228,6 @@ errcode=0
 end subroutine write_model_cell
 !===============================================================================
 
-
-
-
-
 subroutine set_model_properties(errcode,errtag)
 use math_constants,only:INFTOL,FOUR_THIRD,HALF,ONE,TWO,ZERO
 use global
@@ -304,17 +300,12 @@ do i_blk=1,nmatblk
   block_nelmt(i_blk)=count(mat_id==i_blk)
 enddo
 
-
-
-
 allocate(block(nmatblk))
 do i_blk=1,nmatblk
     allocate(block(i_blk)%elmt(block_nelmt(i_blk)))
 enddo
 
-
 allocate(ielmts(nmatblk))
-
 
 ielmts=0
 do i_elmt=1,nelmt
@@ -323,9 +314,6 @@ do i_elmt=1,nelmt
   block(iblk)%elmt(ielmts(iblk))=i_elmt
 
 enddo
-
-
-
 
 ! Convert block model to point model
 matblock: do i_blk=1,nmatblk
@@ -528,9 +516,6 @@ write(logunit, *)'Completed set_model_properties...'
 errcode=0
 end subroutine set_model_properties
 !===============================================================================
-
-
-
 
 subroutine convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
   bulkmod_node, shearmod_node, rho_node, errcode, errtag)

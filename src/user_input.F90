@@ -1,6 +1,7 @@
 module user_input 
 
 contains
+!_______________________________________________________________________________
 
 subroutine process_user_input(cmd, tdate, ttime, tzone, ios, path, &
                               ext, format_str, errcode, errtag, &
@@ -32,7 +33,6 @@ character(len=10) :: ttime ! time
 character(len=5) :: tzone ! time zone
 real(kind=kreal) :: cpu_tstart
 ! Local variables 
-
 
 ! Code 
 
@@ -84,7 +84,6 @@ if(myrank==0)then
   log_file = trim(file_head)//'.log'
   open(unit=logunit,file=trim(log_file),status='replace',action='write',iostat=ios)
   if(ios.ne.0)then
-    print*,ios,trim(log_file)
     write(errtag,'(a)')'ERROR: cannot open log file: '//trim(log_file)
     call control_error(errcode,errtag,stdout,myrank)
   endif
@@ -111,7 +110,6 @@ else
   ptail_inp=''
 endif
 
-
 proc_str=''
 if(ismpi.and.nproc.gt.1)then
   write(format_str,*)ceiling(log10(real(nproc)+1.))
@@ -119,12 +117,10 @@ if(ismpi.and.nproc.gt.1)then
   write(proc_str,fmt=format_str)myrank
 endif
 
-
 ! read input data
 call read_input(inp_fname,errcode,errtag)
 call sync_process()
 call control_error(errcode,errtag,stdout,myrank)
-
 
 ! check method
 if (trim(method)/='sem')then
@@ -135,4 +131,7 @@ else
 endif
 
 end subroutine process_user_input
+!-------------------------------------------------------------------------------
+
 end module user_input
+!===============================================================================

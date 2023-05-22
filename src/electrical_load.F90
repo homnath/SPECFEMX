@@ -14,7 +14,7 @@ contains
 ! TODO
 !  - read and implement CMTSOLUTION
 !  - check for the sources shared among elements/processors
-subroutine electrical_load(load,errcode,errtag)
+subroutine electrical_load(errcode,errtag)
 use dimensionless
 use global
 use element,only:hex8_gnode
@@ -34,7 +34,6 @@ use serial_library
 use math_library_serial
 #endif
 implicit none
-real(kind=kreal),intent(inout) :: load(0:neq)
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 

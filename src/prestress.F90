@@ -8,7 +8,6 @@ contains
 
 subroutine calculate_prestress(strain_elmt, strain_nodal, &
                                 stress_elmt, stress_nodal, & 
-                                extload, du, dprecon, storekmat, &
                                 errcode, errtag, ksp_iter, istat)
 ! USES 
 use global
@@ -43,9 +42,7 @@ implicit none
 real(kind=kreal), allocatable :: strain_elmt(:,:,:), &
                                     strain_nodal(:,:),  &
                                     stress_elmt(:,:,:), & 
-                                    stress_nodal(:,:), & 
-                                    extload(:), & 
-                                    du(:), dprecon(:) , storekmat(:,:,:)
+                                    stress_nodal(:,:)
 integer :: ksp_iter
 
 character(len=250) :: errtag ! error message

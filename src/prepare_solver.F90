@@ -1,15 +1,13 @@
 module prepare_solver 
 contains 
-
-
-
+!_______________________________________________________________________________
 
 ! WE - prepare solver; originally in nonlinear loop
-subroutine prep_inbuilt_solver(dprecon, egdof, storekmat, ndscale,     &
-                               nzero_dprecon, nelmt_elas, eid_elas,    &
+subroutine prep_inbuilt_solver(nzero_dprecon, nelmt_elas, eid_elas,    &
                                nelmt_viscoelas, eid_viscoelas)
     ! USES: 
 use global
+use local
 use math_constants
 use set_precision
 #if (USE_MPI)
@@ -21,8 +19,7 @@ use serial_library
 
     implicit none 
     ! IO 
-    real(kind=kreal),allocatable :: dprecon(:), storekmat(:,:,:), ndscale(:)
-    integer,allocatable :: egdof(:), eid_elas(:), eid_viscoelas(:)
+    integer,allocatable :: eid_elas(:), eid_viscoelas(:)
     integer :: nzero_dprecon, nelmt_elas, nelmt_viscoelas
 
     ! Local 
@@ -88,8 +85,8 @@ use serial_library
   
   
   end subroutine prep_inbuilt_solver
-  
-  
+!-------------------------------------------------------------------------------  
   
 
 end module prepare_solver
+!===============================================================================

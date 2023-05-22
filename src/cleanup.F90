@@ -1,10 +1,12 @@
 module cleanup 
 
 contains 
+!_______________________________________________________________________________
 
 subroutine run_cleanup_specfemx(errtag, errcode)
 
-use global 
+use global
+use local 
 use gll_library, only: cleanup_gll1d
 use element
 use model
@@ -48,18 +50,13 @@ if(ISDISP_DOF)then
   
   return 
 end subroutine run_cleanup_specfemx 
-
+!-------------------------------------------------------------------------------
 
 subroutine run_cleanup_specfem3d(strain_elmt, strain_nodal,  &
-                                 evpt, egdof, egdofu, gdofu,&
-                                 extload,  &
-                                 ubcload, load, du, u, olddu, bcnodalv,  &
-                                 nodalu, nodalphi,  dprecon,& 
-                                 ndscale, num, node_valency, bmat, & 
-                                 deriv, kmat, rhoload, &
-                                 resload, eld)
+                                 evpt, gdofu)
 ! USES
 use global
+use local
 use fault
 #if (USE_MPI)
 use mpi_library
@@ -80,18 +77,12 @@ use solver
 use solver_petsc
 #endif
 
-  implicit none 
-  ! IO variables
+implicit none 
+! IO variables
 
-integer,allocatable :: egdof(:),egdofu(:), gdofu(:), num(:), node_valency(:)
+integer,allocatable :: gdofu(:)
 real(kind=kreal), allocatable :: strain_elmt(:,:,:), strain_nodal(:,:),  &
-                                 evpt(:,:,:), extload(:),  & 
-                                 ubcload(:),  &
-                                 load(:), du(:), u(:), olddu(:), bcnodalv(:,:), &
-                                 nodalu(:,:), nodalphi(:),         &   
-                                 dprecon(:), ndscale(:), bmat(:,:),&
-                                 deriv(:,:), kmat(:,:),    &
-                                 rhoload(:),resload(:), eld(:) 
+                                 evpt(:,:,:)
 
   !CODE:
 
@@ -136,10 +127,8 @@ real(kind=kreal), allocatable :: strain_elmt(:,:,:), strain_nodal(:,:),  &
   if(allocated(infinite_face_idir))deallocate(infinite_face_idir)
   call cleanup_ghost()
 
-
-
 end subroutine run_cleanup_specfem3d
-
-
+!-------------------------------------------------------------------------------
 
 end module cleanup
+!===============================================================================

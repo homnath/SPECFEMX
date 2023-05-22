@@ -326,7 +326,7 @@ end subroutine write_OF_to_ensight
 
 
 ! #################    INITIAL SETUP FUNCTIONS    #####################
-subroutine prepare_sea_level(nodalsl, nodalslrate, storekmatSL, kSL)
+subroutine prepare_sea_level(nodalsl, nodalslrate)
     use global 
     use free_surface
     use set_precision
@@ -335,7 +335,7 @@ subroutine prepare_sea_level(nodalsl, nodalslrate, storekmatSL, kSL)
     implicit none 
 
     integer :: istattemp, istat
-    real(kind=kreal), allocatable :: nodalsl(:), nodalslrate(:), storekmatSL(:,:,:), kSL(:,:)
+    real(kind=kreal), allocatable :: nodalsl(:), nodalslrate(:)
 
     if(myrank.eq.0.and.verbose_bool)then
         write(*,*)'Preparing sea level variables...'
@@ -621,10 +621,9 @@ if(myrank.eq.0.and.verbose)then
     write(*,*)
 endif 
 end subroutine update_ocean_function
+!-------------------------------------------------------------------------------
 
-
-
-subroutine calculate_SL_A_per_proc(nodalsl, nodalu, overwrite_old, verbose)
+subroutine calculate_SL_A_per_proc(nodalsl, overwrite_old, verbose)
     ! Calculates the area covered by ocean (integral of ocean func
     ! over the solid surface)
     use global
@@ -648,7 +647,7 @@ use serial_library
     integer                        :: iface           ! face ID for elmt 
     integer                        :: i_elmt, errcode          ! face ID for elmt 
     integer                        :: nfgll           ! ngll on 2D face
-    real(kind=kreal), allocatable  :: gw(:), nodalsl(:), nodalu(:,:) ! GLL weights 2D
+    real(kind=kreal), allocatable  :: gw(:), nodalsl(:) ! GLL weights 2D
     real(kind=kreal), allocatable  :: dshape4(:,:,:)
     real(kind=kreal)               :: coord(ndim,4), face_normal(3),& 
                                     dx_dxi(NDIM), dx_deta(NDIM), vertical(3), dot_w_vert
@@ -726,12 +725,9 @@ use serial_library
     deallocate(dshape4)
     
 end subroutine calculate_SL_A_per_proc
+!-------------------------------------------------------------------------------
 
-
-
-
-
-subroutine update_SL_area(nodalsl, nodalu, overwrite_old, verbose)
+subroutine update_SL_area(nodalsl, overwrite_old, verbose)
     
 use set_precision
 use dimensionless
@@ -745,12 +741,12 @@ use mpi
 use serial_library
 use math_library_serial
 #endif
-    real(kind=kreal), allocatable  :: nodalsl(:), nodalu(:,:) 
+    real(kind=kreal), allocatable  :: nodalsl(:)
     integer :: errcode
     logical :: overwrite_old, verbose
 
     ! Use ocean function to calculate area of ocean for each processor     
-    call calculate_SL_A_per_proc(nodalsl, nodalu, overwrite_old, verbose)
+    call calculate_SL_A_per_proc(nodalsl, overwrite_old, verbose)
     call sync_process()
     
   
@@ -781,8 +777,7 @@ use math_library_serial
         write(*,*) 
     endif 
 end subroutine update_SL_area
-
-
-
+!-------------------------------------------------------------------------------
 
 end module
+!===============================================================================

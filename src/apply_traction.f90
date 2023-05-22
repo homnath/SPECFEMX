@@ -8,7 +8,7 @@ contains
 ! This routine reads and applies the traction specified in the traction file.
 ! REVISION
 !   HNG, Jul 12,2011; HNG, Apr 09,2010; HNG, Dec 08,2010
-subroutine apply_traction(load,errcode,errtag, nodalu, i_step)
+subroutine apply_traction(errcode,errtag,i_step)
 use global
 use math_constants
 use postprocess
@@ -19,10 +19,8 @@ use integration,only:dshape_quad4_xy,dshape_quad4_yz,dshape_quad4_zx,          &
 use math_library,only : angle
 use free_surface,only:nelmt_fs,nnode_fs,gnode_fs,gnum_fs,rgnum_fs,iface_fs, id_elem_fs, fs_elem_id!, normal_fs, jac2d_fs
 implicit none
-real(kind=kreal),intent(inout) :: load(0:neq)
 integer,intent(out) :: errcode
 integer :: i_step ! IO
-real(kind=kreal),allocatable :: nodalu(:,:) ! only used as dummy for helping to plot traction fs
 
 character(len=250),intent(out) :: errtag
 integer :: lngdof(ndim)

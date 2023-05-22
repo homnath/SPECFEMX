@@ -2,10 +2,8 @@ module bcs_and_dof
 implicit none
 
 contains
-! ______________________________________________________________________
-subroutine sort_gdofs_and_bc(bcnodalv, num, egdof, egdofu, coord, deriv,&
-    eld, eload, bload, vload, rhoload, resload, jac, bmat, nodalu, & 
-    nodalg, nodalphi, nodalB, tot_neq, max_neq, min_neq, nodalphistore, nodalustore)
+!_______________________________________________________________________________
+subroutine sort_gdofs_and_bc()
 
     ! This was previously a large part of the specfem3d script. Overall this
     ! section does the following: 
@@ -37,16 +35,6 @@ use dof
 
 implicit none 
 
-real(kind=kreal), allocatable :: bcnodalv(:,:), nodalu(:,:), nodalphistore(:), nodalustore(:,:), nodalphi(:),nodalg(:,:), nodalB(:,:)
-integer,allocatable::num(:)
-integer,allocatable :: egdof(:),egdofu(:)
-integer :: tot_neq,max_neq,min_neq
-real(kind=kreal),allocatable :: bmat(:,:),coord(:,:),deriv(:,:),    &
-jac(:,:)
-real(kind=kreal),allocatable :: eld(:),eload(:),bload(:),   &
-vload(:),rhoload(:),resload(:)
-
-
 ! Local 
 integer :: istat, errcode, i_elmt
 character(len=250) :: errtag
@@ -56,12 +44,7 @@ write(logunit,*)' Sorting GDOFs and BCs   (sort_gdofs_and_bc)'
 write(logunit,*)
 
 ! Initialise boundary conditions
-allocate(bcnodalv(nndof,nnode))
 bcnodalv=ZERO
-
-! Initialise global degrees of freedom database
-allocate(gdof(nndof,nnode),stat=istat)
-call check_memory_alloc(istat, logunit)
 
 ! Initialise infinite element faces
 allocate(infinite_iface(6,nelmt),infinite_face_idir(6,nelmt))
@@ -73,7 +56,6 @@ call activate_dof(errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
 
-
 ! Ensure that gdof IDs are same in the finite/infinite interface
 ! nodes if they lie across different processors.
 ! This can also be done if we explicitly define the gdof ON/OFF state on those
@@ -84,7 +66,7 @@ where(gdof>0)gdof=1
 call sync_process
 
 ! Apply Dirichlet boundary conditions
-call apply_bc(bcnodalv,errcode,errtag)
+call apply_bc(errcode,errtag)
 call sync_process
 call control_error(errcode,errtag,stdout,myrank)
 
@@ -93,16 +75,21 @@ call finalize_gdof(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 log_msg = 'complete!' ; call write_ifproc0(logunit)
 
-call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
-        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB, nodalphistore, nodalustore)
+!call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
+!        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB, nodalphistore, nodalustore)
+
+!-------------------------------------
+! modify ghost GDOFs
+if(nproc.gt.1)then
+  call prepare_ghost_gdof()
+endif
 
 ! store elemental global degrees of freedoms from nodal gdof
 ! this removes the repeated use of reshape later but it has larger size than
 ! gdof!!!
-allocate(gdof_elmt(nedof,nelmt))
 gdof_elmt=0
 do i_elmt=1,nelmt
-gdof_elmt(:,i_elmt)=reshape(gdof(:,g_num(:,i_elmt)),(/nedof/))
+  gdof_elmt(:,i_elmt)=reshape(gdof(:,g_num(:,i_elmt)),(/nedof/))
 enddo
 
 ! global indexing
@@ -131,11 +118,4 @@ write(logunit,*)
 end subroutine sort_gdofs_and_bc
 ! ______________________________________________________________________
 
-
-
-
-
-
-
-
-end module 
+end module  bcs_and_dof
