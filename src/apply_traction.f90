@@ -122,8 +122,6 @@ if(istraction)then
         nodaltraction(:,nodalids(1)) = nodaltraction(:,nodalids(1)) + q
 
         write(logunit,*)'Added nodaltraction at gnum: ', nodalids(1)
-
-
         
       enddo
       trac_stat=.true.

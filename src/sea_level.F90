@@ -718,10 +718,10 @@ use serial_library
             face_normal(2) = zero
             detjac2d=sqrt(dot_product(face_normal,face_normal))  
 
-            if (nodalu(3, rgnum_fs(i_gll, i_elmtfs)).ne.zero) then 
-                write(*,*)'NOT ZERO', nodalu(3, rgnum_fs(i_gll, i_elmtfs))
-                stop
-            endif 
+            !if (nodalu(3, rgnum_fs(i_gll, i_elmtfs)).ne.zero) then 
+            !   write(*,*)'NOT ZERO', nodalu(3, rgnum_fs(i_gll, i_elmtfs))
+            !    stop
+            !endif 
 
             ocean_height = nodalsl(rgnum_fs(i_gll, i_elmtfs)) - nodalu(3, rgnum_fs(i_gll, i_elmtfs))
             

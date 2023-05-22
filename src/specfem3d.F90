@@ -499,7 +499,7 @@ loop_step: do i_step=istep0,nstep
   if(myrank.eq.0)then   
     write(*,*)
     write(*,*)
-    write(*,'(a,i0,a)')' ~~~~~~~~~~~~~~~~~~~~ TIMESTEP ', i_step, ' ~~~~~~~~~~~~~~~~~~~~'
+    write(*,'(a,i0,a,i0,a)')' ~~~~~~~~~~~~~~~~~~~~ TIMESTEP ', i_step, '/',nstep ,' ~~~~~~~~~~~~~~~~~~~~'
   endif 
 
 
