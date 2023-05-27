@@ -775,7 +775,7 @@ module bilinear_form
         ! Test case 1 of BF_poisson 
         use global
         use set_precision
-        use dimensionless
+        use nondimensionpar
         implicit none 
     
     
@@ -845,7 +845,7 @@ module bilinear_form
             ! Test case 1 of BF_bulk
             use global
             use set_precision
-            use dimensionless
+            use nondimensionpar
             use math_constants
             implicit none 
         
@@ -932,7 +932,7 @@ module bilinear_form
             ! Test case 1 of BF_backgroundgrav1 
             use global
             use set_precision
-            use dimensionless
+            use nondimensionpar
             use math_constants
             implicit none 
         
@@ -1019,7 +1019,7 @@ module bilinear_form
             ! Calculates a global backgrav B2 matrix and tests 
             use global
             use set_precision
-            use dimensionless
+            use nondimensionpar
             use math_constants
             implicit none 
         
@@ -1105,7 +1105,7 @@ module bilinear_form
             ! Calculates a global backgrav B3 matrix and tests 
             use global
             use set_precision
-            use dimensionless
+            use nondimensionpar
             use math_constants
             implicit none 
         
@@ -1197,7 +1197,7 @@ module bilinear_form
             ! Calculates a grav disp coupling matrix and tests 
             use global
             use set_precision
-            use dimensionless
+            use nondimensionpar
             use math_constants
             implicit none 
         
@@ -1294,7 +1294,7 @@ module bilinear_form
             ! Calculates a strain deviator matrix and tests 
             use global
             use set_precision
-            use dimensionless
+            use nondimensionpar
             use math_constants
             implicit none 
         

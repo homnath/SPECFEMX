@@ -19,7 +19,7 @@ contains
 !  HNG, Feb 19, 2016; HNG, Jul 12,2011; HNG, Apr 09,2010; HNG, Dec 08,2010
 ! TODO
 subroutine locate_station(lneq,errcode,errtag)
-use dimensionless
+use nondimensionpar
 use global
 use element,only:hex8_gnode
 use math_constants
@@ -329,7 +329,7 @@ end subroutine locate_station
 !===============================================================================
 
 subroutine compute_station(lneq,errcode,errtag)
-use dimensionless
+use nondimensionpar
 use global
 use element,only:hex8_gnode
 use math_constants

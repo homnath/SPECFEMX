@@ -25,7 +25,7 @@
 
 cmake_minimum_required(VERSION 3.18)
 
-project(specfemc 
+project(specfemx 
         VERSION 
         1.0
         )
@@ -133,13 +133,13 @@ SET(srcboth
    prepare_solver.F90
    mesh_spec.F90
    model.F90
+   nondimension.F90
    cmtsolution.F90
    earthquake_load.F90
    electrical_load.F90
    station.F90
    benchmark.F90
    save_mesh.F90
-   nondimensionalisation.F90
    user_input.F90
    cleanup.F90
    print_w_MPI.F90
@@ -153,8 +153,6 @@ SET(srcboth
    other_forces.F90
    initialise_arrays.F90
    )
-
-
 
 # Compiler preprocessor directives
 # Set the property of the srcboth variable so that it uses MPI??? 
@@ -176,65 +174,65 @@ ENDIF(ISPARALLEL)
 #ENDIF(ISCOMPLEX)
 
 
-# Build geotech library
-#SET(srcgeotech "")
-#message("${srcgeotech}")
+# Build specfem library
+#SET(srcspecfem "")
+#message("${srcspecfem}")
 #IF(BUILD_EXCAVATION)
-#  LIST(APPEND srcgeotech semexcav3d.f90)
+#  LIST(APPEND srcspecfem semexcav3d.f90)
 #ENDIF(BUILD_EXCAVATION)
 #IF(BUILD_SLOPE)
-#  LIST(APPEND srcgeotech semslope3d.f90)
+#  LIST(APPEND srcspecfem semslope3d.f90)
 #ENDIF(BUILD_SLOPE)
 
 
-# ------------------------ GEOTECH ------------------------
+# ------------------------ SPECFEM ------------------------
 
-SET(srcgeotech
-   specfem3d.F90)
+SET(srcspecfem
+   main.F90)
 # Compiler preprocessor directives
 #ADD_DEFINITIONS(CMAKE_Fortran_FLAGS "-DUSE_MPI")
 IF(ISPARALLEL)
-  #SET_PROPERTY(SOURCE ${srcgeotech} PROPERTY COMPILE_DEFINITIONS USE_MPI)
-  SET_PROPERTY(SOURCE ${srcgeotech} APPEND PROPERTY COMPILE_DEFINITIONS USE_MPI)
-  #SET_PROPERTY(SOURCE ${srcgeotech} PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
+  #SET_PROPERTY(SOURCE ${srcspecfem} PROPERTY COMPILE_DEFINITIONS USE_MPI)
+  SET_PROPERTY(SOURCE ${srcspecfem} APPEND PROPERTY COMPILE_DEFINITIONS USE_MPI)
+  #SET_PROPERTY(SOURCE ${srcspecfem} PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
 ENDIF(ISPARALLEL)
 
 IF(USE_PETSC)
-  SET_PROPERTY(SOURCE ${srcgeotech} APPEND PROPERTY COMPILE_DEFINITIONS USE_PETSC)
+  SET_PROPERTY(SOURCE ${srcspecfem} APPEND PROPERTY COMPILE_DEFINITIONS USE_PETSC)
   IF(ISCOMPLEX)
-    SET_PROPERTY(SOURCE ${srcgeotech} APPEND PROPERTY COMPILE_DEFINITIONS USE_COMPLEX)
+    SET_PROPERTY(SOURCE ${srcspecfem} APPEND PROPERTY COMPILE_DEFINITIONS USE_COMPLEX)
   ENDIF(ISCOMPLEX)
 ENDIF(USE_PETSC)
-ADD_LIBRARY(geotech ${srcgeotech})
+ADD_LIBRARY(specfem ${srcspecfem})
 
 
 # Following PETSC link is necessary due to the PETSC module called in the
-# specfem3d.F90
+# main.F90
 IF(USE_PETSC)
-  TARGET_INCLUDE_DIRECTORIES(geotech PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
-  TARGET_LINK_LIBRARIES(geotech ${PETSC_ARCH}/lib/libpetsc.so)
+  TARGET_INCLUDE_DIRECTORIES(specfem PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
+  TARGET_LINK_LIBRARIES(specfem ${PETSC_ARCH}/lib/libpetsc.so)
 ENDIF(USE_PETSC)
 IF(ISPARALLEL)
-  ADD_DEPENDENCIES(geotech sem parsem both)
+  ADD_DEPENDENCIES(specfem sem parsem both)
 ELSE(ISPARALLEL)
-  ADD_DEPENDENCIES(geotech sem serial both)
+  ADD_DEPENDENCIES(specfem sem serial both)
 ENDIF(ISPARALLEL)
 
-# ------------------------ END GEOTECH ------------------------
+# ------------------------ END SPECFEM ------------------------
 
 
 
 # Build specfemx
-#TARGET_LINK_LIBRARIES(geotech ${semall})
-#SET_TARGET_PROPERTIES(geotech PROPERTIES LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
+#TARGET_LINK_LIBRARIES(specfem ${semall})
+#SET_TARGET_PROPERTIES(specfem PROPERTIES LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
 
 IF(ISPARALLEL)
   SET_PROPERTY(SOURCE specfemx.F90 PROPERTY COMPILE_DEFINITIONS USE_MPI)
   #SET_PROPERTY(SOURCE specfemx.F90 PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
-  SET(LIBS geotech both parsem sem ${MPI_Fortran_LIBRARIES})
+  SET(LIBS specfem both parsem sem ${MPI_Fortran_LIBRARIES})
   SET(mainprog pspecfemx)
 ELSE(ISPARALLEL)
-  SET(LIBS geotech both serial sem)
+  SET(LIBS specfem both serial sem)
   SET(mainprog specfemx)
 ENDIF(ISPARALLEL)
 

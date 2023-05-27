@@ -130,11 +130,6 @@ subroutine get_fs_details_noweights(i_elmt, iface, nfgll)
 end subroutine get_fs_details_noweights
 ! #################### END GETTING FS DETAILS #########################
 
-
-
-
-
-
 ! ################### LOG AND OUTPUT FUNCTIONS  #######################
 subroutine print_SL_read()
 
@@ -171,13 +166,10 @@ if(myrank.eq.0.and.verbose_bool)then
 endif 
 end subroutine print_SL_read
 
-
-
-
 subroutine summarise_SL_input(nodalsl)
     ! Summarises sea level data for cartesian sims
 use global 
-use dimensionless
+use nondimensionpar
 use free_surface
 #if(USE_MPI)
 use mpi_library
@@ -218,13 +210,10 @@ use math_library_serial
      
 end subroutine summarise_SL_input
 
-
-
-
 subroutine write_min_max_SL(nodalsl)
-    ! Outputs the min/max SL. Is also called by summarise_SL_input function
-    use global
-    use dimensionless
+! Outputs the min/max SL. Is also called by summarise_SL_input function
+use global
+use nondimensionpar
 #if(USE_MPI)
 use mpi_library
 use math_library_mpi
@@ -259,7 +248,7 @@ subroutine write_SL_to_ensight(nodalsl, i_step)
     use global 
     use postprocess
     use set_precision
-    use dimensionless
+    use nondimensionpar
     use free_surface
 #if(USE_MPI)
 use math_library_mpi
@@ -389,15 +378,12 @@ subroutine prepare_sea_level(nodalsl, nodalslrate)
     return 
 end subroutine prepare_sea_level
 
-
-
-
 subroutine set_original_sea_level(nodalsl)
     ! Uses
     use set_precision
     use global 
     use integration
-    use dimensionless
+    use nondimensionpar
     use free_surface
     use math_constants
     implicit none 
@@ -447,19 +433,10 @@ subroutine set_original_sea_level(nodalsl)
 
 end subroutine set_original_sea_level
 
-
-
-
-
-
-
-
-
-
 subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
     use global
     use free_surface
-    use dimensionless
+    use nondimensionpar
     use set_precision
     use math_constants
     ! IO: 
@@ -502,11 +479,6 @@ subroutine set_cart_constant_SL0(nodalsl, sl_zcoord)
 
 end subroutine set_cart_constant_SL0
 
-
-
-
-
-
 subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
     ! Adds ice in the required location to a single GLL point 
     ! Uses
@@ -514,7 +486,7 @@ subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
     use global 
     use integration
     use free_surface
-    use dimensionless
+    use nondimensionpar
     use math_constants
 
     ! IO vars: 
@@ -558,10 +530,6 @@ subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
 end subroutine add_sl_gll
 
 ! ################### END INITIAL SETUP FUNCTIONS  #####################
-
-
-
-
 
 
 subroutine update_ocean_function(nodalice, nodalsl, errcode, errtag, verbose)
@@ -632,7 +600,7 @@ subroutine calculate_SL_A_per_proc(nodalsl, overwrite_old, verbose)
     use set_precision_mpi
     use free_surface
     use integration
-    use dimensionless
+    use nondimensionpar
     use math_constants
 #if (USE_MPI)
 use mpi_library
@@ -730,7 +698,7 @@ end subroutine calculate_SL_A_per_proc
 subroutine update_SL_area(nodalsl, overwrite_old, verbose)
     
 use set_precision
-use dimensionless
+use nondimensionpar
 use math_constants
 use set_precision_mpi
 #if (USE_MPI)

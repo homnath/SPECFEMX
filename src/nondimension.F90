@@ -3,12 +3,14 @@
 
 ! Last modified:  8th June 2022 (WE) 
 
-
-module nondimensionalisation 
+! (Non)dimensionalize
+module nondimension
+use set_precision
 contains 
+!_______________________________________________________________________________
 
-
-subroutine set_nondimensional_params()
+! Set nondimensionlization reference variables.
+subroutine set_nondimension_refs()
 
 ! USES 
 use global 
@@ -20,10 +22,6 @@ use math_library_serial
 #endif
 
 implicit none
-! IO variables 
-
-! Local variables 
-
 
 !-------------------------------------------------------------------------------
 ! set dimensionalize parameters
@@ -100,15 +98,16 @@ implicit none
     endif
     
     return 
-end subroutine set_nondimensional_params 
-!===============================================================================
+end subroutine set_nondimension_refs 
+!-------------------------------------------------------------------------------
 
-subroutine calc_nondimensionalisation_vals
+! Calculate dimension/nondimension parameters.
+subroutine calc_nondimension_pars
 
   ! USES
   use global
   use math_library_mpi
-  use dimensionless
+  use nondimensionpar
   implicit none 
   ! IO variables
   ! Local variables  
@@ -218,15 +217,15 @@ subroutine calc_nondimensionalisation_vals
     endif
   endif
 
-  end subroutine calc_nondimensionalisation_vals
+  end subroutine calc_nondimension_pars
+!-------------------------------------------------------------------------------
 
-
-  subroutine apply_nondimensionalisation()
+  subroutine apply_nondimension()
     ! USES
     use global !, only: g_coord, NONDIM_L, ISDISP_DOF, massdens_elmt, &
                 !      NONDIM_DENSITY, bulkmod_elmt, NONDIM_MOD, shearmod_elmt, &
                 !      pole_coord0, pole_coord1, NONDIM_L, axis_range
-    use dimensionless
+    use nondimensionpar
     ! IO variables
     ! Local variables
     ! Code: 
@@ -264,7 +263,7 @@ subroutine calc_nondimensionalisation_vals
     pole_coord1=pole_coord1*NONDIM_L
     axis_range=axis_range*NONDIM_L
 
-  end subroutine apply_nondimensionalisation
-!===============================================================================
-end module nondimensionalisation 
+  end subroutine apply_nondimension
+!-------------------------------------------------------------------------------
+end module nondimension
 !===============================================================================

@@ -15,7 +15,7 @@ contains
 !  - read and implement CMTSOLUTION
 !  - check for the sources shared among elements/processors
 subroutine electrical_load(errcode,errtag)
-use dimensionless
+use nondimensionpar
 use global
 use element,only:hex8_gnode
 use math_constants
@@ -83,7 +83,6 @@ integer :: ipass_strict,nfail_strict
 logical :: isinside
 
 character(len=1) :: tchar
-character(len=250) :: line,tag
 character(len=80) :: token
 character(len=80) :: fname
 character(len=80) :: data_path

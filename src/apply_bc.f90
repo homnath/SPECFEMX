@@ -17,7 +17,7 @@ use global
 use math_constants, only:zero
 use element,only:hexface
 use free_surface,only:nnode_fs,gnode_fs
-use dimensionless,only:NONDIM_L
+use nondimensionpar,only:NONDIM_L
 implicit none
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
@@ -336,6 +336,7 @@ subroutine apply_nonzero_bc()
 
   ! Local 
   integer :: i_elmt, i,  ielmt, iedof, j_node, i_dof, j_dof, idof
+
 
   ! Modify RHS vector for prescribed displacements
   ! i.e. if boundary dispalcements are not equal to zero

@@ -4,10 +4,8 @@
 module count_elements 
 
 contains 
-
-subroutine count_elmts( errcode, nelmt_elas, nelmt_viscoelas, & 
-  mdomain, tot_nelmt_elas, max_nelmt_elas, min_nelmt_elas, tot_nelmt_viscoelas, &
-  max_nelmt_viscoelas, min_nelmt_viscoelas)
+!_______________________________________________________________________________
+subroutine count_elmts( errcode ) 
 
   ! Subroutine used to loop through the elements and determine how many
   ! are viscoelastic vs elastic
@@ -18,17 +16,15 @@ use math_library_mpi
 implicit none
 
 ! Local variables: 
-integer :: i_elmt, i_mat                           ! Loop index for elements    
-integer, intent(out)  :: nelmt_elas           ! Count of elastic elements
-integer, intent(out)  :: nelmt_viscoelas      ! Count of viscoelastic elements
-integer, intent(out)  :: mdomain              ! 
-integer, intent(out)  :: tot_nelmt_elas       ! 
-integer, intent(out)  :: max_nelmt_elas       ! 
-integer, intent(out)  :: min_nelmt_elas       ! 
-integer, intent(out)  :: tot_nelmt_viscoelas       ! 
-integer, intent(out)  :: max_nelmt_viscoelas       ! 
-integer, intent(out)  :: min_nelmt_viscoelas      ! 
-integer, intent(out)  :: errcode
+integer :: i_elmt, i_mat     ! Loop index for elements    
+integer  :: mdomain
+integer :: tot_nelmt_elas
+integer :: max_nelmt_elas
+integer :: min_nelmt_elas
+integer :: tot_nelmt_viscoelas
+integer :: max_nelmt_viscoelas
+integer :: min_nelmt_viscoelas
+integer :: errcode
 
 
 ! count elastic and viscoelastic elements
@@ -74,18 +70,12 @@ if(myrank==0)then
   flush(logunit)
 endif
 
-
-
 errcode=0
 return
 end subroutine count_elmts
+!-------------------------------------------------------------------------------
 
-
-
-
-! ______________________________________________________________________
-subroutine split_elas_visco_eids( nelmt_elas, &
-  nelmt_viscoelas, eid_elas, eid_viscoelas )
+subroutine split_elas_visco_eids()
 ! Used to save element ID separately for elastic and viscoelastic 
 ! elements. Ids are stored in eid_viscoelas and eid_elas
 use math_library_mpi
@@ -96,12 +86,6 @@ use global!,  only: ngll, nmaxwell, nelmt, mat_domain, mat_id, &
 
 implicit none 
   
-!In/Out variables
-integer, intent(in)               :: nelmt_elas
-integer, intent(in)               :: nelmt_viscoelas
-integer, allocatable, intent(out) :: eid_elas(:), eid_viscoelas(:)
-
-
 ! Local variables
 integer :: ielmt_elas, ielmt_viscoelas, i_elmt, mdomain
 
@@ -127,12 +111,9 @@ do i_elmt=1,nelmt
   endif
 enddo
 
-
 return 
 end subroutine split_elas_visco_eIDs
-
-
-
+!-------------------------------------------------------------------------------
 
 subroutine store_elemdof_from_nodaldof_global()
 
@@ -150,8 +131,7 @@ subroutine store_elemdof_from_nodaldof_global()
   enddo
 
 end subroutine
-
-
+!-------------------------------------------------------------------------------
 
 !subroutine calc_prestress(strain_elmt, strain_nodal, stress_elmt, &
 !  stress_nodal, evpt, bodyload, slipload, &
@@ -211,7 +191,7 @@ subroutine calculate_valency()
 
   return 
 end subroutine calculate_valency
-
-
+!-------------------------------------------------------------------------------
 
 end module count_elements
+!===============================================================================

@@ -15,7 +15,7 @@ contains
 !  - read and implement CMTSOLUTION
 !  - check for the sources shared among elements/processors
 subroutine earthquake_load(lneq,errcode,errtag)
-use dimensionless
+use nondimensionpar
 use global
 use element,only:hex8_gnode
 use math_constants

@@ -58,7 +58,7 @@ contains
 ! This subroutine activates degrees of freedoms.
 subroutine prepare_fault(errcode,errtag)
 use global
-use dimensionless,only:NONDIM_L
+use nondimensionpar,only:NONDIM_L
 implicit none
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
@@ -99,6 +99,7 @@ pfault_nface=0
 fsurface_plus: do
   read(11,*,iostat=ios)pfault_svec
   if(ios/=0)exit fsurface_plus
+  print*,'ohh:',pfault_svec
   ! Nondimensionalise
   pfault_svec=NONDIM_L*pfault_svec
   count_fsurf=count_fsurf+1
@@ -190,7 +191,7 @@ end subroutine prepare_fault
 subroutine plot_fault_slip_vtk(nface,fault_ielmt,fault_iface,         &
 fault_iedge,slip_vec,vtkout)
 use global,only:myrank,ndim,maxngll2d,ngllx,nglly,g_num,g_coord,itaper_slip
-use dimensionless,only:DIM_L
+use nondimensionpar,only:DIM_L
 use math_library,only:i_uniinv
 use element,only:hexface,hexface_edge
 use math_constants,only:INFTOL,ZERO
@@ -346,7 +347,7 @@ use global
 use math_constants
 use element,only:hexface,hexface_edge!,hexface_sign
 !use preprocess
-!use dimensionless,only:NONDIM_L,DIM_L
+!use nondimensionpar,only:NONDIM_L,DIM_L
 implicit none
 integer,intent(in) :: plus_or_minus
 real(kind=kreal),intent(in) :: sfac
@@ -390,7 +391,8 @@ if(fault_nface.gt.0)then
   endif
 endif
 
-!print*,'slip_vec:',slip_vec
+print*,'Ahh:',plus_or_minus,slip_vec,pfault_svec
+print*,'slip_vec:',slip_vec
 !allocate(kmat(nedof,nedof))
 allocate(kmat(nedofu,nedofu))
 allocate(slip_gll(NDIM,ngll))
@@ -424,17 +426,19 @@ do i_face=1,fault_nface
  
   !kmat=storekmat(:,:,ielmt)
   kmat=storekmat(edofu,edofu,ielmt)
+  if(maxval(abs(kmat)).gt.0)print*,'HIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII'
   iedof=0
   do i_gll=1,ngll
     do i=1,nndofu
       iedof=iedof+1
       if(slip_gll(i,i_gll)/=zero)then
-        load(egdof)=load(egdof)-plus_or_minus*kmat(:,iedof)*slip_gll(i,i_gll)
+        slipload(egdof)=slipload(egdof)-plus_or_minus*kmat(:,iedof)*slip_gll(i,i_gll)
       endif
     enddo
   enddo
 enddo
 
+print*,'Hello1 ha:',maxval(abs(slipload))
 deallocate(kmat)
 deallocate(slip_gll)
 deallocate(egdof)

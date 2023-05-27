@@ -13,7 +13,7 @@ module time_loop
         use global 
         use set_precision
         use math_constants 
-        use dimensionless
+        use nondimensionpar
         ! IO variables
         real(kind=kreal) :: freq, ang_freq, scale_ang_freq2
         real(kind=kreal) :: t, dt, step
@@ -67,12 +67,9 @@ subroutine reset_nodal_arrays_loads(nodalslrate)
     endif
 end subroutine reset_nodal_arrays_loads
 
-
-
-
 subroutine set_elasto_visco_stiffness_matrix(i_step, dt, isscale_ang_freq, & 
-                                                ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
-                                                eid_viscoelas, relaxtime, istep0)
+                                                ang_freq, scale_ang_freq2, & 
+                                                istep0)
 use global 
 use matrix_vector
 #if (USE_MPI)
@@ -93,9 +90,6 @@ use solver_petsc
 integer :: i_step ,i , istep0
 logical            :: isscale_ang_freq
 real(kind=kreal)   :: ang_freq, scale_ang_freq2, dt
-real(kind=kreal), allocatable :: relaxtime(:,:) 
-integer :: nelmt_viscoelas
-integer,allocatable :: eid_viscoelas(:)
 
 ! Local: 
 integer            :: errcode
@@ -221,8 +215,7 @@ else ! TIMESTEPPING
 endif ! if(steptype.eq.FREQSTEP)
 
 end subroutine set_elasto_visco_stiffness_matrix
-
-
+!-------------------------------------------------------------------------------
 
 subroutine run_convergence_loop(nodalsl, nodalslrate, nodalice, nodalicerate)
     use global 

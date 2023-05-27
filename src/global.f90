@@ -76,8 +76,8 @@ real(kind=kreal),parameter :: KSP_DTOL=1.0e30_kreal
 end module ksp_constants
 !===============================================================================
 
-! (Non)dimensionalize
-module dimensionless
+! This module contains the nondimensionalization parameters.
+module nondimensionpar
 use set_precision
 implicit none
 ! density
@@ -115,7 +115,7 @@ real(kind=kreal) :: DIM_B
 real(kind=kreal) :: DIM_EPOT
 ! ice load 
 real(kind=kreal) :: DIM_ICELOAD
-end module dimensionless
+end module nondimensionpar
 !===============================================================================
 
 ! This model contains Earth related constants
@@ -212,6 +212,11 @@ integer :: ngnode ! number of geometrical nodes. usually, for FEM ngnode=nenode
 ! processor
 integer :: nnode,nelmt
 integer,allocatable :: mat_id(:)
+
+integer               :: nelmt_elas
+integer               :: nelmt_viscoelas
+integer, allocatable  :: eid_elas(:), eid_viscoelas(:)
+real(kind=kreal),allocatable :: relaxtime(:,:)
 
 integer,allocatable :: g_num0(:,:),g_num(:,:),gdof(:,:),ggdof(:,:)
 !g_num: global node IDs for each element (per processor).

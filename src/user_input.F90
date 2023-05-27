@@ -3,7 +3,7 @@ module user_input
 contains
 !_______________________________________________________________________________
 
-subroutine process_user_input(cmd, tdate, ttime, tzone, ios, path, &
+subroutine process_user_input(cmd, tdate, ttime, tzone, path, &
                               ext, format_str, errcode, errtag, &
                               ismesh_only,arg1,arg2,inp_fname,prog, &
                               cpu_tstart)
@@ -26,13 +26,13 @@ integer :: errcode
 character(len=250) :: arg1,arg2,inp_fname,prog
 character(len=150) :: path
 character(len=20) :: ext,format_str
-integer ::ios
 character(len=250) :: cmd ! command line
 character(len=8) :: tdate ! date
 character(len=10) :: ttime ! time
 character(len=5) :: tzone ! time zone
 real(kind=kreal) :: cpu_tstart
 ! Local variables 
+integer ::ios
 
 ! Code 
 

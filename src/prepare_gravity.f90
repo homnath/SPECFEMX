@@ -4,7 +4,7 @@ contains
 !-------------------------------------------------------------------------------
 
 subroutine prepare_gravity()
-use dimensionless,only:NONDIM_ACCEL
+use nondimensionpar,only:NONDIM_ACCEL
 use global,only:agrav,logunit,myrank,g_num,ndim,ngll,nelmt,nnode, &
 grav0_nodal,dgrav0_elmt,mat_id,mat_domain,devel_nondim, g0_nodal, & 
 IS_CART_SIM, IS_GLOB_SIM, IS_SL

@@ -9,9 +9,11 @@
 program specfemx
 
   ! Import necessary modules.
-use dimensionless
 use global
+use nondimensionpar
+use nondimension
 use package_version
+use main
 use string_library, only : parse_file
 use input
 use mesh_spec
@@ -32,7 +34,6 @@ use output_to_user
 use serial_library
 use math_library_serial
 #endif
-use nondimensionalisation
 use user_input
 use save_mesh
 use postprocess,only:write_scalar_to_file_freesurf
@@ -47,8 +48,7 @@ use det_solver
 
 implicit none
 
-integer :: iounit,iounit_inf,iounit_fs,i,ios,j,k
-integer :: i_elmt
+integer :: ios
 
 integer :: gnum_hex8(8),node_hex8(8)
 integer :: gnum_quad4(4),node_quad4(4)
@@ -88,8 +88,6 @@ character(len=250) :: errtag ! error message
 integer :: errcode
 
 character(len=60) :: add_tag
-! flag to check whether the file is opened
-logical :: isopen
 ! if the following flag is true program will stop after saving the mesh files
 logical :: ismesh_only
 myrank=0; nproc=1;
@@ -102,7 +100,7 @@ errtag=""; errcode=-1
 call start_process()
 
 ! Read cmd line/process input file etc ... 
-call process_user_input(cmd, tdate, ttime, tzone, ios, path, &
+call process_user_input(cmd, tdate, ttime, tzone, path, &
                         ext, format_str, errcode, errtag, &
                         ismesh_only,arg1,arg2,inp_fname,prog, &
                         cpu_tstart)
@@ -152,7 +150,6 @@ if(ismesh_only)then
   call close_process
 endif
 
-! ___________________________________________________________________
 ! store orginal connectivity which helps to identify ghost interfaces
 allocate(g_num0(ngnode,nelmt))
 g_num0=g_num
@@ -207,8 +204,8 @@ call set_model_properties(errcode,errtag)
 call control_error(errcode,errtag,stdout,myrank)
 
 ! Nondimensionalisation 
-call set_nondimensional_params
-call calc_nondimensionalisation_vals
+call set_nondimension_refs
+call calc_nondimension_pars
 
 ! Read and prepare free surface file.
 ! Information is later used to determine the elevation 
@@ -260,7 +257,7 @@ call save_mesh_ensight(infcase_file,infgeo_file,trinfcase_file, &
 call sync_process()
 
 ! Actually apply non-dimensionalisation
-call apply_nondimensionalisation()
+call apply_nondimension()
 
 ! compute (nondimensionalised) max element size. 
 call compute_max_elementsize()
@@ -275,7 +272,7 @@ out_file = trim(file_head)//'.output'
   open(unit=outunit,file=trim(out_file),status='replace',action='write',iostat=ios)
   if(ios.ne.0)then
     print*,ios,trim(out_file)
-    write(errtag,'(a)')'ERROR: cannot open log file: '//trim(log_file)
+    write(errtag,'(a)')'ERROR: cannot open log file: '//trim(out_file)
     call control_error(errcode,errtag,stdout,myrank)
   endif
 endif 

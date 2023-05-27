@@ -6,9 +6,7 @@ module other_forces
 implicit none
 
 contains
-
-
-
+!_______________________________________________________________________________
 
 subroutine compute_cmt_load(freq)
 
@@ -137,6 +135,7 @@ subroutine compute_split_node_load(t, i_step, sfac, errcode, errtag)
         extload=slipload
       endif
 
+    print*,'Hello0:',maxval(abs(extload))
     return 
 
 end subroutine compute_split_node_load

@@ -43,7 +43,7 @@ subroutine write_ice_to_ensight(nodalice, i_step)
     use postprocess
     use set_precision
     use free_surface
-    use dimensionless
+    use nondimensionpar
     implicit none 
     integer :: i_step
     real(kind=kreal) :: nodalice(:)
@@ -70,7 +70,7 @@ subroutine write_icerate_to_ensight(nodalicerate, i_step)
     use global 
     use postprocess
     use free_surface
-    use dimensionless
+    use nondimensionpar
     implicit none 
     real(kind=kreal) :: nodalicerate(:) ! Nodal rate of I values
     integer :: i_step
@@ -105,7 +105,7 @@ subroutine prepare_ice(nodalice, nodalicerate)
     use free_surface
     use set_precision
     use math_constants
-    use dimensionless
+    use nondimensionpar
     implicit none 
 
     integer :: istattemp, istat
@@ -183,7 +183,7 @@ subroutine set_original_ice_level(nodalice)
     use integration
     use free_surface
     use math_constants
-    use dimensionless
+    use nondimensionpar
 #if(USE_MPI)
 use math_library_mpi
 use mpi_library
@@ -264,7 +264,7 @@ subroutine add_ice_gll(i_elmtfs, i_gll, height, nodalice)
     use integration
     use free_surface
     use math_constants
-    use dimensionless 
+    use nondimensionpar 
 
     ! IO vars: 
     real(kind=kreal) :: height, nodalice(:) 
@@ -297,7 +297,7 @@ subroutine add_ice_cylinder(params, nodalice)
     ! Uses
     use set_precision
     use global 
-    use dimensionless
+    use nondimensionpar
     use integration
     use free_surface
     use math_constants
@@ -371,7 +371,7 @@ subroutine add_ice_sqcuboid(params, nodalice)
     ! Uses
     use set_precision
     use global 
-    use dimensionless
+    use nondimensionpar
     use integration
     use free_surface
     use math_constants
@@ -449,7 +449,7 @@ subroutine add_ice_gaussian(params, nodalice)
     ! input params are x, y, amp, sigma
     use set_precision
     use global 
-    use dimensionless
+    use nondimensionpar
     use integration
     use free_surface
     use math_constants
@@ -536,7 +536,7 @@ subroutine set_ice_rate(nodalice, nodalicerate, i_step)
     use set_precision
     use global 
     use free_surface
-    use dimensionless
+    use nondimensionpar
     use math_constants 
 #if(USE_MPI)
 use math_library_mpi
@@ -615,7 +615,7 @@ subroutine set_ice_rate_slice(nodalice, nodalicerate, i_step)
     use set_precision
     use global 
     use free_surface
-    use dimensionless
+    use nondimensionpar
     use math_constants 
 #if(USE_MPI)
 use math_library_mpi
@@ -775,7 +775,7 @@ use element
 use set_precision 
 use free_surface
 use math_constants
-use dimensionless
+use nondimensionpar
 #if(USE_MPI)
 use math_library_mpi
 use mpi_library
@@ -1075,7 +1075,7 @@ end subroutine calc_iceload_epsilon
 
 subroutine summarise_ice_vol_change()
     use global 
-    use dimensionless
+    use nondimensionpar
 #if(USE_MPI)
 use mpi_library
 use math_library_mpi

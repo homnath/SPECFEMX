@@ -14,7 +14,7 @@ module matrix_vector
     ! TODO: optional precoditioner,optional assembly of stiffness
     subroutine compute_bodyload(bodyload,selfweight,pseudoeq)
     use set_precision
-    use dimensionless
+    use nondimensionpar
     use global,only:myrank,NDIM,nst,nelmt,ngll,nedof,nedofu,nedofphi,nenode,ngnode,&
     ngllx,nglly,ngllz,ngll,g_coord,gdof_elmt,g_num,mat_domain,mat_id,agrav,massdens_elmt,&
     bulkmod_elmt,shearmod_elmt,isempty_blk,rho_blk,ym_blk,magnetization_elmt,&
@@ -188,8 +188,6 @@ module matrix_vector
     rmat_term2(NDIM,NEDOFU),wmat_term2(NEDOFU,NDIM),                           &
     rmat_term3(1,NEDOFU),wmat_term3(NEDOFU,1),                                 &
     rmat_term4(1,NEDOFU),wmat_term4(NEDOFU,1)
-    
-    real(kind=kreal) :: tratio
     
     ! for infinite elements
     integer,parameter :: nginf=8
@@ -403,16 +401,10 @@ module matrix_vector
       rhoload(0)=ZERO
     endif
     
-
+    print*,'WHAT:',maxval(abs(storekmat))
 
     end subroutine compute_stiffness_elastic
     !===============================================================================
-    
-
-
-
-
-
     
     ! This subroutine computes the free surafce contribution
     ! on the stiffness matrix.
@@ -589,9 +581,7 @@ module matrix_vector
     
     ! This subrotine computes the stiffness matrix for the viscoelastic elements.
     ! WARNING: it has to be modified for gravity perturbation.
-    subroutine compute_stiffness_viscoelastic(nelmt_viscoelas,eid_viscoelas,       &
-               dt,relaxtime,storekmat,                              &
-               errcode,errtag)
+    subroutine compute_stiffness_viscoelastic(dt,errcode,errtag)
     use set_precision
     use global,only:myrank,NDIM,nst,ngll,nedof,nedofu,nedofphi,nenode,ngnode,      &
     ngllx,nglly,ngllz,ngll,g_coord,gdof_elmt,g_num,mat_domain,mat_id,massdens_elmt,&
@@ -601,6 +591,7 @@ module matrix_vector
     storejw,devel_nondim,isdxval,isdyval,isdzval, &
     edofu,edofphi,grav0_nodal,dgrav0_elmt,ISGRAV0, &
     muratio_blk,visco_model,VISCO_MAXWELL,VISCO_ZENER,VISCO_GENMAXWELL,nmaxwell
+    use global,only:nelmt_viscoelas,eid_viscoelas,relaxtime,storekmat
     use element,only:hex8_gnode
     use viscoelastic,only:compute_cmat_maxwell,compute_cmat_zener, &
     compute_cmat_genmaxwell
@@ -611,10 +602,7 @@ module matrix_vector
     use gll_library
     use infinite_element
     implicit none
-    integer,intent(in) :: nelmt_viscoelas
-    integer,intent(in) :: eid_viscoelas(:)
-    real(kind=kreal),intent(in) :: dt,relaxtime(:,:)
-    real(kind=kreal),intent(inout) :: storekmat(:,:,:)
+    real(kind=kreal),intent(in) :: dt
     integer,intent(out) :: errcode
     character(len=250),intent(out) :: errtag
     integer :: i

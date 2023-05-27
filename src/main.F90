@@ -2,9 +2,14 @@
 ! REVISION:
 !   HNG, Aug 25,2011; HNG, Jul 14,2011; HNG, Jul 11,2011; Apr 09,2010
 !-------------------------------------------------------------------------------
+module main
+implicit none
+
+contains
+!_______________________________________________________________________________
 subroutine specfem3d()
 ! Import necessary modules
-use dimensionless
+use nondimensionpar
 use global
 use local
 use output_to_user
@@ -78,7 +83,7 @@ character(len=250) :: myfname=' => specfem3d.f90'
 character(len=500) :: errsrc
 
 ! istat: status indicator for allocation (can be used in other contexts)
-integer :: istat, numberproc, myproc
+integer :: istat
 
 ! do-loop indices
 integer :: i_dof,i_elmt,i_eq,i_gll,i_mat,i_nliter,i_node,i_comp,j_dof,j_node
@@ -100,14 +105,11 @@ logical :: nl_isconv ! logical variable to check convergence of
 
 real(kind=kreal) :: f
 
-integer :: todalOFNodes
 ! cmat: elastic matric (Cijkl) in Voigt notation
 ! estrain: elastic strain
 ! esigma: elastic stress
 ! sigma: stress (used in different context than esigma?)
 ! vsigma: viscose stress
-
-integer :: nzero_dprecon, spareint
 
 !kmat: stiffness matrix for each element
 !storekmat: stiffness matrix for all elements
@@ -165,11 +167,6 @@ logical :: isscale_ang_freq=.true.
 real(kind=kreal) :: freq,ang_freq,scale_ang_freq2
 
 ! Viscoelastic parameters
-integer :: mdomain
-integer :: ielmt_elas,ielmt_viscoelas,iviscoelas,nelmt_elas,            &
-nelmt_viscoelas
-integer :: tot_nelmt_elas,max_nelmt_elas,min_nelmt_elas
-integer :: tot_nelmt_viscoelas,max_nelmt_viscoelas,min_nelmt_viscoelas
 integer :: nmatblk_elas
 real(kind=kreal) :: min_relaxtime,max_relaxtime
 
@@ -183,8 +180,6 @@ real(kind=kreal) :: step !current step (t or f)
 real(kind=kreal) :: tunitfac
 
 integer :: i_maxwell
-integer,allocatable :: eid_elas(:),eid_viscoelas(:)
-real(kind=kreal),allocatable :: relaxtime(:,:),muratio(:),tratio(:)
 ! q0: initial state variable for viscoelastic rheology
 real(kind=kreal),allocatable :: q0(:,:)
 
@@ -205,20 +200,15 @@ errtag=""; errcode=-1
 ! ______________________________________________________________________
 ! ______________________________________________________________________
 ! Calculate relaxation time for viscoelastic/plastic models
-call calc_relaxation_time(relaxtime, tunitfac, muratio, & 
-                          tratio, min_relaxtime, max_relaxtime)
+call calc_relaxation_time(tunitfac)
 
 !Count number of viscoelastic and elastic elements 
-call count_elmts(errcode, nelmt_elas, nelmt_viscoelas,     & 
-                 mdomain, tot_nelmt_elas, max_nelmt_elas,  &
-                 min_nelmt_elas, tot_nelmt_viscoelas,      &
-                 max_nelmt_viscoelas, min_nelmt_viscoelas)
+call count_elmts(errcode)
 
 
 ! Split up IDs of elastic and viscoelastic elements into new arrays
 ! New arrays: eid_elas and eid_viscoelas
-call split_elas_visco_eids(nelmt_elas, nelmt_viscoelas, eid_elas,&
-                           eid_viscoelas)
+call split_elas_visco_eids()
 
 
 ! Create new elastic/viscoelastic arrays
@@ -246,34 +236,26 @@ endif
 
 
 call initialise_global_arrays()
-print*,'Hello sir0!'
 call initialise_local_arrays()
 
-print*,'Hello sir1!'
 ! Use BCs to determine global DOF index etc
 call sort_gdofs_and_bc()
-print*,'Hello sir2!'
 call initialise_equation_arrays()
-print*,'Hello sir3!'
 ! Calculate any prestress 
 call calculate_prestress(strain_elmt, strain_nodal,       &
                          stress_elmt, stress_nodal,       & 
                          errcode, errtag, ksp_iter, istat)
    
-print*,'Hello sir4!'
-
 ! compute node valency and assemble all node_valency across processors
 call calculate_valency()
 call assemble_ghosts_nodal_iscalar(node_valency,node_valency)
 
 ! Update log with KSP details
 call log_KSP_summary()
-print*,'Hello sir5!'
 
 ! Initialise RHS vectors + stiffness matrix/mass matrix 
 !call initialise_equation_arrays()
 
-print*,'Hello sir6!'
 ! Timestepping only needed for plastic/viscoelastic situations
 if(isplastic)then
   allocate(olddu(0:neq),evpt(nst,ngll,nelmt))
@@ -484,6 +466,11 @@ loop_step: do i_step=istep0,nstep
       endif 
   endif 
 
+  ! Set the stiffness matrix
+  call set_elasto_visco_stiffness_matrix(i_step, dt, isscale_ang_freq, & 
+  ang_freq, scale_ang_freq2, & 
+  istep0)  
+  
   !apply traction boundary conditions for first timestep
   !WE Reads and adds the traction to the extload variable
   if((istraction.or.isfstraction).and.i_step==1)then
@@ -500,6 +487,7 @@ loop_step: do i_step=istep0,nstep
   if(iseqsource.and.eqsource_type.eq.3)then
     call compute_split_node_load(t, i_step, sfac, &
                                   errcode, errtag)
+    print*,myrank,maxval(abs(extload))
   endif 
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
     call compute_cmt_load(freq)
@@ -513,14 +501,10 @@ loop_step: do i_step=istep0,nstep
   if (is_ICE)then 
     call calc_ice_load(nodalicerate, i_step=i_step)
   endif   
+  print*,'WHERE1:',maxval(abs(storekmat))
 
 
-  ! Set the stiffness matrix
-  call set_elasto_visco_stiffness_matrix(i_step, dt, isscale_ang_freq, & 
-  ang_freq, scale_ang_freq2, nelmt_viscoelas, & 
-  eid_viscoelas, relaxtime, istep0)  
-
-
+  print*,'WHERE1:',maxval(abs(storekmat))
   ! Apply non-zero boundary conditions to the bcnodalv array 
   ! Note this is NOT applying the loading terms (e.g. extload)
   call apply_nonzero_bc()
@@ -528,8 +512,7 @@ loop_step: do i_step=istep0,nstep
 
   ! PREPARE BUILT IN SOLVER
   if(solver_type.eq.builtin_solver)then
-    call prep_inbuilt_solver(nzero_dprecon, nelmt_elas, eid_elas,&
-                            nelmt_viscoelas, eid_viscoelas)
+    call prep_inbuilt_solver()
   endif
 
 
@@ -558,9 +541,8 @@ loop_step: do i_step=istep0,nstep
   call run_nonlinear_solver(isscale_ang_freq,         &
                             ksp_iter, scale_ang_freq2, nl_iter, ksp_tot, uerr, &
                             nl_isconv, nodalslrate, dt_vp, &
-                            nelmt_elas, eid_elas,strain_elmt, evpt, &
-                            f, stress_elmt, nelmt_viscoelas, relaxtime, &
-                            muratio, i_step, tratio, eid_viscoelas, dt, q0)
+                            strain_elmt, evpt, &
+                            f, stress_elmt, i_step, dt, q0)
 
 
   ! Now need to remove the sea level contribution to the kmat so we can reuse it 
@@ -614,13 +596,14 @@ loop_step: do i_step=istep0,nstep
     if(savedata%ice)then 
       call write_ice_to_ensight(nodalice, i_step)
     endif 
+    maxnodalsl = maxscal(maxval(nodalsl))
+    if(myrank.eq.0)then 
+      write(outunit,'(g0.6,1x, g0.6,1x, g0.6)') maxnodalsl, &
+      total_ice_mass_change, SLmasschange
+    endif 
   endif 
 
-  maxnodalsl = maxscal(maxval(nodalsl))
   call sync_process()
-  if(myrank.eq.0)then 
-    write(outunit,'(g0.6,1x, g0.6,1x, g0.6)') maxnodalsl, total_ice_mass_change, SLmasschange
-  endif 
 
   ! Update number of non-linear iterations
   nl_tot=nl_tot+nl_iter
@@ -675,4 +658,6 @@ call cleanup_ghost()
 
 return
 end subroutine specfem3d
+!-------------------------------------------------------------------------------
+end module main
 !===============================================================================

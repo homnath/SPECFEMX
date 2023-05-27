@@ -3,8 +3,7 @@ contains
 !_______________________________________________________________________________
 
 ! WE - prepare solver; originally in nonlinear loop
-subroutine prep_inbuilt_solver(nzero_dprecon, nelmt_elas, eid_elas,    &
-                               nelmt_viscoelas, eid_viscoelas)
+subroutine prep_inbuilt_solver()
     ! USES: 
 use global
 use local
@@ -19,8 +18,7 @@ use serial_library
 
     implicit none 
     ! IO 
-    integer,allocatable :: eid_elas(:), eid_viscoelas(:)
-    integer :: nzero_dprecon, nelmt_elas, nelmt_viscoelas
+    integer :: nzero_dprecon
 
     ! Local 
     integer :: i_elmt, ielmt, j_dof, i_eq, i_dof

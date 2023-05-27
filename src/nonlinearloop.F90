@@ -225,9 +225,8 @@ end subroutine update_nodal_u_vector
 !#######################################################################
 
 subroutine calc_stressstrain(nl_iter, devp, dt_vp, evp, flow,  &
-                             m1, m2, m3, nelmt_elas, nl_isconv,  &
-                             erate,eid_elas,&
-                             cmat, estrain, sigma, effsigma, &
+                             m1, m2, m3, nl_isconv,  &
+                             erate, cmat, estrain, sigma, effsigma, &
                              jacw, strain_elmt, evpt ,    &
                              stress_elmt, dq1, dq2, dq3, dsbar, f,     &
                              fmax,lode_theta,sigm)
@@ -245,9 +244,7 @@ subroutine calc_stressstrain(nl_iter, devp, dt_vp, evp, flow,  &
 
   ! IO 
   logical :: nl_isconv
-  integer :: nelmt_elas, nl_iter
-  integer,allocatable :: eid_elas(:)
-
+  integer :: nl_iter
 
   real(kind=kreal) :: dq1, dq2, dq3, dsbar, f, fmax, lode_theta, sigm, &
                       jacw, dt_vp, cmat(nst,nst), estrain(nst),        &
@@ -341,9 +338,7 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
                               K, G, strain_elmt, i_nliter,      &
                               stress_elmt, estrain,dev_strain, jacw,   &
                               trace_strain,esigma,vsigma,    &
-                              imatve, nelmt_viscoelas,relaxtime,&
-                              muratio, tratio,    &
-                              eid_viscoelas,dt, q0)
+                              imatve, dt, q0)
   ! USES 
   use global
   use local
@@ -359,13 +354,11 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
                       e0(nst), vesigma(nst)
 
   real(kind=kreal),allocatable :: q0(:,:),          &
-                                  relaxtime(:,:),      &
-                                  muratio(:), tratio(:),      &
                                   strain_elmt(:,:,:),        &
                                   stress_elmt(:,:,:)
 
-  integer :: i_step, i_nliter, imatve, nelmt_viscoelas, nl_iter
-  integer,allocatable :: eid_viscoelas(:)
+  integer :: i_step, i_nliter, imatve, nl_iter
+  real(kind=kreal) :: muratio(nmaxwell),tratio(nmaxwell)
 
   logical :: nl_isconv
 
@@ -447,20 +440,13 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
 
 
 end subroutine visco_stressstrain
-
-
-
-
-
-
-
+!_______________________________________________________________________________
 
 subroutine run_nonlinear_solver(isscale_ang_freq,&
                                 ksp_iter,scale_ang_freq2, nl_iter, ksp_tot, uerr,&
                                 nl_isconv, nodalslrate, dt_vp, & 
-                                nelmt_elas, eid_elas,strain_elmt, evpt,&
-                                f, stress_elmt, nelmt_viscoelas, relaxtime, &
-                                muratio, i_step, tratio, eid_viscoelas, dt, q0)
+                                strain_elmt, evpt, f, stress_elmt, &
+                                i_step, dt, q0)
 use global
 use local
 #if (USE_MPI)
@@ -478,14 +464,12 @@ use output_to_user
 implicit none 
 
 ! IO variables: 
-real(kind=kreal),allocatable :: nodalslrate(:), relaxtime(:,:),muratio(:), tratio(:), q0(:,:)
+real(kind=kreal),allocatable :: nodalslrate(:), q0(:,:)
 real(kind=kreal),allocatable :: strain_elmt(:,:,:), evpt(:,:,:), stress_elmt(:,:,:)
 real(kind=kreal) :: uerr
-integer,allocatable :: eid_viscoelas(:)
-integer,allocatable :: eid_elas(:)
 
 logical :: isscale_ang_freq,nl_isconv
-integer :: ksp_iter, nl_iter,ksp_tot, nelmt_elas, i_step, nelmt_viscoelas
+integer :: ksp_iter, nl_iter,ksp_tot, i_step
 real(kind=kreal) :: scale_ang_freq2, dt_vp, f, dt
 
 
@@ -591,9 +575,8 @@ nonlinear: do i_nliter=1,NL_MAXITER
     if(isplastic)bload=ZERO
     ! Calculate elastic/plastic stress & strain  
     call calc_stressstrain(nl_iter, devp, dt_vp, evp, flow,  &
-                          m1, m2, m3, nelmt_elas, nl_isconv,  &
-                          erate,eid_elas,&
-                          cmat, estrain, sigma, effsigma, &
+                          m1, m2, m3, nl_isconv,  &
+                          erate, cmat, estrain, sigma, effsigma, &
                           jacw, strain_elmt, evpt ,    &
                           stress_elmt, dq1, dq2, dq3, dsbar, f,     &
                           fmax,lode_theta,sigm)
@@ -613,9 +596,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
                             K, G, strain_elmt, i_nliter,      & 
                             stress_elmt, estrain, dev_strain, jacw,  &
                             trace_strain, esigma, vsigma, &
-                            imatve, nelmt_viscoelas,relaxtime,& 
-                            muratio, tratio,    &
-                            eid_viscoelas, dt, q0)
+                            imatve, dt, q0)
     bodyload(0)=ZERO
     !viscoload(0)=ZERO
   endif !(ISDISP_DOF) 

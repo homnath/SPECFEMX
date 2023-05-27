@@ -6,7 +6,7 @@ module relaxation_time
 contains 
 
 !_________________________________________________________
-subroutine calc_relaxation_time(relaxtime, tunitfac, muratio, tratio, min_relaxtime, max_relaxtime)
+subroutine calc_relaxation_time(tunitfac)
   use math_constants !,only:ONE, inftol
   use math_library_mpi
   use conversion_constants! , only:  SEC2HOUR, SEC2DAY, SEC2MONTH, SEC2YEAR
@@ -24,12 +24,10 @@ subroutine calc_relaxation_time(relaxtime, tunitfac, muratio, tratio, min_relaxt
 
   ! Local variables: 
   integer          :: iviscoelas, imat, i_mat
-  real(kind=kreal),  allocatable :: relaxtime(:,:),muratio(:),tratio(:)
-  real(kind=kreal)             :: tunitfac
+  real(kind=kreal) :: tunitfac
   real(kind=kreal) :: min_relaxtime,max_relaxtime
 
-
-  allocate(relaxtime(nmaxwell,nmatblk_viscoelas),muratio(nmaxwell),tratio(nmaxwell))
+  allocate(relaxtime(nmaxwell,nmatblk_viscoelas))
 
   ! Relaxation time
   ! Convert relaxation time unit to the time step time unit for consistency
