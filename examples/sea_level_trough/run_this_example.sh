@@ -76,6 +76,7 @@ result=$(cmp_files "../examples/sea_level_trough/stable_partmesh_output.txt" "pa
 
 if [ $result -eq 1 ]; then 
     echo -e " WARNING: OUTPUT FILES ARE DIFFERENT"
+    exit 1
 else 
     echo "  -- partmesh output files are the same (yay!)"
 fi 
