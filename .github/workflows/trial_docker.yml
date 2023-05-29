@@ -2,7 +2,8 @@ name: trial-docker-1
 
 on:
   push:
-    branches: [actions_setup]
+    branches: 
+      - master
 
 jobs: 
   run_compilers_in_docker:
