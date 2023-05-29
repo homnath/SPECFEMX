@@ -74,9 +74,12 @@ end function str2real
 
 ! parse file name and return path, file head, and extension
 subroutine parse_file(fname,path,head,ext)
+use global, only: logunit
 character(len=*),intent(in) :: fname
 character(len=*),intent(out) :: path,head,ext
 integer :: i,ipath,iext,slen
+
+
 
 slen=len(fname)
 
@@ -109,6 +112,8 @@ enddo
 head=fname(ipath+1:iext-1)
 path=fname(1:ipath)
 ext=fname(iext+1:slen)
+
+
 return
 end subroutine parse_file
 

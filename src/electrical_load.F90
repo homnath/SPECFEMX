@@ -14,8 +14,8 @@ contains
 ! TODO
 !  - read and implement CMTSOLUTION
 !  - check for the sources shared among elements/processors
-subroutine electrical_load(lneq,load,errcode,errtag)
-use dimensionless
+subroutine electrical_load(errcode,errtag)
+use nondimensionpar
 use global
 use element,only:hex8_gnode
 use math_constants
@@ -25,7 +25,6 @@ IsPointInHexahedron,norm,vector_rotateZ
 use string_library
 use shape_library,only : dshape_function_hex8p
 use gll_library,only : gll_lagrange3d_point,zwgljd
-use cmtsolution
 use map_location
 #if (USE_MPI)
 use mpi_library
@@ -35,8 +34,6 @@ use serial_library
 use math_library_serial
 #endif
 implicit none
-integer,intent(in) :: lneq
-real(kind=kreal),intent(inout) :: load(0:lneq)
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 
@@ -69,7 +66,7 @@ real(kind=kreal),dimension(:,:),allocatable :: dshape_hex8
 real(kind=kreal),dimension(:),allocatable :: lagrange_gll
 real(kind=kreal),dimension(:,:),allocatable :: dlagrange_gll
 
-real(kind=kreal) :: sload(0:lneq)
+real(kind=kreal) :: sload(0:neq)
 
 integer :: i_gll,ielmt_min,inode_min,i_point,i_src
 integer :: nelmt_srctry
@@ -86,7 +83,6 @@ integer :: ipass_strict,nfail_strict
 logical :: isinside
 
 character(len=1) :: tchar
-character(len=250) :: line,tag
 character(len=80) :: token
 character(len=80) :: fname
 character(len=80) :: data_path

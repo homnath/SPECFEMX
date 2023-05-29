@@ -6,7 +6,7 @@ contains
 ! mtraction file
 ! REVISION
 !   HNG, Jul 12,2011; HNG, Apr 09,2010; HNG, Dec 08,2010
-subroutine apply_mtraction(load,errcode,errtag)
+subroutine apply_mtraction(errcode,errtag)
 use global
 use math_constants
 use element,only:hexface,hexface_sign
@@ -16,7 +16,6 @@ use integration,only:dshape_quad4_xy,dshape_quad4_yz,dshape_quad4_zx,          &
 use math_library,only : angle,magnetic_unitvec
 use conversion_constants,only:DEG2RAD
 implicit none
-real(kind=kreal),intent(inout) :: load(0:neq)
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 integer :: lndofphi,lngdofu(ndim)

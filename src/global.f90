@@ -76,8 +76,8 @@ real(kind=kreal),parameter :: KSP_DTOL=1.0e30_kreal
 end module ksp_constants
 !===============================================================================
 
-! (Non)dimensionalize
-module dimensionless
+! This module contains the nondimensionalization parameters.
+module nondimensionpar
 use set_precision
 implicit none
 ! density
@@ -113,7 +113,9 @@ real(kind=kreal) :: DIM_MPOT
 real(kind=kreal) :: DIM_B
 ! electric potential
 real(kind=kreal) :: DIM_EPOT
-end module dimensionless
+! ice load 
+real(kind=kreal) :: DIM_ICELOAD
+end module nondimensionpar
 !===============================================================================
 
 ! This model contains Earth related constants
@@ -137,6 +139,12 @@ use math_constants,only: ONE
 implicit none
 
 integer(kind=8) :: GPU_pointer
+
+! WE edits: 
+real(kind=kreal), allocatable:: weJAC(:,:,:,:)    ! NDIM x NDIM jacobian for NGLL for N ELEMENTS 
+real(kind=kreal), allocatable:: weJACINV(:,:,:,:) ! NDIM x NDIM inverse jac for NGLL at N ELEMENTS 
+real(kind=kreal), allocatable:: weDETJAC(:,:)     ! Determinant of jacobian at GLL for each element 
+
 
 ! UTM projection zone (Optional input)
 integer :: UTM_ZONE
@@ -178,10 +186,15 @@ integer :: ngllx,nglly,ngllz,ngll
 integer :: ngllxy,ngllyz,ngllzx,maxngll2d
 integer,parameter :: ng=8 ! number of gauss points for FEM
 
+
 logical :: ismpi !.true. : MPI, .false. : serial
 integer :: myrank,nproc !myrank is indexed from 0
 integer :: ngdof !Number of nodal degrees of freedom per processor = nndof*nnode
 integer :: neq !number of equations per processor = ngdof - degrees of freedom
+integer :: tot_neq,max_neq,min_neq
+
+real(kind=kreal),allocatable :: dprecon(:),ndscale(:)
+
 ! lost due to constraints
 integer,allocatable :: l2gdof(:)!map from local dof (in processor) to global dof
 ! (in entire system). l2gdof contains the global (system-wide) indices for the 
@@ -200,6 +213,11 @@ integer :: ngnode ! number of geometrical nodes. usually, for FEM ngnode=nenode
 integer :: nnode,nelmt
 integer,allocatable :: mat_id(:)
 
+integer               :: nelmt_elas
+integer               :: nelmt_viscoelas
+integer, allocatable  :: eid_elas(:), eid_viscoelas(:)
+real(kind=kreal),allocatable :: relaxtime(:,:)
+
 integer,allocatable :: g_num0(:,:),g_num(:,:),gdof(:,:),ggdof(:,:)
 !g_num: global node IDs for each element (per processor).
 !gdof: matrix of nodal dof (per processor).
@@ -209,10 +227,29 @@ integer,allocatable :: gdof_elmt(:,:)
 !gdof_elmt: matrix of elemental degrees of freedom (per processor), e.g.,
 !gdof_elmt(:,1) gives all dof in 1st element in the processsor.
 
+! node_valency: number of elements that share each node.
+integer,allocatable :: node_valency(:)
 ! number of elemental degrees of freedoms for displacement
 integer :: nedofu
-! number of elemental degrees of freedoms for gravity
+! number of elemental degrees of freedoms for potential (gravity, magnetic,
+! electrical, etc.)
 integer :: nedofphi
+
+real(kind=kreal), allocatable :: bcnodalv(:,:)
+real(kind=kreal),allocatable :: nodalu(:,:),nodalphi(:),nodalg(:,:),           &
+nodalB(:,:),nodalphistore(:),nodalustore(:,:)
+
+!storekmat: stiffness matrix for all elements
+real(kind=kreal),allocatable :: storekmat(:,:,:), storekmatSL(:,:,:)
+! Sea level variables: 
+real(kind=kreal), allocatable :: kSL(:,:)!  SL contribution to kmat
+!storemmat: mass matrix for all elements
+real(kind=kreal),allocatable :: storemmat(:,:)
+real(kind=kreal),allocatable :: slipload(:), extload(:), bodyload(:),  &
+                                selfload(:), viscoload(:),ubcload(:),  &
+                                load(:),resload(:),du(:),u(:),olddu(:),&
+                                rhoload(:),iceload(:),                 & 
+                                visco_q0(:,:,:,:), elas_e0(:,:,:)
 
 ! acceleration due to gravity
 ! https://physics.nist.gov/cgi-bin/cuu/Value?gn
@@ -250,6 +287,8 @@ real(kind=kreal),allocatable :: bulkmod_blk(:),shearmod_blk(:)
 real(kind=kreal),allocatable :: massdens_elmt(:,:),bulkmod_elmt(:,:),          &
 shearmod_elmt(:,:)
 real(kind=kreal),allocatable :: grav0_nodal(:,:),dgrav0_elmt(:,:,:)
+! WE - g at time 0 (normal to the local vertical) 
+real(kind=kreal),allocatable :: g0_nodal(:)
 ! magnetization
 real(kind=kreal),allocatable :: magnetization_elmt(:,:,:)
 ! electrical conductivity
@@ -317,7 +356,7 @@ real(kind=kreal) :: eqkx,eqky,eqkz
 ! First three components are axial components. Last three components are
 ! shear components.
 integer,parameter :: NST=6
-character(len=250) :: file_head,inp_path,out_path,part_path
+character(len=250) :: file_head,inp_path,out_path,part_path, SL_path
 ! displacement BC, ghost, traction, and water surface files
 character(len=250) :: confile,idfile
 character(len=250),dimension(3) :: coordfile
@@ -475,16 +514,25 @@ integer,parameter :: petsc_solver=2  ! select PETSC solver
 integer :: solver_type=smart_solver !builtin_solver !petsc_solver !smart_solver 
 ! By default solver is symmetric but it may be changed later depending on the
 ! conditions.
-logical :: symmetric_solver=.true.
+logical :: symmetric_solver=.false.
 ! save options
 type savedata_options
   logical :: model,disp,stress,porep,psigma,maxtau,nsigma,scf,vmeps
   logical :: model_cell
   logical :: strain
+  logical :: traction
   logical :: gpot,agrav
   logical :: mpot,magb
   logical :: epot
   logical :: infinite
+  logical :: sl0     ! initial sea level
+  logical :: sl      ! current sea level
+  logical :: ice0    ! initial ice level
+  logical :: iceload ! initial ice level
+  logical :: oceanf  ! ocean function 
+  logical :: oceanf0 ! initial ocean function 
+  logical :: ice     ! current ice level
+  logical :: icerate 
   ! Free surface plot. If this option is .TRUE., and the free surface file is
   ! given, the result will be plotted on the free surface.
   logical :: fsplot,fsplot_plane 
@@ -498,10 +546,93 @@ character(len=1),parameter :: CR=achar(13) ! carriage return to overwrite
 ! format string for time step
 character(len=20) :: tstep_sformat
 ! Log file all information
-character(len=250) :: log_file
+character(len=250) :: log_file,out_file, SL_log_file, ICE_log_file, kmat_log_file, debug_file
 ! file unit ID for log file
 integer :: logunit=7
+integer :: outunit=8
 integer :: stdout=6
+
+character(len=250) :: log_msg
+
+
+
+! _________________________ ICE PARAMETERS _________________________
+character(len=250) :: icefile,iceratefile                ! Input file name 
+logical :: is_ICE
+real(kind=kreal), allocatable  :: iceobjs(:,:) !  list of ice objects read in, 
+integer ::  nice_obj            !num of ice objs.
+
+
+real(kind=kreal),parameter :: rho_ice_dim = 917.00_kreal !kg/m^3 for 0 Centrigrade https://www.cs.mcgill.ca/~rwest/wikispeedia/wpcd/wp/i/Ice.htm
+real(kind=kreal)::  rho_ice                              !may be nondimensionalised
+
+
+! _________________________ SEA LEVEL STUFF ___________________________
+
+! Flag for cartesian or global simulation 
+logical :: IS_CART_SIM, IS_GLOB_SIM , is_SL, SL0_is_constant
+character(len=250) :: slfile                ! Input file name 
+integer ::  nsl_obj            !num of ice objs.
+real(kind=kreal), allocatable  :: slobjs(:,:) !  list of ice objects read in, 
+
+
+! Constants: 
+real(kind=kreal),parameter :: rho_water_dim = 999.87_kreal !kg/m^3 for 0 Centrigrade
+real(kind=kreal)::  rho_water 
+
+
+! Sea Level variables
+real(kind=kreal), allocatable     :: oceanf(:,:), nodalOF(:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
+real(kind=kreal)                  :: SL0_constant  ! Constant initial SL value 
+real(kind=kreal), allocatable     :: icnodalSL(:,:)  ! Initial condition for SL (gll pt on face, element on Free Surf.)
+real(kind=kreal), allocatable     :: nodalsl0(:),  nodalsldisp(:)   ! Store of nodal initial SL 
+real(kind=kreal), allocatable     :: nodalice0(:)   ! Store of nodal initial ice 
+
+integer :: allnodesfs ! Number of Nodes on the free surface 
+
+! Sea level degrees of freedom 
+logical :: ISSL_DOF   ! Activates SL or not
+integer,parameter :: nndofsl=1  ! number of sea level degrees of freedom per node - \theta
+integer, dimension(nndofsl) :: idofsl    ! should be an array of size 1 (only 1 dof per node) and the ID will be 5 if phi and u are present
+integer :: nedofsl    ! number of elemental degrees of freedom for sea level
+integer,allocatable  :: edofsl(:) !IDs for SL degrees of freedom per element
+
+! Area of water, Volume of water, for tracking changes in water mass
+real(kind=kreal)     ::  SLarea          = 0.0_kreal 
+real(kind=kreal)     ::  totalSLA        = 0.0_kreal 
+real(kind=kreal)     ::  SLvolume        = 0.0_kreal   
+real(kind=kreal)     ::  SLmasschange    = 0.0_kreal   
+real(kind=kreal)     ::  SLsummasschange = 0.0_kreal   
+real(kind=kreal)     ::  SLarea_old      = 0.0_kreal 
+real(kind=kreal)     ::  SLvolume_old    = 0.0_kreal
+
+real(kind=kreal)     :: icechangevol           ! Volume of ice change
+real(kind=kreal)     :: icemasschange_per_ts   ! mass change per timestep
+real(kind=kreal)     :: icechangevoltmp        ! Volume of ice change temporary
+
+real(kind=kreal)     :: total_ice_mass_change  = 0.0_kreal       ! Over all timesteps
+
+real(kind=kreal), allocatable ::  icerate(:) ! constant value of ice change 
+
+! Arrays for saving different contributions of the ice load: 
+real(kind=kreal), allocatable  :: nodal_iceload_u(:,:), nodal_iceload_phi(:), nodal_iceload_sl(:) ! dim nnode_fs
+
+logical :: verbose_bool     = .true.
+logical :: verbose_save_var = .false.  ! prints when saved to ensight
+
+! Sea level contribution test functions: 
+real(kind=kreal) :: theta_tf    = ONE
+real(kind=kreal) :: u_tf(3)     = ONE
+real(kind=kreal) :: phi_tf      = ONE
+
+integer :: oceannodes, totaloceannodes ! counts the number of ocean nodes (C=1)
+
+! Sea level convergence loop (cloop)
+
+integer :: ncloop_MAX = 10000
+real(kind=kreal) :: CLOOP_CONV_THRESH = 1.0e-14_kreal
+logical :: cloop_converged
+
 
 ! developement variables
 ! By default model is nondimensionalized unless the "devel_nondim" is .false. 
@@ -513,5 +644,9 @@ real(kind=kreal) :: devel_gaminf
 real(kind=kreal) :: devel_rtfac
 ! example: axial_rod
 character(len=20) :: devel_example
+
+
+
+
 end module global
 !===============================================================================

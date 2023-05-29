@@ -14,8 +14,8 @@ contains
 ! TODO
 !  - read and implement CMTSOLUTION
 !  - check for the sources shared among elements/processors
-subroutine earthquake_load(lneq,load,errcode,errtag)
-use dimensionless
+subroutine earthquake_load(lneq,errcode,errtag)
+use nondimensionpar
 use global
 use element,only:hex8_gnode
 use math_constants
@@ -37,7 +37,6 @@ use math_library_serial
 #endif
 implicit none
 integer,intent(in) :: lneq
-real(kind=kreal),intent(inout) :: load(0:lneq)
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 

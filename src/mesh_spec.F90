@@ -9,10 +9,69 @@ private :: rank, get_global,get_global_indirect_addressing, swap_all
 contains
 !-------------------------------------------------------------------------------
 
+! This subroutine just runs a few commands to keep the driver file clean
+subroutine create_spec_elem(tot_nelmt,max_nelmt,min_nelmt, &
+                            tot_nnode,max_nnode,min_nnode, &
+                            errcode,errtag)
+
+! USES
+use global
+use output_to_user
+#if (USE_MPI)
+use mpi_library
+use math_library_mpi
+#else
+use serial_library
+use math_library_serial
+#endif
+use element
+implicit none 
+! IO variables
+character(len=250) :: errtag ! error message
+integer :: errcode
+integer :: tot_nelmt,max_nelmt,min_nelmt,tot_nnode,max_nnode,min_nnode
+
+! Local variables
+
+! Code: 
+  call hex2spec(ndim,ngnode,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
+  call control_error(errcode,errtag,stdout,myrank)
+
+  tot_nelmt=sumscal(nelmt); tot_nnode=sumscal(nnode)
+  max_nelmt=maxscal(nelmt); max_nnode=maxscal(nnode)
+  min_nelmt=minscal(nelmt); min_nnode=minscal(nnode)
+
+  if(myrank==0)then
+    write(logunit,*)'----------- SPECTRAL ELEMENTS ----------'
+
+    write(logunit,'(a, i0)')' * Total                       :  ',tot_nelmt
+    write(logunit,'(a, i0)')' * Min elements per processor  :  ',min_nelmt
+    write(logunit,'(a, i0)')' * Max elements per processor  :  ',max_nelmt
+    write(logunit,*) 
+    write(logunit,'(a, i0)')' * Total nodes                 :  ',tot_nnode
+    write(logunit,'(a, i0)')' * Min nodes per processor     :  ',min_nnode
+    write(logunit,'(a, i0)')' * Max nodes per processor     :  ',max_nnode
+    write(logunit,*)
+    write(logunit,*)
+
+    flush(logunit)
+  endif
+
+  return
+
+end subroutine create_spec_elem
+
+
+
+
+
+
+
+
 ! This subroutine convert all hexahedral meshes (8-noded) to spectral elements
 ! of arbitrary order defined by ngllx, nglly, and ngllz
 subroutine hex2spec(ndim,ngnod,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
-use global,only : g_coord,g_num
+use global,only : g_coord,g_num, logunit, myrank
 use shape_library,only : shape_function_hex8
 use gll_library,only:gllpx,gllpy,gllpz
 
@@ -40,31 +99,36 @@ integer, dimension(:), allocatable :: iglob
 errtag="ERROR: unknown!"
 errcode=-1
 
-ngll=ngllx*nglly*ngllz
 
+ngll=ngllx*nglly*ngllz
 xmin=minval(g_coord(1,:))
 xmax=maxval(g_coord(1,:))
-
 npoint=nelmt*(ngllx*nglly*ngllz)
+
+
+
 allocate(xstore(npoint),ystore(npoint),zstore(npoint),stat=istat)
 if(istat/=0)then
   write(errtag,'(a)')'ERROR: cannot allocate memory!'
   return
 endif
 
+
+
 ! get shape function for 8-noded hex
 call shape_function_hex8(ngnod,ngllx,nglly,ngllz,gllpx,gllpy,gllpz,shape_hex8)
+
 
 ! compute coordinates all local gll points
 xstore=zero
 ystore=zero
 zstore=zero
-
 ipoint=0
 do i_elmt=1,nelmt
   do k=1,ngllz
     do j=1,nglly
       do i=1,ngllx
+
         xgll = zero
         ygll = zero
         zgll = zero
@@ -76,7 +140,6 @@ do i_elmt=1,nelmt
         enddo
 
         ipoint=ipoint+1
-
         xstore(ipoint) = xgll
         ystore(ipoint) = ygll
         zstore(ipoint) = zgll
@@ -85,16 +148,27 @@ do i_elmt=1,nelmt
     enddo
   enddo
 enddo
-deallocate(g_coord,g_num) ! no longer need these
 
+
+
+
+
+deallocate(g_coord,g_num) ! no longer need these
 allocate(iglob(npoint))
+
 
 ! gets ibool indexing from local (gll points) to global points
 call get_global(ndim,xstore,ystore,zstore,iglob,nnode,npoint,xmin,xmax)
 
+
+
+
 ! now we got the new number of nodes (nnode)
 !- we can create a new indirect addressing to reduce cache misses
 call get_global_indirect_addressing(nnode,npoint,iglob)
+
+
+
 
 allocate(g_coord(3,nnode),g_num(ngll,nelmt)) ! alocate with new number of nodes
 ipoint=0
@@ -119,6 +193,13 @@ enddo
 
 deallocate(iglob,xstore,ystore,zstore)
 
+if(myrank.eq.0)then 
+  write(logunit,*)'✓ Finished hexahedra --> spectral elements' 
+  write(logunit,*) 
+endif
+
+
+
 errcode=0
 return
 
@@ -126,7 +207,6 @@ end subroutine hex2spec
 !============================================
 
 subroutine get_global(ndim,xold,yold,zold,iglob,nnode,npoint,xmin,xmax)
-
 ! this routine must be in double precision to avoid sensitivity
 ! to roundoff errors in the coordinates of the points
 
@@ -163,6 +243,10 @@ zp=zold
 
 ! define geometrical tolerance based upon typical size of the model
 smalltol = 1.e-10_kreal * abs(xmax - xmin)
+!write(*,*)'SMALL TOLERANCE IS:', smalltol
+
+
+!write(*,*)'Entered get_global(): '
 
 ! dynamically allocate arrays
   allocate(ind(npoint), &
@@ -173,6 +257,8 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
     write(*,*)'ERROR: error allocating arrays!'
     stop
   endif
+
+
 
 ! establish initial pointers
   do i=1,npoint
@@ -185,21 +271,39 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
   ifseg(1)=.true.
   ninseg(1)=npoint
 
+  !write(*,*)'Sorting: '
+
+
+
   do j=1,ndim
+
+
 
 ! sort within each segment
     ioff=1
+
     do iseg=1,nseg
+
+
       if(j == 1) then
-        call rank(xp(ioff),ind,ninseg(iseg))
+        call rank(xp(ioff), ind, ninseg(iseg))
       else if(j == 2) then
+ 
+
         call rank(yp(ioff),ind,ninseg(iseg))
       else
+
         call rank(zp(ioff),ind,ninseg(iseg))
       endif
+
       call swap_all(iloc(ioff),xp(ioff),yp(ioff),zp(ioff),iwork,work,ind,ninseg(iseg))
+
+      
       ioff=ioff+ninseg(iseg)
     enddo
+
+
+
 
 ! check for jumps in current coordinate
 ! compare the coordinates of the points within a small tolerance
@@ -217,8 +321,10 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
       enddo
     endif
 
+
 ! count up number of different segments
     nseg=0
+    
     do i=1,npoint
       if(ifseg(i)) then
         nseg=nseg+1
@@ -227,7 +333,12 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
         ninseg(nseg)=ninseg(nseg)+1
       endif
     enddo
+
+
+
   enddo ! j=1,ndim
+
+
 
 ! assign global node numbers (now sorted lexicographically)
   ig=0
@@ -238,6 +349,8 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
 
   nnode=ig
 
+  !write(*,*)'IGLOB: ', iglob
+
 ! deallocate arrays
   deallocate(ind)
   deallocate(ninseg)
@@ -247,8 +360,10 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
   end subroutine get_global
 !===========================================
 
-! sorting routines put in same file to allow for inlining
 
+
+
+! sorting routines put in same file to allow for inlining
   subroutine rank(a,ind,n)
 !
 ! use heap sort (numerical recipes)
@@ -262,46 +377,110 @@ smalltol = 1.e-10_kreal * abs(xmax - xmin)
   integer :: i,j,l,ir,indx
   real(kind=kreal) :: q !double precision
 
+
+  !write(*,*)'inside rank: '
+  !write(*,*)'a = ', a
+  !write(*,*)'n = ', n
+  !write(*,*)'ind = ', ind
+
+
+
   do j=1,n
    ind(j)=j
   enddo
+  !write(*,*)'ind array is now: ', ind 
+
 
   if (n == 1) return
 
   l=n/2+1
   ir=n
+
+  !write(*,*)'l = ', l
+  !write(*,*)'ir = ', ir
+
+
   100 continue
+
+   !write(*,*) 'l=  ', l
    if (l>1) then
+       !write(*,*)'l is larger than 1 so subtract 1'
       l=l-1
       indx=ind(l)
+      !write(*,*)'indx = ind(l) = ', indx
       q=a(indx)
+      !write(*,*)'q = a(indx) = ', q
+
    else
+    !write(*,*)'l is NOT larger than 1'
+
       indx=ind(ir)
+      !write(*,*)'indx = ind(ir) = ', indx 
+
       q=a(indx)
+      !write(*,*)'q = a(indx) = ', q 
+
       ind(ir)=ind(1)
+      !write(*,*)'ind(ir) = ind(1)', ind(ir) 
+
       ir=ir-1
+      !write(*,*)'ir -= 1 so ir =', ir 
+
       if (ir == 1) then
+        !write(*,*)'ir now == 1 so'
+
          ind(1)=indx
+         !write(*,*)'ind(1) = indx and RETURN'
          return
       endif
    endif
+
+  
    i=l
+   !write(*,*)'i = l =', i 
    j=l+l
+   !write(*,*)'j = l+l =', j 
+
+   !write(*,*)'____ AT 200 pt'
   200    continue
    if (j <= ir) then
+    !write(*,*)'j <= ir so enter'
+
       if (j<ir) then
-         if ( a(ind(j))<a(ind(j+1)) ) j=j+1
+        !write(*,*)'j < ir so enter'
+
+         if ( a(ind(j))<a(ind(j+1)) ) then 
+          !write(*,*)'a(ind(j))<a(ind(j+1)) so enter'
+          j=j+1
+          !write(*,*) 'j is now += 1   = ', j
+         endif 
       endif
+
       if (q<a(ind(j))) then
+        !write(*,*)'q<a(ind(j)) so enter'
          ind(i)=ind(j)
+         !write(*,*)'ind(i) = ind(j) = ', ind(i)
          i=j
          j=j+j
+         !write(*,*)'i = j = ', i
+         !write(*,*)'j = j+j = ', j
       else
+        !write(*,*)'NOT TRUE q<a(ind(j)) so enters else'
+
          j=ir+1
+         !write(*,*)'j =ir+1 =  ', j
       endif
+      !write(*,*)'Go to 200'
    goto 200
    endif
    ind(i)=indx
+   !write(*,*)'ind(i) = indx =', ind(i)
+   !write(*,*)''
+   !write(*,*)''
+   !write(*,*)'Go to 100'
+   !write(*,*)''
+   !write(*,*)''
+
   goto 100
 
 end subroutine rank
@@ -320,6 +499,8 @@ subroutine swap_all(ia,a,b,c,iw,w,ind,n)
   real(kind=kreal) :: a(n),b(n),c(n),w(n) !double precision
 
   integer :: i
+
+
 
   iw(:) = ia(:)
   w(:) = a(:)
@@ -362,15 +543,19 @@ integer:: i_point
 mask_ibool = -1
 copy_ibool_ori = ibool
 ! reduces misses
+
 inumber = 0
 do i_point=1,npoint
+  
   if(mask_ibool(copy_ibool_ori(i_point)) == -1) then
     inumber = inumber + 1
     ibool(i_point) = inumber
     mask_ibool(copy_ibool_ori(i_point)) = inumber
+
   else
     ! use an existing point created previously
     ibool(i_point) = mask_ibool(copy_ibool_ori(i_point))
+
   endif
 enddo
 return

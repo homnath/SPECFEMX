@@ -11,12 +11,21 @@ use global,only:ismpi,myrank,nproc,stdout
 implicit none
 integer :: errcode
 ismpi=.true. ! parallel
+
+
+
 call MPI_INIT(errcode)
 if(errcode /= 0) call mpierror('ERROR: cannot initialize MPI!',errcode,stdout)
 call MPI_COMM_RANK(MPI_COMM_WORLD,myrank,errcode)
 if(errcode /= 0) call mpierror('ERROR: cannot find processor ID (rank)!',errcode,stdout)
 call MPI_COMM_SIZE(MPI_COMM_WORLD,nproc,errcode)
 if(errcode /= 0) call mpierror('ERROR: cannot find number of processors!',errcode,stdout)
+
+if(myrank==0)then
+    write(*,*)'* Running in parallel... '
+    write(*,*)'  --> number of processors: ', nproc
+  endif
+
 return
 end subroutine start_process
 !=======================================================
@@ -56,7 +65,9 @@ implicit none
 integer,intent(in) :: ierr
 character(len=500),intent(in) :: errsrc
 if(ierr.ne.0)then
-    write(*,*)'ERROR: insufficient memory!'//trim(errsrc)
+    write(*,*)'ERROR: cannot allocate array/s!'
+    write(*,*)'Code: ',ierr
+    write(*,*)'Source: '//trim(errsrc)
     stop
 endif
 end subroutine check_allocate

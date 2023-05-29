@@ -80,7 +80,7 @@ end subroutine count_cmtsolution
 !  HNG, Oct 04, 2018
 ! TODO
 subroutine read_cmtsolution(source_coord,M_cmt,errcode,errtag)
-use dimensionless
+use nondimensionpar
 use global
 use math_constants
 use conversion_constants

@@ -47,6 +47,18 @@ real(kind=kreal),intent(in) :: storekmat(:,:,:)
 end subroutine petsc_set_stiffness_matrix
 !=======================================================
 
+subroutine petsc_set_stiffness_matrix_freq(storekmat,storemmat,freq,           &
+scale_freq2,isscale_freq2)
+use ieee_arithmetic
+implicit none
+
+real(kind=kreal),intent(in) :: storekmat(:,:,:),storemmat(:,:)
+
+real(kind=kreal),intent(in) :: freq,scale_freq2 ! angular frequency                           
+logical,intent(in) :: isscale_freq2
+end subroutine petsc_set_stiffness_matrix_freq
+!=======================================================
+
 subroutine petsc_set_vector(rload)
 !use global,only:l2gdof,nelmt,NEDOF
 use ieee_arithmetic
@@ -70,6 +82,11 @@ implicit none
 real(kind=kreal),intent(in) :: rload(0:)
 
 end subroutine petsc_set_initialguess
+!=======================================================
+
+subroutine petsc_set_solver()
+implicit none
+end subroutine petsc_set_solver
 !=======================================================
 
 subroutine petsc_solve(sdata,cg_iter,ireason)
