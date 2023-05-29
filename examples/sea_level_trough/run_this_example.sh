@@ -15,6 +15,19 @@ check_dir_exists() {
 }
 
 
+function cmp_files(){
+    # Compare with stable output from partmesh - should return blank if identical
+    if [ -n "$(cmp $1 $2)" ]
+    then 
+        # Error - not the same
+        echo 1
+    else 
+        echo 0
+    fi
+    
+}
+
+
 
 
 echo ""
@@ -56,11 +69,13 @@ echo " - Running partmesh: "
 # slightly for each run
 awk '!/total elapsed time/' partmesh_output.txt > tmpfile && mv tmpfile partmesh_output.txt
 
-# Compare with stable output from partmesh - should return blank if 
-if [ -n "$(cmp ../examples/sea_level_trough/stable_partmesh_output.txt partmesh_output.txt)" ]
-then 
-    echo " WARNING: OUTPUT FILES ARE DIFFERENT"
-    exit
+
+
+# Compare with stable output from partmesh - should return 0 if identical
+result=$(cmp_files "../examples/sea_level_trough/stable_partmesh_output.txt" "partmesh_output.txt")
+
+if [ $result -eq 1 ]; then 
+    echo -e " WARNING: OUTPUT FILES ARE DIFFERENT"
 else 
     echo "  -- partmesh output files are the same (yay!)"
 fi 

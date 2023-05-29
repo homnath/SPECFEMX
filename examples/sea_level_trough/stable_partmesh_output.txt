@@ -45,5 +45,4 @@ nbc=  1... ./input/uptrough/uptrough_free_surface
 complete!
  number of partitions:           40
  mesh partitioning finished successfully!
- total elapsed time:    1.863151     s
  -----------------------------------------
