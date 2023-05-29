@@ -174,6 +174,7 @@ src:do i_src=1,ncmt_source
   ismrt=.false.
   ismrp=.false.
   ismtp=.false.
+print*,'testing'
   do i_line=1,nline_cmtsolution
     read(11,'(a)',iostat=ios)line ! This will read a line and proceed to next line
     if (ios/=0)exit src

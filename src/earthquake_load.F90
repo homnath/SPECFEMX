@@ -610,6 +610,7 @@ elseif(eqsource_type==1)then
   ! 6: Mzx
   ! read CMT sources
   call read_cmtsolution(source_coord,M_cmt,errcode,errtag)
+  print*,'hello',myrank
   if(errcode.ne.0)return
   ! NOTE: all quantities are nondimensionalized within read_cmtsolution routine
 

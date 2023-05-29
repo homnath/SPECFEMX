@@ -886,7 +886,8 @@ loop_step: do i_step=istep0,nstep
   endif
   ! moment-density tensor apparoch: compute equivalent moment-density tensor
   ! from the prescribe slip on the fault
-  if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
+  if(iseqsource.and.eqsource_type.lt.3)then
+    if((steptype.eq.TIMESTEP.and.i_step==1) .or. steptype.eq.FREQSTEP)then
     if(myrank==0)then
       write(logunit,'(a)')'  Earthquake source type: moment-density tensor'
       flush(logunit)
@@ -898,6 +899,8 @@ loop_step: do i_step=istep0,nstep
       !WARNING: make it general for nsrc
       sff=source_frequency_function_complex(freq,source_hdur(1))
       extload=extload*sff
+      print*,myrank,maxval(abs(extload)),sff
+    endif
     endif
   endif
   
