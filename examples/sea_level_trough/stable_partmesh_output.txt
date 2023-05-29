@@ -1,0 +1,49 @@
+reading main input file...
+ infinite elements: NO
+ * Detected sea level flag
+   --> Fetching information from file: uptrough_SL
+         + Saving initial Sea Level
+         + Saving ocean functions
+   --> See uptroughSL.log for details 
+ 
+ * Detected ice flag
+   --> Fetching information from file: uptrough_ice
+         + Saving initial ice distribution
+         + Saving ice rate
+         + Saving ice load
+   --> See uptroughICE.log for details 
+ 
+ * Detected devel flag
+ 
+ relaxation time factor: 1.00000
+complete!
+reading mesh & material IDs...
+ Reading the icerate values...
+complete!
+reading material properties...
+ Number of empty blocks: 0
+ Number of viscoelastic blocks: 0
+complete!
+ partition directory: ./partition/
+ matfile: uptrough_material_list
+ nodes valence: 
+   min =            1 max =            8
+   nsize =            8 sup_neighbour =           38
+ mesh2dual: 
+   max_neighbour =           26
+   sup_neighbour =           38
+ mat id:           1           1
+ domains: T
+ domains: F
+ domains: F
+ domains: F
+ num_material:           1           1
+writing bc files... ./input/uptrough/uptrough_ssbcux
+nbc=  1... ./input/uptrough/uptrough_ssbcuy
+nbc=  1... ./input/uptrough/uptrough_ssbcuz
+nbc=  1... ./input/uptrough/uptrough_free_surface
+complete!
+ number of partitions:           40
+ mesh partitioning finished successfully!
+ total elapsed time:    1.863151     s
+ -----------------------------------------
