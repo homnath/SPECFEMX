@@ -139,7 +139,7 @@ character(len=80) :: fname
 character(len=80) :: data_path
 character(len=250) :: pfile
 
-logical :: islat,islong,isdepth,ismrr,ismtt,ismpp,ismrt,ismrp,ismtp
+logical :: istshift,ishdur,islat,islong,isdepth,ismrr,ismtt,ismpp,ismrt,ismrp,ismtp
 errtag="ERROR: unknown!"
 errcode=-1
 
@@ -165,6 +165,8 @@ allocate(isrc_located(ncmt_source))
 isrc_located=0
 nsrc=0
 src:do i_src=1,ncmt_source
+  istshift=.false.
+  ishdur=.false.
   islat=.false.
   islong=.false.
   isdepth=.false.
@@ -198,7 +200,7 @@ print*,'testing'
         write(*,*)'ERROR: cannot read time shift!',ind,trim(line)
         stop
       endif
-      islat=.true.
+      istshift=.true.
     endif
     ! half duration
     if (trim(token)=='half')then
@@ -216,7 +218,7 @@ print*,'testing'
         write(*,*)'ERROR: cannot read half duration!',ind,trim(line)
         stop
       endif
-      islat=.true.
+      ishdur=.true.
     endif
     ! latitude
     if (trim(token)=='latitude:')then
@@ -416,6 +418,14 @@ print*,'testing'
     endif
   enddo
   ! Check status
+  if(.not.istshift)then
+    write(errtag,*)'ERROR: cannot read time shift!'
+    return
+  endif
+  if(.not.ishdur)then
+    write(errtag,*)'ERROR: cannot read ihalf duration!'
+    return
+  endif
   if(.not.islat)then
     write(errtag,*)'ERROR: cannot read latitude!'
     return
@@ -561,7 +571,7 @@ print*,'testing'
     ! Nondimensionalize
     M_cmt(:,i_src)=NONDIM_MTENS*CGS2SI_MOMENT*M_cmt(:,i_src)
     source_coord(:,i_src)=NONDIM_L*source_coord(:,i_src)
-  elseif(trim(cmt_mapto).eq.'UTM')then
+  else !UTM or NONE
     ! Nondimentionalize M
     ! NOTE: unit of M is in CGS units. We should convert them to SI unit.
     Mpp=NONDIM_MTENS*CGS2SI_MOMENT*Mpp
@@ -591,10 +601,17 @@ print*,'testing'
     M_cmt(4,i_src)=-Mtp !Mxy
     M_cmt(5,i_src)=-Mrt !Myz
     M_cmt(6,i_src)= Mrp !Mzx
- 
-    ! Compute UTM coordinates
-    call geodetic2utm(long,lat,utmx(1),utmx(2))
-    print*,utmx 
+
+    if(trim(cmt_mapto).eq.'UTM')then
+      ! Compute UTM coordinates
+      call geodetic2utm(long,lat,utmx(1),utmx(2))
+    elseif(trim(cmt_mapto).eq.'NONE')then
+      utmx(1)=long
+      utmx(2)=lat
+    else
+      write(errtag,*)'ERROR: number of CMT sources mismatch!'
+      return
+    endif
     ! Nondimentionalize coordinates
     utmx=NONDIM_L*utmx
     depth=NONDIM_L*KM2M*depth
@@ -608,6 +625,9 @@ print*,'testing'
     ! NOTE: All the processors will try to find elevation, but only a single
     ! processor or processors shared by the point will find the correct elevation.
     ! Otherwise the elevation is set to ZERO.
+    ! NOTE: At the time of calling this routine, coordinates are
+    ! nondimensionalized. Therefore, the passing coordinates must also be
+    ! nondimensionalizaed.
     call free_surface_elevation(utmx,elevation,isrc_located(i_src))
 
     source_coord(3,i_src)=elevation-depth
@@ -639,10 +659,6 @@ print*,'testing'
       this_src_located
       flush(logunit)
     endif
-
-  elseif(trim(cmt_mapto).eq.'NONE')then
-
-  else
 
   endif
 
