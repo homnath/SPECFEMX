@@ -664,11 +664,11 @@ elseif(petsc_solver_type.eq.SUPERLU)then
     !call MatSuperluSetILUDropTol(Fmat,1.e-8,ierr);
     !CHKERRA(ierr)
   endif
-elseif(petsc_solver_type.eq.MUMPS)then
-  if(myrank==0)then
-    write(logunit,'(a)')'Solver type: MUMPS'
-    flush(logunit)
-  endif
+!elseif(petsc_solver_type.eq.MUMPS)then
+!  if(myrank==0)then
+!    write(logunit,'(a)')'Solver type: MUMPS'
+!    flush(logunit)
+!  endif
 !  flg_lu    = PETSC_FALSE;
 !  flg_ch = PETSC_FALSE;
 !  ! version < 3.8.0
@@ -698,9 +698,9 @@ elseif(petsc_solver_type.eq.MUMPS)then
 !    icntl = 1; val = 0.0;
 !    call MatMumpsSetCntl(Fmat,icntl,val,ierr);
 !  endif
-  call KSPSetType(ksp,KSPPREONLY,ierr)
-  call KSPGetPC(ksp,pc,ierr)
-  call PCSetType(pc,PCLU,ierr)
+!  call KSPSetType(ksp,KSPPREONLY,ierr)
+!  call KSPGetPC(ksp,pc,ierr)
+!  call PCSetType(pc,PCLU,ierr)
 !  call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr)
 !  call PCFactorSetUpMatSolverType(pc,ierr)
 !  call PCFactorGetMatrix(pc,Fmat,ierr)
@@ -748,49 +748,49 @@ errsrc=trim(myfname)//' => petsc_set_solver'
 petsc_solver_type=1
 !petsc_solver_type=MUMPS
 
-if(petsc_solver_type.eq.SUPERLU)then
-  if(myrank==0)then
-    write(logunit,'(a)')'Solver type: SUPERLU'
-    flush(logunit)
-  endif
-    call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
-    CHKERRA(ierr)
-    call PCFactorSetMatSolverType(pc,MATSOLVERSUPERLU,ierr);
-    CHKERRA(ierr)
-    call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
-    CHKERRA(ierr)
- 
-    call PCFactorGetMatrix(pc,Fmat,ierr);
-    CHKERRA(ierr)
+!if(petsc_solver_type.eq.SUPERLU)then
+!  if(myrank==0)then
+!    write(logunit,'(a)')'Solver type: SUPERLU'
+!    flush(logunit)
+!  endif
+!    call PCFactorSetShiftType(pc,MAT_SHIFT_POSITIVE_DEFINITE,ierr)
+!    CHKERRA(ierr)
+!    call PCFactorSetMatSolverType(pc,MATSOLVERSUPERLU,ierr);
+!    CHKERRA(ierr)
+!    call PCFactorSetUpMatSolverType(pc,ierr); ! call MatGetFactor() to create F
+!    CHKERRA(ierr)
+! 
+!    call PCFactorGetMatrix(pc,Fmat,ierr);
+!    CHKERRA(ierr)
     !call MatSuperluSetILUDropTol(Fmat,1.e-8,ierr);
     !CHKERRA(ierr)
-elseif(petsc_solver_type.eq.MUMPS)then
-  if(myrank==0)then
-    write(logunit,'(a)')'Solver type: MUMPS'
-    flush(logunit)
-  endif
-  call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr)
-  call PCFactorSetUpMatSolverType(pc,ierr)
-  call PCFactorGetMatrix(pc,Fmat,ierr)
+!elseif(petsc_solver_type.eq.MUMPS)then
+ !  if(myrank==0)then
+ !   write(logunit,'(a)')'Solver type: MUMPS'
+ !   flush(logunit)
+ ! endif
+ ! call PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,ierr)
+ ! call PCFactorSetUpMatSolverType(pc,ierr)
+ ! call PCFactorGetMatrix(pc,Fmat,ierr)
 
   !sequential ordering
-  icntl = 7
-  ival  = 2
-   call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+ ! icntl = 7
+ ! ival  = 2
+ !  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
 
   !threshold for row pivot detection
-  icntl = 24
-  ival  = 1
-  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
-  icntl = 3
-  val = 1.e-6
-  call MatMumpsSetCntl(Fmat,icntl,val,ierr)
+ ! icntl = 24
+ ! ival  = 1
+ ! call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+ ! icntl = 3
+ ! val = 1.e-6
+ ! call MatMumpsSetCntl(Fmat,icntl,val,ierr)
 
   !compute determinant of A
-  icntl = 33
-  ival  = 1
-  call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
-endif
+ ! icntl = 33
+ ! ival  = 1
+ ! call MatMumpsSetIcntl(Fmat,icntl,ival,ierr)
+!endif
 
 end subroutine petsc_set_solver
 !===============================================================================
