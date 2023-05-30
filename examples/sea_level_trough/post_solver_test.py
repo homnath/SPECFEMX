@@ -8,7 +8,7 @@ nsteps    = 2
 
 
 # Create tester:
-tester = Tester(TEST_ID, NPROCS, dpath_trial='./example_output', dpath_stable='./example_output')
+tester = Tester(TEST_ID, NPROCS, dpath_trial='./output_uptrough/', dpath_stable='./stable_output')
 tester.print_test_stats(nsteps=nsteps, verb=verb, bodyvars=body_vars)
 
 # Loop through timesteps:
