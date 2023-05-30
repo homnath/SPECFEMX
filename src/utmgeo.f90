@@ -110,6 +110,7 @@ ep2=e2/(1.d0-e2)
 !
 !---- Set Zone parameters
 !
+print*,'UTM_ZONE',UTM_ZONE,rlon4,rlat4
 
 lsouth = .false.
 if (UTM_ZONE < 0) lsouth = .true.

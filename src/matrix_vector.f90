@@ -401,8 +401,6 @@ module matrix_vector
       rhoload(0)=ZERO
     endif
     
-    print*,'WHAT:',maxval(abs(storekmat))
-
     end subroutine compute_stiffness_elastic
     !===============================================================================
     

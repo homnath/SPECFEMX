@@ -487,10 +487,11 @@ loop_step: do i_step=istep0,nstep
   if(iseqsource.and.eqsource_type.eq.3)then
     call compute_split_node_load(t, i_step, sfac, &
                                   errcode, errtag)
-    print*,myrank,maxval(abs(extload))
+    !print*,myrank,'NSPLIT extload:',maxval(abs(extload))
   endif 
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
     call compute_cmt_load(freq)
+    !print*,myrank,'CMT extload:',maxval(abs(extload))
   ! electrical current prescribed at points
   if(isecurrent.and.i_step==1)then
     call compute_electrical_load(errcode,errtag)
@@ -501,10 +502,7 @@ loop_step: do i_step=istep0,nstep
   if (is_ICE)then 
     call calc_ice_load(nodalicerate, i_step=i_step)
   endif   
-  print*,'WHERE1:',maxval(abs(storekmat))
 
-
-  print*,'WHERE1:',maxval(abs(storekmat))
   ! Apply non-zero boundary conditions to the bcnodalv array 
   ! Note this is NOT applying the loading terms (e.g. extload)
   call apply_nonzero_bc()

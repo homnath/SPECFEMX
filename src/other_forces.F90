@@ -1,6 +1,4 @@
 ! Holds all the bits for forces that aren't traction: 
-
-
 module other_forces 
 
 implicit none
