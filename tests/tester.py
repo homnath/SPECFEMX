@@ -7,8 +7,8 @@ class Tester():
     def __init__(self, test_id, nprocs, dpath_trial, dpath_stable, precision=1e-10):
 
         self.id             = test_id
-        self.trial_fpath    = f'{dpath_trial}/{self.id}'
-        self.stable_fpath   = f'{dpath_stable}/{self.id}'
+        self.trial_fpath    = f'{dpath_trial}'
+        self.stable_fpath   = f'{dpath_stable}'
 
         self.nprocs = nprocs
         self.lnp = len(str(self.nprocs))
