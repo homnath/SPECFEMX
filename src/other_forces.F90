@@ -1,6 +1,4 @@
 ! Holds all the bits for forces that aren't traction: 
-
-
 module other_forces 
 
 implicit none
@@ -130,9 +128,9 @@ subroutine compute_split_node_load(t, i_step, sfac, errcode, errtag)
       endif
 
       if(srate)then
-        extload=t*slipload
+        extload=extload+t*slipload
       else
-        extload=slipload
+        extload=extload+slipload
       endif
 
     print*,'Hello0:',maxval(abs(extload))

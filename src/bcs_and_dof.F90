@@ -20,6 +20,7 @@ use global
 use math_constants
 use set_precision
 use output_to_user
+!use ghost
 #if(USE_MPI)
 use mpi_library
 use math_library_mpi

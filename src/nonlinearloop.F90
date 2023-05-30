@@ -30,15 +30,13 @@ subroutine write_cpu_timer(format_str, cpu_tstart,cpu_tend,telap)
 
 end subroutine write_cpu_timer
 
-
-
 !#######################################################################
 subroutine run_solver(scale_ang_freq2, ksp_iter, errcode,  &
                       ksp_convreason, errtag, isscale_ang_freq)
-    ! USES
-    use global 
-    use set_precision
-    use output_to_user
+! USES
+use global 
+use set_precision
+use output_to_user
 
 #if (USE_MPI)
 use mpi_library
@@ -57,9 +55,6 @@ use sparse_serial
 use solver
 use solver_petsc
 #endif
-
-
-
     implicit none
     
     ! IO 
@@ -109,8 +104,7 @@ use solver_petsc
 end subroutine run_solver
 !#######################################################################
 
-subroutine check_convergence(uerr, maxu, maxdu,  & 
-                             nl_isconv, i_nliter)
+subroutine check_convergence(i_nliter,maxu,maxdu,nl_isconv)
 ! USES
 use global 
 use math_constants
@@ -123,10 +117,11 @@ use math_library_serial
   implicit none 
 
   ! IO 
-  real(kind=kreal) :: uerr,maxu,maxdu
-  logical :: nl_isconv ! is there nonlinear convergence bool 
-  integer :: i_nliter
-  ! Local: none
+  integer,intent(in) :: i_nliter
+  real(kind=kreal),intent(in) :: maxu,maxdu
+  logical,intent(out) :: nl_isconv ! is there nonlinear convergence bool 
+  ! Local
+  real(kind=kreal) :: uerr
 
   ! Code: 
     if(isplastic)then
@@ -224,12 +219,7 @@ end subroutine update_nodal_u_vector
 
 !#######################################################################
 
-subroutine calc_stressstrain(nl_iter, devp, dt_vp, evp, flow,  &
-                             m1, m2, m3, nl_isconv,  &
-                             erate, cmat, estrain, sigma, effsigma, &
-                             jacw, strain_elmt, evpt ,    &
-                             stress_elmt, dq1, dq2, dq3, dsbar, f,     &
-                             fmax,lode_theta,sigm)
+subroutine calc_stressstrain(nl_iter,nl_isconv,strain_elmt,stress_elmt,evpt,fmax)
 
   ! USES
   use global
@@ -243,20 +233,18 @@ subroutine calc_stressstrain(nl_iter, devp, dt_vp, evp, flow,  &
   implicit none 
 
   ! IO 
-  logical :: nl_isconv
-  integer :: nl_iter
+  logical,intent(in) :: nl_isconv
+  integer,intent(in) :: nl_iter
+  real(kind=kreal),intent(inout) :: fmax
+  real(kind=kreal) :: strain_elmt(:,:,:),stress_elmt(:,:,:), evpt(:,:,:)
 
-  real(kind=kreal) :: dq1, dq2, dq3, dsbar, f, fmax, lode_theta, sigm, &
+  ! Local 
+  integer :: i_elmt, ielmt, imat, i_gll
+  real(kind=kreal) :: dq1, dq2, dq3, dsbar, f, lode_theta, sigm, &
                       jacw, dt_vp, cmat(nst,nst), estrain(nst),        &
                       sigma(nst), effsigma(nst), devp(nst), erate(nst),&
                       evp(nst), m1(nst,nst), m2(nst,nst), m3(nst,nst), & 
                       flow(nst,nst)
-
-  real(kind=kreal),allocatable :: strain_elmt(:,:,:), &
-                                  stress_elmt(:,:,:), evpt(:,:,:)
-
-  ! Local 
-  integer :: i_elmt, ielmt, imat, i_gll
   
   
   ! CODE: 
@@ -547,9 +535,9 @@ nonlinear: do i_nliter=1,NL_MAXITER
 
   ! Get maximum value of u (disp/grav/sl etc)
   maxu=maxscal(maxval(abs(u)))
-
+  print*,'Hellooooooo:',maxu
   ! check convergence
-  call check_convergence(uerr, maxu, maxdu, nl_isconv, i_nliter)
+  call check_convergence(i_nliter,maxu, maxdu, nl_isconv)
 
   ! Update nodal vectors following inversion step 
   call sync_process()
@@ -574,21 +562,14 @@ nonlinear: do i_nliter=1,NL_MAXITER
     ! We should change this for efficiency.
     if(isplastic)bload=ZERO
     ! Calculate elastic/plastic stress & strain  
-    call calc_stressstrain(nl_iter, devp, dt_vp, evp, flow,  &
-                          m1, m2, m3, nl_isconv,  &
-                          erate, cmat, estrain, sigma, effsigma, &
-                          jacw, strain_elmt, evpt ,    &
-                          stress_elmt, dq1, dq2, dq3, dsbar, f,     &
-                          fmax,lode_theta,sigm)
+    call calc_stressstrain(nl_iter,nl_isconv,strain_elmt,stress_elmt,evpt,fmax)
     bodyload(0)=ZERO
-
 
     ! If all elastic then leave non-linear loop because only one timestep 
     !if(allelastic) then 
     !  write(logunit,*)' ALL ELASTIC --> EXITING NON LINEAR'
     !  exit nonlinear
     !endif 
-
 
     ! Calculate stress and strain for viscoelastic elements
     call visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
@@ -600,8 +581,6 @@ nonlinear: do i_nliter=1,NL_MAXITER
     bodyload(0)=ZERO
     !viscoload(0)=ZERO
   endif !(ISDISP_DOF) 
-
-
 
   ! time step 0  and i_nliter 0 is entirely elastic
   ! write data for tiem step 0
