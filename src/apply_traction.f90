@@ -108,7 +108,7 @@ if(istraction)then
         !lngdof=gdof(idofu,g_num(hex8_gnode(inode),ielmt))
 
         lngdof=gdof(idofu,gnum_fs(igll, fs_elem_id( ielmt))) 
-        load(lngdof)=load(lngdof)+q
+        extload(lngdof)=extload(lngdof)+q
 
         write(logunit,*)'Added traction at gnum: ', gnum_fs(igll, fs_elem_id( ielmt))
         write(logunit,*)'                  gdof: ', lngdof
@@ -187,7 +187,7 @@ if(istraction)then
         enddo
 
         ! Add traction contribution to load
-        load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
+        extload(fgdof(1:nfdof))=extload(fgdof(1:nfdof))+ftracload(1:nfdof)
 
 
         ! reshape the traction addition vector into a (NDIM x MAXNGLL2D)
@@ -255,7 +255,7 @@ if(istraction)then
           ftracload(3:nfdof:3)=ftracload(3:nfdof:3)+ &
           q(3)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) ! *face_normal(3) !only in Z direction
        enddo
-       load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
+       extload(fgdof(1:nfdof))=extload(fgdof(1:nfdof))+ftracload(1:nfdof)
      enddo
      trac_stat=.true.
     elseif(tractype==23)then ! torsion
@@ -336,7 +336,7 @@ if(istraction)then
           ftracload(3:nfdof:3)=ftracload(3:nfdof:3)+ &
           q(3)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) ! *face_normal(3) !only in Z direction
        enddo
-       load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
+       extload(fgdof(1:nfdof))=extload(fgdof(1:nfdof))+ftracload(1:nfdof)
      enddo
      trac_stat=.true.
     else
@@ -443,7 +443,7 @@ if(isfstraction0.and.nnode_fs>0)then
       detjac=sqrt(dot_product(face_normal,face_normal))
       face_normal=hexface_sign(iface)*face_normal/detjac
 
-      load(igdofu)=load(igdofu)+detjac*gll_weights(i_gll)*q
+      extload(igdofu)=extload(igdofu)+detjac*gll_weights(i_gll)*q
       
     enddo
   enddo

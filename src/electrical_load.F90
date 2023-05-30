@@ -343,7 +343,7 @@ source: do i_src=1,nsource
   !  ! add average load per source
   !  load=load+sload/real(n_felmt,kreal)
   !else
-    load=load+sload
+    extload=extload+sload
   !endif
 enddo source ! i_src
 deallocate(isnode,iselmt)
