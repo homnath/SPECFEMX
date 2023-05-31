@@ -133,7 +133,6 @@ subroutine compute_split_node_load(t, i_step, sfac, errcode, errtag)
         extload=extload+slipload
       endif
 
-    print*,'Hello0:',maxval(abs(extload))
     return 
 
 end subroutine compute_split_node_load

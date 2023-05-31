@@ -4,7 +4,7 @@
 module nonlinearloop 
 
 contains
-
+!_______________________________________________________________________________
 
 !#######################################################################
 subroutine write_cpu_timer(format_str, cpu_tstart,cpu_tend,telap)
@@ -158,7 +158,6 @@ subroutine update_nodal_u_vector(nodalslrate)
   use math_constants
   implicit none 
 
-
   ! IO 
   real(kind=kreal),allocatable :: nodalslrate(:)
   ! local: 
@@ -167,8 +166,6 @@ subroutine update_nodal_u_vector(nodalslrate)
 
   ! Code: 
   ! update total nodal solution vector
-
-  
   if(ISDISP_DOF)then
     do i_dof=1,nndofu
       idof=idofu(i_dof)
@@ -216,10 +213,9 @@ subroutine update_nodal_u_vector(nodalslrate)
 end subroutine update_nodal_u_vector
 
 
-
 !#######################################################################
 
-subroutine calc_stressstrain(nl_iter,nl_isconv,strain_elmt,stress_elmt,evpt,fmax)
+subroutine calc_stressstrain(nl_iter,nl_isconv,fmax)
 
   ! USES
   use global
@@ -236,7 +232,6 @@ subroutine calc_stressstrain(nl_iter,nl_isconv,strain_elmt,stress_elmt,evpt,fmax
   logical,intent(in) :: nl_isconv
   integer,intent(in) :: nl_iter
   real(kind=kreal),intent(inout) :: fmax
-  real(kind=kreal) :: strain_elmt(:,:,:),stress_elmt(:,:,:), evpt(:,:,:)
 
   ! Local 
   integer :: i_elmt, ielmt, imat, i_gll
@@ -323,8 +318,8 @@ end subroutine calc_stressstrain
 ! Calculate stress and strain for viscoelastic elements
 subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma,  & 
                               e0, i_step,& 
-                              K, G, strain_elmt, i_nliter,      &
-                              stress_elmt, estrain,dev_strain, jacw,   &
+                              K, G, i_nliter,      &
+                              estrain,dev_strain, jacw,   &
                               trace_strain,esigma,vsigma,    &
                               imatve, dt, q0)
   ! USES 
@@ -341,9 +336,7 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
                       dev_strain(nst), esigma(nst), vsigma(nst),       &  
                       e0(nst), vesigma(nst)
 
-  real(kind=kreal),allocatable :: q0(:,:),          &
-                                  strain_elmt(:,:,:),        &
-                                  stress_elmt(:,:,:)
+  real(kind=kreal),allocatable :: q0(:,:)
 
   integer :: i_step, i_nliter, imatve, nl_iter
   real(kind=kreal) :: muratio(nmaxwell),tratio(nmaxwell)
@@ -433,7 +426,7 @@ end subroutine visco_stressstrain
 subroutine run_nonlinear_solver(isscale_ang_freq,&
                                 ksp_iter,scale_ang_freq2, nl_iter, ksp_tot, uerr,&
                                 nl_isconv, nodalslrate, dt_vp, & 
-                                strain_elmt, evpt, f, stress_elmt, &
+                                f, &
                                 i_step, dt, q0)
 use global
 use local
@@ -453,7 +446,6 @@ implicit none
 
 ! IO variables: 
 real(kind=kreal),allocatable :: nodalslrate(:), q0(:,:)
-real(kind=kreal),allocatable :: strain_elmt(:,:,:), evpt(:,:,:), stress_elmt(:,:,:)
 real(kind=kreal) :: uerr
 
 logical :: isscale_ang_freq,nl_isconv
@@ -535,7 +527,6 @@ nonlinear: do i_nliter=1,NL_MAXITER
 
   ! Get maximum value of u (disp/grav/sl etc)
   maxu=maxscal(maxval(abs(u)))
-  print*,'Hellooooooo:',maxu
   ! check convergence
   call check_convergence(i_nliter,maxu, maxdu, nl_isconv)
 
@@ -562,7 +553,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
     ! We should change this for efficiency.
     if(isplastic)bload=ZERO
     ! Calculate elastic/plastic stress & strain  
-    call calc_stressstrain(nl_iter,nl_isconv,strain_elmt,stress_elmt,evpt,fmax)
+    call calc_stressstrain(nl_iter,nl_isconv,fmax)
     bodyload(0)=ZERO
 
     ! If all elastic then leave non-linear loop because only one timestep 
@@ -574,8 +565,8 @@ nonlinear: do i_nliter=1,NL_MAXITER
     ! Calculate stress and strain for viscoelastic elements
     call visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
                             e0, i_step, &
-                            K, G, strain_elmt, i_nliter,      & 
-                            stress_elmt, estrain, dev_strain, jacw,  &
+                            K, G, i_nliter,      & 
+                            estrain, dev_strain, jacw,  &
                             trace_strain, esigma, vsigma, &
                             imatve, dt, q0)
     bodyload(0)=ZERO

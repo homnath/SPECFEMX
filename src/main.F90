@@ -131,11 +131,6 @@ integer :: i
 !ubcload: load contributed by displacement BC
 !load: like resload. Not currently used
 
-!strain_elmt: strain for all elements
-!stress_elmt: stress for each element
-!stress_nodal: nodal stress for all elements in processor
-real(kind=kreal),allocatable :: strain_elmt(:,:,:),strain_nodal(:,:),      &
-stress_elmt(:,:,:),stress_nodal(:,:),evpt(:,:,:)
 !bcnodalv: prescribed BC nodal variables
 !nodalu: nodal displacement for all nodes (not just BC)
 
@@ -242,9 +237,7 @@ call initialise_local_arrays()
 call sort_gdofs_and_bc()
 call initialise_equation_arrays()
 ! Calculate any prestress 
-call calculate_prestress(strain_elmt, strain_nodal,       &
-                         stress_elmt, stress_nodal,       & 
-                         errcode, errtag, ksp_iter, istat)
+call calculate_prestress(errcode, errtag, ksp_iter)
    
 ! compute node valency and assemble all node_valency across processors
 call calculate_valency()
@@ -391,8 +384,6 @@ if(is_SL)then
   call summarise_SL_input(nodalsl)                       
 endif 
 
-
-
 ! Write initial (pre-looping) values to istep = 0
 if(myrank.eq.0)then
   write(*,*)' Saving initial values to ensight: '
@@ -407,9 +398,7 @@ if(savedata%oceanf)then
   call write_OF_to_ensight(i_step=istep0-1)
 endif 
 call save_pot_variables(i_step=istep0-1)
-call save_displacement_variables(strain_elmt, strain_nodal, &
-                                 stress_elmt, stress_nodal, & 
-                                 i_step=istep0-1)
+call save_displacement_variables(i_step=istep0-1)
 
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
@@ -539,8 +528,7 @@ loop_step: do i_step=istep0,nstep
   call run_nonlinear_solver(isscale_ang_freq,         &
                             ksp_iter, scale_ang_freq2, nl_iter, ksp_tot, uerr, &
                             nl_isconv, nodalslrate, dt_vp, &
-                            strain_elmt, evpt, &
-                            f, stress_elmt, i_step, dt, q0)
+                            f, i_step, dt, q0)
 
 
   ! Now need to remove the sea level contribution to the kmat so we can reuse it 
@@ -569,9 +557,7 @@ loop_step: do i_step=istep0,nstep
 
   ! Save displacement variables to Ensight
   if(ISDISP_DOF)then
-    call save_displacement_variables(strain_elmt, strain_nodal, &
-                                    stress_elmt, stress_nodal, & 
-                                    i_step=i_step)
+    call save_displacement_variables(i_step=i_step)
   endif
 
 

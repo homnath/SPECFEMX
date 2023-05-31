@@ -318,8 +318,10 @@ if(infbc)then
   close(11)
 endif
 
-write(logunit,*)' ✓  Applied boundary conditions'
-write(logunit,*)
+if(myrank.eq.0)then
+  write(logunit,*)' ✓  Applied boundary conditions'
+  write(logunit,*)
+endif
 errcode=0
 
 return
@@ -385,7 +387,6 @@ subroutine apply_nonzero_bc()
       enddo
     enddo
   endif
-
 
 end subroutine apply_nonzero_bc
 !===============================================================================

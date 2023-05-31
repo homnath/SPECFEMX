@@ -132,9 +132,7 @@ use serial_library
 end subroutine save_pot_variables
 !===============================================================================
 
-subroutine save_displacement_variables(strain_elmt, strain_nodal, &
-                                       stress_elmt, stress_nodal, & 
-                                       i_step )
+subroutine save_displacement_variables(i_step )
 
     ! USES
 use global 
@@ -150,13 +148,11 @@ use serial_library
 #endif 
 
   ! IO variables
+  integer :: i_step
   ! Local variables  
-  integer :: i_step, i_comp
-  real(kind=kreal),allocatable :: strain_elmt(:,:,:),strain_nodal(:,:),      &
-                                  stress_elmt(:,:,:),stress_nodal(:,:)
+  integer :: i_comp
 
   real(kind=kreal):: dm 
-
 
   ! CODE: 
   

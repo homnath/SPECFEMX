@@ -38,11 +38,12 @@ implicit none
 ! Local 
 integer :: istat, errcode, i_elmt
 character(len=250) :: errtag
-
-write(logunit,*)' -------------------------------------------------'
-write(logunit,*)' Sorting GDOFs and BCs   (sort_gdofs_and_bc)'
-write(logunit,*)
-
+if(myrank.eq.0)then
+  write(logunit,*)' -------------------------------------------------'
+  write(logunit,*)' Sorting GDOFs and BCs   (sort_gdofs_and_bc)'
+  write(logunit,*)
+  flush(logunit)
+endif
 ! Initialise boundary conditions
 bcnodalv=ZERO
 
@@ -108,14 +109,13 @@ tot_neq=sumscal(neq); max_neq=maxscal(neq); min_neq=minscal(neq)
 if(myrank==0)then
   write(logunit,'(a,i0,a,i0,a,i0)')'degrees of freedoms => total:',tot_neq,&
                                   ' max:',max_neq,' min:',min_neq
+  write(logunit,*)' ✓  Finished sorting GDOFs with BCs'
+  write(logunit,*)
   flush(logunit)
 endif
 
-write(logunit,*)' ✓  Finished sorting GDOFs with BCs'
-write(logunit,*)
-
-
 end subroutine sort_gdofs_and_bc
-! ______________________________________________________________________
+!-------------------------------------------------------------------------------
 
 end module  bcs_and_dof
+!===============================================================================

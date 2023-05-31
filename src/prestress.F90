@@ -6,9 +6,7 @@ module prestress
 contains 
     
 
-subroutine calculate_prestress(strain_elmt, strain_nodal, &
-                                stress_elmt, stress_nodal, & 
-                                errcode, errtag, ksp_iter, istat)
+subroutine calculate_prestress(errcode, errtag, ksp_iter)
 ! USES 
 use global
 use preprocess
@@ -37,12 +35,7 @@ use solver_petsc
 #endif
 
 implicit none
-! IO Variables
  
-real(kind=kreal), allocatable :: strain_elmt(:,:,:), &
-                                    strain_nodal(:,:),  &
-                                    stress_elmt(:,:,:), & 
-                                    stress_nodal(:,:)
 integer :: ksp_iter
 
 character(len=250) :: errtag ! error message
@@ -59,16 +52,6 @@ allocate(storeinterpf_infinite(ngll,ngll,nelmt_infinite))
 
 ! computes and stores elemental derivative and integration information
 call precompute_derivative_integration(errcode,errtag)
-
-if(savedata%stress.or.isplastic)then
-    allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
-    stress_elmt=ZERO
-endif
-
-if(savedata%strain)then
-    allocate(strain_elmt(nst,ngll,nelmt),strain_nodal(nst,nnode))
-    strain_elmt=ZERO
-endif
 
 if(isstress0)then
 
