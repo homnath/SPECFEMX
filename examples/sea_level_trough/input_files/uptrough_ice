@@ -1,5 +1,5 @@
 # First line tells us how many ice objects
-# 1 = single node, height
-# 2 = cylinder, x, y, rad, height
+# # 1 = single node, height
+# # 2 = cylinder, x, y, rad, height
 1
-3 0.0, 90.0, 152.1682687, 0.3
+3 0.0, 10.0, 102.1682687, 0.5 

@@ -78,5 +78,41 @@ if [ $result -eq 1 ]; then
     echo -e " WARNING: OUTPUT FILES ARE DIFFERENT"
     exit 1
 else 
-    echo "  -- partmesh output files are the same (yay!)"
+    echo "  -- partmesh log file is the same!"
 fi 
+
+
+# Compare the individual partmesh files: 
+
+result=$(cmp_files "../examples/sea_level_trough/stable_partmesh_output.txt" "partmesh_output.txt")
+
+let sum=0
+
+for FILE in ./stable_partition/*  
+    do 
+        # Extract the file name:
+        substr="uptrough"           # Search string
+        prefix=${FILE%%$substr*}    
+        index=${#prefix}            # Find index in string
+        prefix=${FILE:index:100};  
+        
+
+        result=$(cmp_files $FILE  "./partition/${prefix}" )
+
+        if [ $result -eq 1 ]; then 
+            echo " WARNING: OUTPUT FILES ARE DIFFERENT"
+            echo -e "--> FILE:  " $prefix
+            exit 1
+        fi 
+
+        # Keep a track of partmesh comparisons: 
+        sum=$( expr $sum + $result)
+    done
+
+    # Double check the sum value: 
+    if [ $sum -gt 0 ]; then 
+        echo -e " WARNING: PARTMESH OUTPUT FILES ARE DIFFERENT"
+        exit 1
+    else 
+        echo "  -- partmesh output files are the same! "
+    fi
