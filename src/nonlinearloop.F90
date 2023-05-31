@@ -206,9 +206,9 @@ subroutine update_nodal_u_vector(nodalslrate)
 
   endif
 
-
-
-  write(logunit,*)'  ✓ Updated nodal u vectors. '
+  if(myrank.eq.0)then
+    write(logunit,*)'  ✓ Updated nodal u vectors. '
+  endif
 
 end subroutine update_nodal_u_vector
 
@@ -308,8 +308,10 @@ subroutine calc_stressstrain(nl_iter,nl_isconv,fmax)
     if(nl_isconv .or. nl_iter==nl_maxiter)cycle
     bodyload(egdofu)=bodyload(egdofu)+bload
   enddo ! i_elmt
-
-  write(logunit,*)'  ✓ Calculated stress and strain '
+  
+  if(myrank.eq.0)then
+    write(logunit,*)'  ✓ Calculated stress and strain '
+  endif
 
 
 end subroutine calc_stressstrain
@@ -417,8 +419,9 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
 
   enddo ! i_elmt
 
-  write(logunit,*)'  ✓ Calculated viscoelastic stress and strain '
-
+  if(myrank.eq.0)then
+    write(logunit,*)'  ✓ Calculated viscoelastic stress and strain '
+  endif
 
 end subroutine visco_stressstrain
 !_______________________________________________________________________________

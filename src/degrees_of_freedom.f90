@@ -310,8 +310,10 @@ errcode=-1
 neq=0
 neqsl = 0
 
-write(logunit,*)
-write(logunit,*)'Finalising DOF global IDs: '
+if(myrank.eq.0)then
+  write(logunit,*)
+  write(logunit,*)'Finalising DOF global IDs: '
+endif
 
 if (ISSL_DOF)then 
   ! If SL then we want to run it as original version first by ignoring 
@@ -375,10 +377,10 @@ write(22)nnode
 write(22)g_num
 close(22)
 
-
-
-write(logunit,*)' ✓ Finalised DOFs'
-write(logunit,*)
+if(myrank.eq.0)then
+  write(logunit,*)' ✓ Finalised DOFs'
+  write(logunit,*)
+endif
 ! Compute nodal to global
 errcode=0
 return
