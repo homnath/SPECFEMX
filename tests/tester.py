@@ -95,7 +95,17 @@ class Tester():
                     if verbose==2:
                         print()
             except:
-                errstr = f'  ✖ Variable {vt} has different values'
+                # Calculate avg error %
+                err = np.abs(self.trial.testvars[vt] - self.stable.testvars[vt]).flatten()
+
+                means = [np.abs(np.mean(self.trial.testvars[vt])), np.abs(np.mean(self.stable.testvars[vt]))]
+                minmean = np.min(means)
+                if minmean==0:
+                    minmean = np.max(means)
+
+                approx_err = np.mean(err)/minmean
+
+                errstr = f'  ✖ Variable {vt} has different values -  mean error %: {approx_err}'
                 raise ValueError(errstr)
 
 
