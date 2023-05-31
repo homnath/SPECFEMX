@@ -181,8 +181,6 @@ subroutine calc_nondimension_pars
     ! F = ma so mass * acceleration?
     DIM_ICELOAD = DIM_M*DIM_ACCEL 
 
-
-
     if(myrank.eq.0)then
       write(*,*)'*****   Nondimensionalise: YES  *****'
       write(*,*)

@@ -206,8 +206,9 @@ integer :: overwrite_ctr, iover
 errtag="ERROR: unknown!"
 errcode=-1
 
-write(logunit,*)'    Activating DOF'
-
+if(myrank.eq.0)then
+  write(logunit,*)'    Activating DOF'
+endif
 
 ! Initialize all DOFs to OFF
 gdof=0
@@ -270,17 +271,20 @@ if(ISSL_DOF)then
     gdof(5, numf) = 1
   enddo 
   
-  
-  write(logunit,*)'    Total unique FS nodes:' , nnode_fs
-  write(logunit,*)'    Total FS faces       : ', nelmt_fs
-  write(logunit,*)'    Total U   DOF        : ', INT(SUM(gdof(1, :))) + INT(SUM(gdof(2, :))) + INT(SUM(gdof(3, :)))  
-  write(logunit,*)'    Total PHI DOF        : ', INT(SUM(gdof(4, :))) 
-  write(logunit,*)'    Total SL  DOF        : ', INT(SUM(gdof(5, :))) 
+  if(myrank.eq.0)then 
+    write(logunit,*)'    Total unique FS nodes:' , nnode_fs
+    write(logunit,*)'    Total FS faces       : ', nelmt_fs
+    write(logunit,*)'    Total U   DOF        : ', INT(SUM(gdof(1, :))) + INT(SUM(gdof(2, :))) + INT(SUM(gdof(3, :)))  
+    write(logunit,*)'    Total PHI DOF        : ', INT(SUM(gdof(4, :))) 
+    write(logunit,*)'    Total SL  DOF        : ', INT(SUM(gdof(5, :))) 
+  endif
 
 endif
 
-write(logunit,*)' ✓  Activated DOF'
-write(logunit,*)
+if(myrank.eq.0)then
+  write(logunit,*)' ✓  Activated DOF'
+  write(logunit,*)
+endif
 
 errcode=0
 
@@ -306,8 +310,10 @@ errcode=-1
 neq=0
 neqsl = 0
 
-write(logunit,*)
-write(logunit,*)'Finalising DOF global IDs: '
+if(myrank.eq.0)then
+  write(logunit,*)
+  write(logunit,*)'Finalising DOF global IDs: '
+endif
 
 if (ISSL_DOF)then 
   ! If SL then we want to run it as original version first by ignoring 
@@ -371,10 +377,10 @@ write(22)nnode
 write(22)g_num
 close(22)
 
-
-
-write(logunit,*)' ✓ Finalised DOFs'
-write(logunit,*)
+if(myrank.eq.0)then
+  write(logunit,*)' ✓ Finalised DOFs'
+  write(logunit,*)
+endif
 ! Compute nodal to global
 errcode=0
 return

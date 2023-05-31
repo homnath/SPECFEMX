@@ -246,6 +246,7 @@ write(11,'(a)',advance='no')'time values: '
 !    write(11,'(es12.5)',advance='yes')srf(i)
 !  enddo
 !else
+! Write also the initial time step.
   do i=0,ns-1
     write(11,'(es12.5)',advance='yes')step0+real(i)*dstep
   enddo

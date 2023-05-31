@@ -6,6 +6,7 @@ contains
 
 subroutine initialise_global_arrays()
 use global
+use math_constants,only:ZERO
 implicit none 
 
 ! Local variables
@@ -24,6 +25,16 @@ allocate(nodalu(nndofu,nnode),stat=istat)
 if (istat/=0)then
     write(*,*)'ERROR: cannot allocate memory!'
     stop
+endif
+if(ISDISP_DOF)then
+  if(savedata%stress.or.isplastic)then
+      allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
+      stress_elmt=ZERO
+  endif
+  if(savedata%strain)then
+      allocate(strain_elmt(nst,ngll,nelmt),strain_nodal(nst,nnode))
+      strain_elmt=ZERO
+  endif
 endif
 
 if(ISSL_DOF)then

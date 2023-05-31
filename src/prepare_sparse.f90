@@ -40,15 +40,15 @@ errsrc=trim(myfname)//' => prepare_sparse'
 if(myrank==0) then
   write(logunit,*) '++++++++++++++++++++++++++++++++++++++++'
   write(logunit,*) '       preparing sparse matrix...'
-
 endif
 
 nmax=nelmt*(NEDOF*NEDOF)
 
-write(logunit,*)'NEDOF : ', NEDOF
-write(logunit,*)'nelmt : ', nelmt
-write(logunit,*)'nmax  : ', nmax
-
+if(myrank.eq.0)then
+  write(logunit,*)'NEDOF : ', NEDOF
+  write(logunit,*)'nelmt : ', nelmt
+  write(logunit,*)'nmax  : ', nmax
+endif
 allocate(col0(nmax),row0(nmax),gcol0(nmax),grow0(nmax),stat=ierr)
 call check_allocate(ierr,errsrc)
 
