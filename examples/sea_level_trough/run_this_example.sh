@@ -8,7 +8,7 @@ check_dir_exists() {
     then
         echo "  -- ${dirname} already exists" 
     else
-        mkdir output_uptrough 
+        mkdir ${dirname} 
         echo "  -- created ${dirname}" 
     fi 
 
@@ -52,7 +52,6 @@ cd build && cp "${inp_path}/uptrough.slurm" ./
 echo "  --  Copied slurm file to build directory"
 
 
-
 # Make the output_uptrough dir: 
 echo ""
 echo " - Checking if directories need to be created"
@@ -65,15 +64,15 @@ echo ""
 echo " - Running partmesh: "
 ./bin/partmesh "${inp_path}/uptrough.psem" > partmesh_output.txt  
 
+
+
+# ____________ COMPARE THE PARTMESH LOG FILE ____________
 # Before comparison, remove line stating runtime as it will vary 
 # slightly for each run
 awk '!/total elapsed time/' partmesh_output.txt > tmpfile && mv tmpfile partmesh_output.txt
-
-
-
-# Compare with stable output from partmesh - should return 0 if identical
+# compare
 result=$(cmp_files "../examples/sea_level_trough/stable_partmesh_output.txt" "partmesh_output.txt")
-
+# check result
 if [ $result -eq 1 ]; then 
     echo -e " WARNING: OUTPUT FILES ARE DIFFERENT"
     exit 1
@@ -82,8 +81,9 @@ else
 fi 
 
 
-# Compare the individual partmesh files: 
 
+
+# ___________ COMPARE THE PARTMESH DATA FILES ___________
 result=$(cmp_files "../examples/sea_level_trough/stable_partmesh_output.txt" "partmesh_output.txt")
 
 let sum=0
@@ -116,3 +116,6 @@ for FILE in ./stable_partition/*
     else 
         echo "  -- partmesh output files are the same! "
     fi
+
+
+ 
