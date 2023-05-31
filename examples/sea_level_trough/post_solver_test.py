@@ -1,15 +1,16 @@
-from tester import Tester, parse_args
+from tester import Tester, parse_args, gen_proc_list
 import sys
 
-def run_test(testid, nprocs, verb, body_vars, nsteps, dpath_trial, dpath_stable):
-    # Create tester:
-    tester = Tester(testid, nprocs, dpath_trial=dpath_trial, dpath_stable=dpath_stable)
-
+def run_test(tester, verb, vars, nsteps):
     # Loop through timesteps:
     for ts in range(nsteps):
-        for iproc in range(tester.nprocs):
+        if verb==0:
+            print(f"\n------------------------ TIMESTEP {ts} ------------------------")
 
-            print(f"\n------------------------ TIMESTEP {ts} - PROCESSOR {iproc} ------------------------")
+        for iproc in tester.proc_list:
+
+            if verb>0:
+                print(f"\n------------------------ TIMESTEP {ts} - PROCESSOR {iproc} ------------------------")
 
             # Set processor:
             tester.set_iproc(iproc)
@@ -19,17 +20,44 @@ def run_test(testid, nprocs, verb, body_vars, nsteps, dpath_trial, dpath_stable)
 
 
             # Get the data for each variable (e.g. strain, displacement)
-            # that is stored throughout the entire body (not just free surface):
-            tester.stable.get_body_vars(timestep=ts, bodyvars=body_vars, verbose=verb)
-            tester.trial.get_body_vars(timestep=ts,  bodyvars=body_vars, verbose=verb)
-            tester.compare_body_vars(verbose=verb)
+            tester.stable.get_vars(timestep=ts, vars=vars, verbose=verb)
+            tester.trial.get_vars(timestep=ts,  vars=vars, verbose=verb)
+
+            tester.compare_vars(verbose=verb)
+
+
 
 
 if __name__ == "__main__":
-
-
     # Get args:
     a = parse_args()
-    run_test(testid=a.ID, nprocs=a.N, verb=a.V, body_vars=a.BV, nsteps=a.TS, dpath_trial=a.ptrial, dpath_stable=a.pstable)
+
+    if a.test_body:
+        # Generate procs for body :
+        PROC_LIST = gen_proc_list(typ='range', p0=0, pmax=a.N)
+
+        # Create tester:
+        TESTER = Tester(test_id=a.ID,
+                        dpath_trial=a.ptrial,
+                        dpath_stable=a.pstable,
+                        proc_list=PROC_LIST,
+                        casetype='body',
+                        supress_warnings =True)
+
+        run_test(tester=TESTER,  verb=a.V, vars=a.VAR, nsteps=a.TS)
 
 
+
+    if a.test_fs:
+        # Generate procs for free surface :
+        PROC_LIST = gen_proc_list(typ='from_dir', label='free_surface', dir=a.pstable)
+
+        # Create tester:
+        TESTER = Tester(test_id=a.ID,
+                        dpath_trial=a.ptrial,
+                        dpath_stable=a.pstable,
+                        proc_list=PROC_LIST,
+                        casetype='fs',
+                        supress_warnings =True)
+
+        run_test(tester=TESTER,  verb=a.V, vars=a.VAR, nsteps=a.TS)

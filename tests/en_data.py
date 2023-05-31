@@ -14,7 +14,7 @@ VAR_ABBV = {'dis'   : 'displacement'   ,
             }
 
 class EnData():
-    def __init__(self, id):
+    def __init__(self, id, warnings):
         self.id             = id
         self.case           = None
         self.geofile        = None
@@ -24,25 +24,30 @@ class EnData():
         self.testvars       = None
         self.ntestvars      = None
 
-        self.nbody_vars_loaded = None
+        self.n_vars_loaded = None
         self.iproc = None
+        self.suppress_warnings = warnings
 
-    def get_body_vars(self,timestep, bodyvars, verbose):
+    def get_vars(self,timestep, vars, verbose):
         if verbose>0:
-            print(f'Loading body variables for {self.id}')
+            print(f'Loading variables for {self.id}')
 
         # User to signal which to load:
-        self.bodyvars = bodyvars
-        self.loaded_bodyvars = []
+        self.vars = vars
+        self.loaded_vars = []
         # Function that loads and sets all available variables:
         # For now let us load all of the variables present:
         # set each dictionary variable to the loaded np array of
         # data for that  variable
 
+        # Tracks if some desired variables are not available (e.g. free surface variables like ice are part of the
+        # case file but not available inside the mesh (only on surface)
+        unavail_vars = []
+        unavail_switch = 0
 
         loaded_ctr = 0
         # Loops through variables user wants to test
-        for bv in self.bodyvars:
+        for bv in self.vars:
             # Will turn to 1 if this var has been set
 
             searchctr = 0
@@ -76,10 +81,11 @@ class EnData():
                             # Increase number of loaded vars:
                             loaded_ctr +=1
                             # Store loaded var:
-                            self.loaded_bodyvars.append(v)
+                            self.loaded_vars.append(v)
                     except:
-                        print(f'  * WARNING: {self.id}:{v}:proc{self.iproc} is a variable but file path doesnt exist - NOT LOADED')
-
+                        # Cant load it:
+                        unavail_vars.append(v)
+                        unavail_switch = 1
 
 
                 # If it hasnt found what user is requesting:
@@ -87,8 +93,14 @@ class EnData():
                     raise ValueError(f"You asked for variable {bv} but the available vars are: {self.case.get_variables()}")
 
 
-        self.nbody_vars_loaded = loaded_ctr
-        if verbose>0:
-            print()
+        if self.suppress_warnings==False:
+            if unavail_switch==1:
+                print(f'  * WARNING: The following variables have no data in desired section - NOT LOADED:')
+                for k in range(len(unavail_vars)):
+                    print(f"    - {self.id} :  {unavail_vars[k]}")
+                print()
+
+        self.n_vars_loaded = loaded_ctr
+
 
 

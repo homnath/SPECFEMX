@@ -1,17 +1,22 @@
 import numpy as np
 from en_data import EnData
 import ensightreader as er
+import argparse
+import os
+
+all_vars = ['displacement', 'strain', 'gravity_potential', 'oceanf', 'iceload_phi',
+            'iceload_sl', 'iceload_u', 'ice', 'icerate', 'sea_level', 'gravity_acceleration']
 
 
 class Tester():
-    def __init__(self, test_id, nprocs, dpath_trial, dpath_stable, precision=1e-10):
+    def __init__(self, test_id, casetype, proc_list, dpath_trial, dpath_stable, precision=1e-10, supress_warnings=False):
 
         self.id             = test_id
+        self.id0            = test_id
+
         self.trial_fpath    = f'{dpath_trial}'
         self.stable_fpath   = f'{dpath_stable}'
 
-        self.nprocs = nprocs
-        self.lnp = len(str(self.nprocs))
 
         self.iproc = None
         self.precision = precision
@@ -19,7 +24,24 @@ class Tester():
         self.print_testing_precision()
         self.print_dirs()
 
+        self.update_casetype(casetype)
 
+        self.proc_list = proc_list
+        self.nprocs    = len(self.proc_list)
+        self.lnp       = len(str(self.nprocs))
+
+        self.suppress_warnings = supress_warnings
+
+
+    def update_casetype(self, cs):
+        if np.logical_and(cs!='fs', cs!='body'):
+            raise ValueError("Casetype must be 'fs' or 'body' ")
+        # can be fs or body
+        self.casetype = cs
+        if self.casetype == 'fs':
+            self.id = self.id0 + '_free_surface'
+
+        print('Updated casetype to: ', cs)
 
     def read_stable(self):
         self.stable = self.read_ensight(self.stable_fpath, id='stable')
@@ -40,8 +62,9 @@ class Tester():
 
 
     def read_ensight(self, path, id):
-        d = EnData(id)
+        d = EnData(id, self.suppress_warnings)
         d.case       = er.read_case(path + f"/{self.id}_proc{self.iproc}.case")
+
         d.geofile    = d.case.get_geometry_model()
         d.part_names = d.geofile.get_part_names()
         d.part       = d.geofile.get_part_by_name(d.part_names[0])
@@ -57,28 +80,28 @@ class Tester():
 
 
     def check_eq_num_vars(self):
-        # Check the number of LOADED body variables is same for stable and test cases:
-        if self.trial.nbody_vars_loaded != self.stable.nbody_vars_loaded:
-            raise ValueError(f"Trial num body vars loaded  : {self.trial.nbody_vars_loaded} \n            Stable num body vars loaded : {self.stable.nbody_vars_loaded}")
+        # Check the number of LOADED variables is same for stable and test cases:
+        if self.trial.n_vars_loaded != self.stable.n_vars_loaded:
+            raise ValueError(f"Trial num vars loaded  : {self.trial.n_vars_loaded} \n            Stable num vars loaded : {self.stable.n_vars_loaded}")
 
-        assert(len(self.trial.loaded_bodyvars)  == self.trial.nbody_vars_loaded)
-        assert(len(self.stable.loaded_bodyvars) == self.stable.nbody_vars_loaded)
+        assert(len(self.trial.loaded_vars)  == self.trial.n_vars_loaded)
+        assert(len(self.stable.loaded_vars) == self.stable.n_vars_loaded)
 
 
 
-    def compare_body_vars(self, verbose=0):
+    def compare_vars(self, verbose=0):
         # First check there are equal numbers of loaded vars to test:
         self.check_eq_num_vars()
 
-        nvars = self.trial.nbody_vars_loaded
+        nvars = self.trial.n_vars_loaded
 
         for i in range(nvars):
             # Get variable name, e.g. displacement (str)
-            vs = self.stable.loaded_bodyvars[i]
-            vt = self.trial.loaded_bodyvars[i]
+            vs = self.stable.loaded_vars[i]
+            vt = self.trial.loaded_vars[i]
 
             if vs!=vt:
-                raise ValueError("self.stable.loaded_bodyvars[i] is not equal to self.trial.loaded_bodyvars[i]")
+                raise ValueError("self.stable.loaded_vars[i] is not equal to self.trial.loaded_vars[i]")
 
 
             if verbose==2:
@@ -108,7 +131,7 @@ class Tester():
                 raise ValueError(errstr)
 
 
-        print(f'-- Tested {nvars} variables for processor {self.iproc}')
+        print(f'  ✔ Tested {nvars} variables for processor {self.iproc}')
 
 
     def print_dirs(self):
@@ -131,7 +154,11 @@ class Tester():
         print()
 
 
-import argparse
+
+
+
+
+
 
 def parse_args():
 
@@ -148,20 +175,63 @@ def parse_args():
                         help='File path to trial results directory (str)')
     parser.add_argument('-path_stable', '--pstable', type=str, nargs='?',
                         help='File path to stable results directory (str)')
-    parser.add_argument('-body_vars', '--BV', default=[], nargs='+')
+    parser.add_argument('-vars', '--VAR', default=[], nargs='+', help='List of variables to test. Use "all" to test all available')
+    parser.add_argument('-test_body', '--test_body', action='store_true', help='Test variable values in entire body')
+    parser.add_argument('-test_fs', '--test_fs', action='store_true', help='Test variable values on free surface body')
 
     a = parser.parse_args()
+
+    # Check if asking for all available variables:
+    if np.logical_and(len(a.VAR) == 1, a.VAR[0] == 'all'):
+        a.VAR = all_vars
 
 
     # Print test parameters:
     print("----------------- TESTING PARAMS -----------------")
+    print(f" Test body vars. :     {a.test_body}")
+    print(f" Test fs vars.   :     {a.test_fs}\n")
     print(f" Test ID          :     {a.ID}")
     print(f" Num. procs       :     {a.N}")
     print(f" Verbosity level  :     {a.V}")
     print(f" Num. timesteps   :     {a.TS}")
-    print(f" Body variables   :     {a.BV}")
+    print(f" Variables   :     {a.VAR}")
     print(f" Trial file path  :     {a.ptrial}")
     print(f" Stable file path :     {a.pstable}")
     print("--------------------------------------------------")
 
     return a
+
+
+
+
+
+def gen_proc_list(typ, p0=0, pmax=None, dir=None, label=None):
+    if typ=='range':
+
+        if type(pmax)==type(None):
+            raise ValueError("Max processor number not specified.")
+
+        list = np.arange(p0, pmax)
+        return list
+    elif typ=='from_dir':
+
+        assert(label!=None)
+
+        # Initialise list:
+        list = []
+
+        # Looks for any processors that have a case file 'label' in the name
+        for f in os.listdir(dir):
+            if np.logical_and(f.find('case')!=-1 , f.find(label)!=-1):
+
+                # Get processor value:
+                ftmp = f[f.find('proc')+4:]
+                proc = ftmp[:ftmp.find('.case')]
+
+                list.append(int(proc))
+
+        # Convert to numpy and sort:
+        list = np.array(list)
+        list.sort()
+
+        return list
