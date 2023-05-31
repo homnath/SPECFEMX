@@ -89,7 +89,6 @@ class Tester():
 
             try:
                 assert ((np.abs(self.trial.testvars[vt] - self.stable.testvars[vt]) < self.precision).all())
-
                 if verbose>0:
                     print(f'  ✔  Variable {vt} matches')
                     if verbose==2:
@@ -131,9 +130,38 @@ class Tester():
         print('*****************************************************************')
         print()
 
-    def print_test_stats(self, nsteps=None, verb=None, bodyvars=None):
-        print(f" Test ID         :     {self.id}")
-        print(f" Num. procs      :     {self.nprocs}")
-        print(f" Verbosity level :     {verb}")
-        print(f" Num. timesteps  :     {nsteps}")
-        print(f" Body variables  :     {bodyvars}")
+
+import argparse
+
+def parse_args():
+
+    parser = argparse.ArgumentParser(prog='SPECFEMX Tester', description='Run test case for SPECFEMX')
+    parser.add_argument('-test_id', '--ID', type=str, nargs='?',
+                        help='Test ID e.g. test1 or uptrough (str)')
+    parser.add_argument('-nprocs', '--N', action='store', type=int,
+                        help='Number of processors (int)')
+    parser.add_argument('-ntsteps', '--TS', action='store', type=int,
+                        help='Number of timesteps (int)')
+    parser.add_argument('-verbosity', '--V', action='store', type=int, choices=range(3), default=0,
+                        help='Verbosity (0-2: default=0) - higher val = more verbose (int)')
+    parser.add_argument('-path_trial', '--ptrial', type=str, nargs='?',
+                        help='File path to trial results directory (str)')
+    parser.add_argument('-path_stable', '--pstable', type=str, nargs='?',
+                        help='File path to stable results directory (str)')
+    parser.add_argument('-body_vars', '--BV', default=[], nargs='+')
+
+    a = parser.parse_args()
+
+
+    # Print test parameters:
+    print("----------------- TESTING PARAMS -----------------")
+    print(f" Test ID          :     {a.ID}")
+    print(f" Num. procs       :     {a.N}")
+    print(f" Verbosity level  :     {a.V}")
+    print(f" Num. timesteps   :     {a.TS}")
+    print(f" Body variables   :     {a.BV}")
+    print(f" Trial file path  :     {a.ptrial}")
+    print(f" Stable file path :     {a.pstable}")
+    print("--------------------------------------------------")
+
+    return a

@@ -13,8 +13,6 @@ VAR_ABBV = {'dis'   : 'displacement'   ,
             'grav'  : 'gravity_acceleration'
             }
 
-
-
 class EnData():
     def __init__(self, id):
         self.id             = id
