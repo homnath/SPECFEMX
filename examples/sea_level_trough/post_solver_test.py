@@ -1,7 +1,7 @@
 from tester import Tester
 
 TEST_ID   = 'uptrough'
-NPROCS    = 10
+NPROCS    = 40
 verb      = 0
 body_vars = ['dis', 'eps', 'gpot', 'grav']
 nsteps    = 2
