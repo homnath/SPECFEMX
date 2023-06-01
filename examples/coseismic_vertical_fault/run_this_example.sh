@@ -70,7 +70,7 @@ echo " - Running partmesh: "
 # slightly for each run
 awk '!/total elapsed time/' partmesh_output.txt > tmpfile && mv tmpfile partmesh_output.txt
 # compare
-result=$(cmp_files "./examples/coseismic_vertical_fault/stable_partmesh_output.txt" "partmesh_output.txt")
+result=$(cmp_files "../examples/coseismic_vertical_fault/stable_partmesh_output.txt" "partmesh_output.txt")
 # check result
 if [ $result -eq 1 ]; then 
     echo -e " WARNING: OUTPUT FILES ARE DIFFERENT"
