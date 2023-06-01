@@ -77,7 +77,7 @@ endif
 end subroutine compute_magnetic_traction
 
 
-subroutine compute_split_node_load(t, i_step, sfac, slipload, extload, storekmat, errcode, errtag)
+subroutine compute_split_node_load(t, i_step, sfac, storekmat, errcode, errtag)
     ! uses 
     use global ! itaper_slip, divide_slip, iseqsource, eqsource_type, srate
     use fault 
@@ -91,7 +91,7 @@ subroutine compute_split_node_load(t, i_step, sfac, slipload, extload, storekmat
     real(kind=kreal)              :: t
     integer                       :: i_step 
     real(kind=kreal)              :: sfac
-    real(kind=kreal), allocatable :: slipload(:),extload(:)
+    !real(kind=kreal), allocatable :: slipload(:),extload(:)
     real(kind=kreal), allocatable :: storekmat(:,:,:)
     character(len=250) :: errtag ! error message
     integer :: errcode
