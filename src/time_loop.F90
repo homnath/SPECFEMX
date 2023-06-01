@@ -192,9 +192,6 @@ else ! TIMESTEPPING
         endif
         
 
-
-
-
     !    endif ! Petsc solver
     !endif ! istep
         

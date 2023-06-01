@@ -460,25 +460,27 @@ if(is_SL)then
 endif 
 
 
-
 ! Write initial (pre-looping) values to istep = 0
-if(myrank.eq.0)then
-  write(*,*)' Saving initial values to ensight: '
-endif   
-if(savedata%ice)then 
-  call write_ice_to_ensight(nodalice, i_step=istep0-1)
+! necessary for SL to see initial ice load etc...maybe not necessary for 
+! other applications? 
+if(ISSL_DOF)then
+  if(myrank.eq.0)then
+    write(*,*)' Saving initial values to ensight: '
+  endif   
+  if(savedata%ice)then 
+    call write_ice_to_ensight(nodalice, i_step=istep0-1)
+  endif 
+  if(savedata%sl)then
+    call write_SL_to_ensight(nodalsl, i_step=istep0-1)
+  endif 
+  if(savedata%oceanf)then
+    call write_OF_to_ensight(i_step=istep0-1)
+  endif 
+  call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=istep0-1)
+  call save_displacement_variables(strain_elmt, strain_nodal, &
+                                  stress_elmt, stress_nodal, & 
+                                  nodalustore, node_valency, i_step=istep0-1)
 endif 
-if(savedata%sl)then
-  call write_SL_to_ensight(nodalsl, i_step=istep0-1)
-endif 
-if(savedata%oceanf)then
-  call write_OF_to_ensight(i_step=istep0-1)
-endif 
-call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=istep0-1)
-call save_displacement_variables(strain_elmt, strain_nodal, &
-                                 stress_elmt, stress_nodal, & 
-                                 nodalustore, node_valency, i_step=istep0-1)
-
 
 
 !----------------------------------------------------------------------
@@ -641,13 +643,6 @@ loop_step: do i_step=istep0,nstep
   endif ! IF_SL 
 
 
-
-  
-
-
-
-
-
   ! Print warning if not converging
   !if(nl_iter>=NL_MAXITER .and. .not.nl_isconv)then
   !  if(myrank==0)then
@@ -662,13 +657,13 @@ loop_step: do i_step=istep0,nstep
   !endif
 
 
-
   ! Save displacement variables to Ensight
   if(ISDISP_DOF)then
     call save_displacement_variables(strain_elmt, strain_nodal, &
                                     stress_elmt, stress_nodal, & 
                                     nodalustore, node_valency, i_step=i_step)
   endif
+
 
 
   ! Save potential variables to Ensight
@@ -690,12 +685,14 @@ loop_step: do i_step=istep0,nstep
     if(savedata%ice)then 
       call write_ice_to_ensight(nodalice, i_step)
     endif 
-  endif 
 
-  maxnodalsl = maxscal(maxval(nodalsl))
-  call sync_process()
-  if(myrank.eq.0)then 
-    write(outunit,'(g0.6,1x, g0.6,1x, g0.6)') maxnodalsl, total_ice_mass_change, SLmasschange
+    ! Pring the max nodal SL, the total mass change and total ice change
+    maxnodalsl = maxscal(maxval(nodalsl))
+    call sync_process()
+    if(myrank.eq.0)then 
+      write(outunit,'(g0.6,1x, g0.6,1x, g0.6)') maxnodalsl, total_ice_mass_change, SLmasschange
+    endif 
+
   endif 
 
 
