@@ -83,14 +83,12 @@ fi
 
 
 # ___________ COMPARE THE PARTMESH DATA FILES ___________
-result=$(cmp_files "../examples/sea_level_trough/stable_partmesh_output.txt" "partmesh_output.txt")
-
 let sum=0
 
 for FILE in ./stable_partition/*  
     do 
         # Extract the file name:
-        substr="uptrough"           # Search string
+        substr="vfault"           # Search string
         prefix=${FILE%%$substr*}    
         index=${#prefix}            # Find index in string
         prefix=${FILE:index:100};  
