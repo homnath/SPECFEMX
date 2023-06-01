@@ -39,7 +39,7 @@ echo ""
 
 
 example_path="./examples/coseismic_vertical_fault/input"
-inp_path="input/coseismic_vertical_fault"
+inp_path="./"
 build_inp_path="./build/${inp_path}"
 
 # Copy and rename: 
@@ -61,7 +61,7 @@ echo ""
 
 # Run the mesh partitioning for 40 nodes
 echo " - Running partmesh: "
-./bin/partmesh "${inp_path}/vfault.psem" > partmesh_output.txt  
+./bin/partmesh "${inp_path}/input/vfault.psem" > partmesh_output.txt  
 
 
 
