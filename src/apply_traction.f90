@@ -120,8 +120,6 @@ if(istraction)then
         nodaltraction(:,nodalids(1)) = nodaltraction(:,nodalids(1)) + q
 
         write(logunit,*)'Added nodaltraction at gnum: ', nodalids(1)
-
-
         
       enddo
       trac_stat=.true.
@@ -635,12 +633,12 @@ endif !(isfstraction)
 
       ! Save the traction: 
 if (savedata%traction)then
-  write(logunit,*)' min Traction extload: ', minval(load)
-  write(logunit,*)' max Traction extload: ', maxval(load)
-  write(logunit,*)' min nodaltraction : ',   minval(nodaltraction)
-  write(logunit,*)' max nodaltraction : ',   maxval(nodaltraction)
+  write(*,*)' min Traction extload: ', minval(load)
+  write(*,*)' max Traction extload: ', maxval(load)
+  write(*,*)' min nodaltraction : ',   minval(nodaltraction)
+  write(*,*)' max nodaltraction : ',   maxval(nodaltraction)
 
-  write(logunit,*)'Saving traction - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
+  write(*,*)'Saving traction - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
   call write_vector_to_file(nnode,nodalu,ext='traction',istep=0) 
   ! On the free surface
   if(savedata%fsplot)then

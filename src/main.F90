@@ -354,14 +354,20 @@ if(isbodyload)then
   call compute_bodyload(selfload,selfweight=isselfweight)
 endif 
 
+
+
 call sync_process()
 
 ! Initialise ice: 
 if(is_ICE)then
+
+  ! Ensure correct normals
+  call check_surface_normals()
   ! Prepare the ice stuff and set the user-inputted initial condition
   call prepare_ice(nodalice, nodalicerate)
   call set_original_ice_level(nodalice)
 endif 
+
 
 
 ! Initialise Sea Level 
@@ -385,17 +391,25 @@ if(is_SL)then
 endif 
 
 ! Write initial (pre-looping) values to istep = 0
-if(myrank.eq.0)then
-  write(*,*)' Saving initial values to ensight: '
-endif   
-if(savedata%ice)then 
-  call write_ice_to_ensight(nodalice, i_step=istep0-1)
-endif 
-if(savedata%sl)then
-  call write_SL_to_ensight(nodalsl, i_step=istep0-1)
-endif 
-if(savedata%oceanf)then
-  call write_OF_to_ensight(i_step=istep0-1)
+! necessary for SL to see initial ice load etc...maybe not necessary for 
+! other applications? 
+if(ISSL_DOF)then
+  if(myrank.eq.0)then
+    write(*,*)' Saving initial values to ensight: '
+  endif   
+  if(savedata%ice)then 
+    call write_ice_to_ensight(nodalice, i_step=istep0-1)
+  endif 
+  if(savedata%sl)then
+    call write_SL_to_ensight(nodalsl, i_step=istep0-1)
+  endif 
+  if(savedata%oceanf)then
+    call write_OF_to_ensight(i_step=istep0-1)
+  endif 
+  call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=istep0-1)
+  call save_displacement_variables(strain_elmt, strain_nodal, &
+                                  stress_elmt, stress_nodal, & 
+                                  nodalustore, node_valency, i_step=istep0-1)
 endif 
 call save_pot_variables(i_step=istep0-1)
 call save_displacement_variables(i_step=istep0-1)
@@ -416,7 +430,7 @@ loop_step: do i_step=istep0,nstep
   if(myrank.eq.0)then   
     write(*,*)
     write(*,*)
-    write(*,'(a,i0,a)')' ~~~~~~~~~~~~~~~~~~~~ TIMESTEP ', i_step, ' ~~~~~~~~~~~~~~~~~~~~'
+    write(*,'(a,i0,a,i0,a)')' ~~~~~~~~~~~~~~~~~~~~ TIMESTEP ', i_step, '/',nstep ,' ~~~~~~~~~~~~~~~~~~~~'
   endif 
 
 
@@ -559,6 +573,7 @@ loop_step: do i_step=istep0,nstep
   if(ISDISP_DOF)then
     call save_displacement_variables(i_step=i_step)
   endif
+
 
 
   ! Save potential variables to Ensight

@@ -244,6 +244,7 @@ use math_library_serial
 end subroutine
 
 
+
 subroutine write_SL_to_ensight(nodalsl, i_step)
     use global 
     use postprocess
@@ -660,6 +661,7 @@ use serial_library
             dx_deta = matmul(coord,dshape4(2,:,i_gll))
 
             ! Calc normal and therefore jac dec (2D) on the fly
+            ! Note that the sign is not necessarily correct but not important
             face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
             face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
             face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
@@ -675,10 +677,19 @@ use serial_library
             endif 
 
 
+
             ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
+            ! IF YOU WANT TO USE A CUSTOM VERTICAL YOU NEED TO ADD THE HEXFACE FOR
+            ! THE CORRECT SIGN OF THE NORMAL SO THAT IT IS ALWAYS POSITIVE
             face_normal(1) = zero
             face_normal(2) = zero
             detjac2d=sqrt(dot_product(face_normal,face_normal))  
+
+            !if (nodalu(3, rgnum_fs(i_gll, i_elmtfs)).ne.zero) then 
+            !   write(*,*)'NOT ZERO', nodalu(3, rgnum_fs(i_gll, i_elmtfs))
+            !    stop
+            !endif 
+
             ocean_height = nodalsl(rgnum_fs(i_gll, i_elmtfs)) - nodalu(3, rgnum_fs(i_gll, i_elmtfs))
             
 
