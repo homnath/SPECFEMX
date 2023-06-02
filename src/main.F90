@@ -406,10 +406,8 @@ if(ISSL_DOF)then
   if(savedata%oceanf)then
     call write_OF_to_ensight(i_step=istep0-1)
   endif 
-  call save_pot_variables(nodalphistore, nodalg, nodalB, node_valency,i_step=istep0-1)
-  call save_displacement_variables(strain_elmt, strain_nodal, &
-                                  stress_elmt, stress_nodal, & 
-                                  nodalustore, node_valency, i_step=istep0-1)
+  call save_pot_variables(i_step=istep0-1)
+  call save_displacement_variables(i_step=istep0-1)
 endif 
 call save_pot_variables(i_step=istep0-1)
 call save_displacement_variables(i_step=istep0-1)

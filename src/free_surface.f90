@@ -198,7 +198,7 @@ subroutine check_surface_normals()
   integer                        :: iface           ! face ID for elmt 
   integer                        :: i_elmt, errcode          ! face ID for elmt 
   integer                        :: nfgll           ! ngll on 2D face
-  real(kind=kreal), allocatable  :: gw(:), nodalsl(:), nodalu(:,:) ! GLL weights 2D
+  real(kind=kreal), allocatable  :: gw(:), nodalsl(:) ! GLL weights 2D
   real(kind=kreal), allocatable  :: dshape4(:,:,:)
   real(kind=kreal)               :: coord(ndim,4), face_normal(3),dx_dxi(NDIM), dx_deta(NDIM), vertical(3), dot_w_vert
         

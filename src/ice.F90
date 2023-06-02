@@ -797,7 +797,7 @@ use serial_library
     integer                        :: fgdof(nndof, maxngll2d), errcode ! face global degrees of freedom
 
     ! for projection to face normal: 
-    real(kind=kreal) :: vertical(3), unit_normal(3),face_normal_len, cos_theta
+    real(kind=kreal) :: vertical(3), unit_normal(3), face_normal_len, cos_theta
 
 
 
