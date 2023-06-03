@@ -79,7 +79,7 @@ log_msg = trim('computing electrical load...') ;   call write_ifproc0(logunit)
 call electrical_load(errcode,errtag)
 !call sync_process
 call control_error(errcode,errtag,stdout)
-print*,'in electrical:',maxval(abs(extload))
+!print*,'in electrical:',maxval(abs(extload))
 end subroutine compute_electrical_load
 !===============================================================================    
 

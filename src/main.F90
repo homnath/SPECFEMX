@@ -481,7 +481,7 @@ loop_step: do i_step=istep0,nstep
   ! electrical current prescribed at points
   if(isecurrent.and.i_step==1)then
     call compute_electrical_load(errcode,errtag)
-    print*,'in main:',maxval(abs(extload))
+    !print*,'in main:',maxval(abs(extload))
   endif
 
   ! Calculate ice load: 
