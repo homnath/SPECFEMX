@@ -38,6 +38,7 @@ message(NOTICE " -->  Some comments added + allows cleanup function call.")
 SET(srcsem
   global.f90
   local.f90
+  shared.f90
   output_to_user.F90
   package_version.f90
   string_library.f90

@@ -60,19 +60,6 @@ call MPI_BARRIER(MPI_COMM_WORLD,errcode)
 end subroutine sync_process
 !=======================================================
 
-subroutine check_allocate(ierr,errsrc)
-implicit none
-integer,intent(in) :: ierr
-character(len=500),intent(in) :: errsrc
-if(ierr.ne.0)then
-    write(*,*)'ERROR: cannot allocate array/s!'
-    write(*,*)'Code: ',ierr
-    write(*,*)'Source: '//trim(errsrc)
-    stop
-endif
-end subroutine check_allocate
-!===========================================================
-
 ! write error and stop
 subroutine control_error(errcode,errtag,stdout,myrank)
 implicit none
@@ -94,19 +81,5 @@ stop
 end subroutine control_error
 !=======================================================
 
-! get processor tag
-function proc_tag() result(ptag)
-use global,only:myrank,nproc
-implicit none
-character(len=20) :: format_str,ptag
-
-write(format_str,*)ceiling(log10(real(nproc)+1.))
-format_str='(a,i'//trim(adjustl(format_str))//'.'//trim(adjustl(format_str))//')'
-
-write(ptag,fmt=format_str)'_proc',myrank
-
-return
-end function
-!=======================================================
-
 end module mpi_library
+!===============================================================================

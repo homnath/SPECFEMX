@@ -11,6 +11,7 @@ subroutine process_user_input(cmd, tdate, ttime, tzone, path, &
 ! USES
 use global
 use package_version
+use shared
 use string_library
 use input 
 #if(USE_MPI)

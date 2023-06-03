@@ -90,6 +90,7 @@ subroutine initialise_equation_arrays()
 use global 
 use math_constants
 use set_precision
+use shared,only:check_allocate
 implicit none 
 
 integer :: istat
