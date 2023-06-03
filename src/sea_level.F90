@@ -592,15 +592,14 @@ end subroutine update_ocean_function
 !-------------------------------------------------------------------------------
 
 subroutine calculate_SL_A_per_proc(nodalsl, overwrite_old, verbose)
-    ! Calculates the area covered by ocean (integral of ocean func
-    ! over the solid surface)
-    use global
-    use element
-    use mpi
-    use free_surface
-    use integration
-    use nondimensionpar
-    use math_constants
+! Calculates the area covered by ocean (integral of ocean func
+! over the solid surface)
+use global
+use element
+use free_surface
+use integration
+use nondimensionpar
+use math_constants
 #if (USE_MPI)
 use mpi_library
 #else

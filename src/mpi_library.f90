@@ -12,8 +12,6 @@ implicit none
 integer :: errcode
 ismpi=.true. ! parallel
 
-
-
 call MPI_INIT(errcode)
 if(errcode /= 0) call mpierror('ERROR: cannot initialize MPI!',errcode,stdout)
 call MPI_COMM_RANK(MPI_COMM_WORLD,myrank,errcode)
@@ -58,27 +56,6 @@ integer :: errcode
 call MPI_BARRIER(MPI_COMM_WORLD,errcode)
 
 end subroutine sync_process
-!=======================================================
-
-! write error and stop
-subroutine control_error(errcode,errtag,stdout,myrank)
-implicit none
-integer,intent(in) :: errcode
-character(len=*),intent(in) :: errtag
-integer,intent(in) :: stdout,myrank
-integer :: ierr
-
-! any of the MPI process can have ERROR, NOT necessarily 0 process
-! DO NOT use if(myrank==0) here!
-if(errcode.eq.0)return
-! print error message and stop execution
-write(stdout,'(a)')trim(errtag)
-flush(stdout)
-! stop all the MPI processes, and exit
-write(stdout,'(a)')'aborting MPI...'
-call MPI_ABORT(MPI_COMM_WORLD,errcode,ierr)
-stop
-end subroutine control_error
 !=======================================================
 
 end module mpi_library

@@ -30,33 +30,6 @@ return
 end subroutine sync_process
 !===============================================================================
 
-! write error and stop
-subroutine control_error(errcode,errtag,stdout,myrank)
-implicit none
-integer,intent(in) :: errcode
-character(*),intent(in) :: errtag
-integer,intent(in) :: stdout,myrank
-
-if(errcode.eq.0)return
-
-! print error message and stop execution
-if(myrank==0)write(stdout,'(a)')errtag
-stop
-end subroutine control_error
-!===============================================================================
-
-! get processor tag
-function proc_tag() result(ptag)
-!use global,only:myrank,nproc
-implicit none
-character(len=20) :: ptag
-
-ptag=''
-
-return
-end function
-!===============================================================================
-
 subroutine prepare_ghost()
 use global,only:nnode,nndof
 implicit none

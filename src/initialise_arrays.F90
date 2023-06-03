@@ -1,5 +1,5 @@
 module initialise_arrays 
-use mpi_library,only:check_allocate
+use shared,only:check_allocate
 implicit none
 contains 
 !_______________________________________________________________________________

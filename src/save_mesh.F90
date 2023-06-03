@@ -1,7 +1,7 @@
 module save_mesh
 
 contains 
-
+!_______________________________________________________________________________
 
 subroutine write_original_mesh(ipart, spart, npart, &
                                 geo_file, infcase_file,& 
@@ -10,6 +10,7 @@ subroutine write_original_mesh(ipart, spart, npart, &
                                trinfcase_file,trinfgeo_file)
 ! USES
 use global 
+use shared
 use output_to_user
 use write_ensight
 use model 
@@ -37,9 +38,6 @@ use serial_library
 
     ! Code: 
 
-
-
-
     if(infbc)then
         ! classify finite/infinite elements for multiblock data plot
         npart=3
@@ -59,7 +57,7 @@ use serial_library
         geo_file=trim(file_head)//'_original'//trim(ptail)//'.geo'
         add_tag='_original'
         call write_ensight_casefile(case_file,geo_file,add_tag,errcode,errtag)
-        call control_error(errcode,errtag,stdout,myrank)
+        call control_error(errcode,errtag,stdout)
         ! write Ensight gold .geo file
         geo_file=trim(out_path)//trim(geo_file)
         call write_ensight_geo_part1(geo_file,ensight_hex8,ipart,spart,1, &
@@ -71,7 +69,7 @@ use serial_library
         trinfgeo_file=trim(file_head)//'_original_trinf'//trim(ptail)//'.geo'
         add_tag='_original_trinf'
         call write_ensight_casefile(trinfcase_file,trinfgeo_file,add_tag,errcode,errtag)
-        call control_error(errcode,errtag,stdout,myrank)
+        call control_error(errcode,errtag,stdout)
         ! write Ensight gold .geo file
         trinfgeo_file=trim(out_path)//trim(trinfgeo_file)
         call write_ensight_geo_part1(trinfgeo_file,ensight_hex8,ipart,spart,2, &
@@ -83,7 +81,7 @@ use serial_library
         infgeo_file=trim(file_head)//'_original_inf'//trim(ptail)//'.geo'
         add_tag='_original_inf'
         call write_ensight_casefile(infcase_file,infgeo_file,add_tag,errcode,errtag)
-        call control_error(errcode,errtag,stdout,myrank)
+        call control_error(errcode,errtag,stdout)
         ! write Ensight gold .geo file
         infgeo_file=trim(out_path)//trim(infgeo_file)
         call write_ensight_geo_part1(infgeo_file,ensight_hex8,ipart,spart,3, &
@@ -99,7 +97,7 @@ use serial_library
         geo_file=trim(file_head)//'_original'//trim(ptail)//'.geo'
         add_tag='_original'
         call write_ensight_casefile(case_file,geo_file,add_tag,errcode,errtag)
-        call control_error(errcode,errtag,stdout,myrank)
+        call control_error(errcode,errtag,stdout)
 
         ! write Ensight gold .geo file
         geo_file=trim(out_path)//trim(geo_file)
@@ -120,15 +118,14 @@ use serial_library
 end subroutine write_original_mesh
 !===============================================================================
 
-subroutine save_mesh_ensight(infcase_file,infgeo_file,trinfcase_file, &
-    trinfgeo_file,isgeo_change,add_tag, twidth, &
-    fscase_file,fsgeo_file, fspcase_file,fspgeo_file, &
+subroutine save_mesh_ensight(isgeo_change,add_tag, twidth, &
     ns,fi,fs,ts, errcode, errtag, format_str, &
-    case_file,geo_file, ipart, spart,spart_fs, buffer, node_hex8, gnum_hex8, &
+    ipart, spart,spart_fs, node_hex8, gnum_hex8, &
     gnum_quad4,node_quad4)
 
 ! USES 
 use global 
+use shared
 use write_ensight
 use element
 use free_surface
@@ -152,7 +149,7 @@ integer :: node_hex8(8), gnum_hex8(8)
 character(len=250) :: infcase_file,infgeo_file,trinfcase_file,trinfgeo_file
 character(len=250) :: fscase_file,fsgeo_file
 character(len=250) :: fspcase_file,fspgeo_file
-character(len=250) :: case_file,geo_file
+character(len=250) :: geo_file
 logical :: isgeo_change
 character(len=60) :: add_tag
 character(len=20) :: format_str
@@ -176,7 +173,7 @@ endif
 add_tag='_inf'
 call write_ensight_casefile_long(infcase_file,infgeo_file,add_tag,isgeo_change, &
 ts,ns,fs,fi,twidth,errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 endif
 
 if(savedata%fsplot)then
@@ -191,7 +188,7 @@ endif
 add_tag='_free_surface'
 call write_ensight_casefile_long(fscase_file,fsgeo_file,add_tag,isgeo_change, &
 ts,ns,fs,fi,twidth,errcode,errtag,freesurf=.true.,isplane=.false.)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 endif
 
 if(savedata%fsplot_plane)then
@@ -206,7 +203,7 @@ endif
 add_tag='_free_surface_plane'
 call write_ensight_casefile_long(fspcase_file,fspgeo_file,add_tag,isgeo_change, &
 ts,ns,fs,fi,twidth,errcode,errtag,freesurf=.true.,isplane=.TRUE.)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 endif
 
 ! Format string
