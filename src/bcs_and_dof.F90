@@ -19,6 +19,7 @@ subroutine sort_gdofs_and_bc()
 use global
 use math_constants
 use set_precision
+use shared
 use output_to_user
 !use ghost
 #if(USE_MPI)
@@ -55,7 +56,7 @@ infinite_face_idir=-9999
 ! Activate the degrees of freedom 
 call activate_dof(errcode,errtag)
 call sync_process
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! Ensure that gdof IDs are same in the finite/infinite interface
 ! nodes if they lie across different processors.
@@ -69,11 +70,11 @@ call sync_process
 ! Apply Dirichlet boundary conditions
 call apply_bc(errcode,errtag)
 call sync_process
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! Finalise the GDOF after BCs have been applied 
 call finalize_gdof(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 log_msg = 'complete!' ; call write_ifproc0(logunit)
 
 !call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &

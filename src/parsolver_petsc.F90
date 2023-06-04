@@ -12,7 +12,8 @@ module parsolver_petsc
 use ksp_constants                                                                
 use global                                                                       
 use math_library_mpi,only:maxscal,minscal                                          
-use mpi_library,only:check_allocate,sync_process                                 
+use shared,only:check_allocate
+use mpi_library,only:sync_process                                 
 use ghost_library_mpi,only:ngpart,gpart                                          
                                                                                  
 use petscksp  

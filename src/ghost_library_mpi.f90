@@ -27,6 +27,7 @@ subroutine prepare_ghost()
 use element
 use global,only:ndim,nnode,nndof,ngllx,nglly,ngllz,g_num0,g_num,g_coord,gfile, &
 part_path,proc_str,file_head,stdout
+use shared
 use math_library, only : iquick_sort,sort_array_coord
 use math_library_mpi, only : maxscal
 
@@ -107,14 +108,14 @@ open(unit=11,file=trim(fname),access='stream',form='unformatted',    &
 status='old',action='read',iostat=istat)
 if (istat /= 0)then
   write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
 endif
 read(11)sline
 read(11)mrank ! master partition ID
 
 if(mrank/=myrank)then
   write(errtag,*)'ERROR: wrong gpart file partition ',mrank,' !'
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
 endif
 
 read(11)sline
@@ -163,7 +164,7 @@ do i_gpart=1,ngpart ! ghost partitions loop
       eid=get_faceidHEX8(inode4,gnode8)
     else
       write(errtag,*)'ERROR: wrong etype:',etype,' for ghost partition ',mrank,'!'
-      call control_error(errcode,errtag,stdout,myrank)
+      call control_error(errcode,errtag,stdout)
     endif
 
     ! initialize
@@ -185,7 +186,7 @@ do i_gpart=1,ngpart ! ghost partitions loop
       kg0=minval(kgn(node_face(:,eid))); kg1=maxval(kgn(node_face(:,eid)))
     else
       write(errtag,*)'ERROR: wrong etype:',etype,' for ghost partition ',mrank,'!'
-      call control_error(errcode,errtag,stdout,myrank)
+      call control_error(errcode,errtag,stdout)
     endif
 
     do k_g=kg0,kg1
@@ -230,7 +231,7 @@ do i_gpart=1,ngpart ! ghost partitions loop
   deallocate(xp,yp,zp)
   if(ncount/=new_ncount)then
     write(errtag,*)'ERROR: number of ghost nodes mismatched after sorting!'
-    call control_error(errcode,errtag,stdout,myrank)
+    call control_error(errcode,errtag,stdout)
   endif
 
   ! find ghost gdof

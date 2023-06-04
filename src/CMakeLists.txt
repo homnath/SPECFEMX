@@ -31,13 +31,14 @@ project(specfemx
         )
 
 
-message(NOTICE "CMakeLists.txt was last deited on Jan 25th 2023 by WE ")
+message(NOTICE "CMakeLists.txt was last edited on Jan 25th 2023 by WE ")
 message(NOTICE " -->  Some comments added + allows cleanup function call.")
 
 # Source files for sem library
 SET(srcsem
   global.f90
   local.f90
+  shared.f90
   output_to_user.F90
   package_version.f90
   string_library.f90
@@ -86,7 +87,6 @@ IF(ISPARALLEL)
      math_library_mpi.f90
      relaxation_time.f90
      ghost_library_mpi.f90
-     count_elements.f90
      prepare_sparse.f90
      parsolver.f90)
      # If using PETSC then add relevant f90 to the list srcparsem
@@ -126,9 +126,8 @@ ELSE(ISPARALLEL)
   ADD_DEPENDENCIES(serial sem)
 ENDIF(ISPARALLEL)
 
-
-
 SET(srcboth
+   count_elements.F90
    prestress.F90
    prepare_solver.F90
    mesh_spec.F90
@@ -260,6 +259,7 @@ ENDIF(USE_PETSC)
 IF(ISPARTMESH)
   SET(srcpartmesh
      global.f90
+     shared.f90
      string_library.f90
      serial_library.f90
      math_library.f90

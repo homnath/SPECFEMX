@@ -346,7 +346,8 @@ module matrix_vector
                   eload(edofphi)=eload(edofphi)+lagrange_gll(i,:)*divM*jacw
                 endif
               endif
-            else !if(POT_TYPE==PMAGNETIC)
+            endif
+            if(POT_TYPE==PGRAVITY)then
               eload(edofphi)=eload(edofphi)+lagrange_gll(i,:)*massdens_elmt(i,ielmt)*jacw
             endif
           endif
@@ -375,7 +376,7 @@ module matrix_vector
 
 
       storekmat(:,:,ielmt)=kmat
-      if(.not.ISDISP_DOF .and. ISPOT_DOF)then
+      if(.not.ISDISP_DOF .and. ISPOT_DOF .and. POT_TYPE==PGRAVITY)then
         rhoload(egdof)=rhoload(egdof)+eload
       endif
     enddo ! i_elmt
@@ -383,20 +384,12 @@ module matrix_vector
    
     ! rhoload is computed if only the ISPOT_DOF is TRUE
     ! multiply rhoload by 4*PI*G
-    if(.not.ISDISP_DOF.and.ISPOT_DOF)then
+    if(.not.ISDISP_DOF.and.ISPOT_DOF .and. POT_TYPE==PGRAVITY)then
       if(.not.devel_nondim)then
-        if(POT_TYPE==PMAGNETIC)then
-          !rhoload=rhoload
-        else
-          rhoload=FOUR_PI_G*rhoload
-        endif
+        rhoload=FOUR_PI_G*rhoload
       else
-        if(POT_TYPE==PMAGNETIC)then
-          !rhoload=rhoload
-        else
-          rhoload=FOUR*rhoload
-          ! Note: PI*G is nondimensionalized
-        endif
+        rhoload=FOUR*rhoload
+        ! Note: PI*G is nondimensionalized
       endif
       rhoload(0)=ZERO
     endif

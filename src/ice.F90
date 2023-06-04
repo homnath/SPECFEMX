@@ -840,14 +840,8 @@ use serial_library
     endif 
 
 
-
     eps_area = epsilon/SLarea
-    if(myrank.eq.0)then
-        write(*,*) 'EPS AREA: ', eps_area
-    endif
-    ! Now calculate the actual iceload  - TODO there may be a way to combine the two loops
-    ! and calculate epsilon, then apply it at the end, which would be more efficient
-    ! but leave that til later.  
+
 
 
     do i_elmtfs=1,nelmt_fs
@@ -897,7 +891,7 @@ use serial_library
             do j = 1, NDIM    
                 dof = fgdof(j, i_gll) 
                 if (dof.gt.0)then 
-                    !dof = dof !+ 1   ! For some reason! 
+                    dof = dof + 1   ! For some reason! 
 
                     iceload(dof) = iceload(dof) + (val *  (-grav0_nodal(j, num_FS(i_gll))) )
                     
@@ -911,7 +905,7 @@ use serial_library
             ! Phi:  + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi
             dof = fgdof(4, i_gll) 
             if (dof.gt.0)then 
-                !dof = dof !+ 1   ! For some reason! 
+                dof = dof + 1   ! For some reason! 
 
                 iceload(dof) = iceload(dof) + val  
                 if (savedata%iceload)then 
@@ -920,11 +914,11 @@ use serial_library
             endif 
 
 
-
             ! Theta: + epsilon/A * g * pi2d
             dof = fgdof(5, i_gll)
             if (dof.gt.0)then 
-                !dof = dof !+ 1   ! For some reason! 
+                dof = dof + 1   ! For some reason! 
+                write(*,*) dof 
 
                 iceload(dof) = iceload(dof) - (eps_area * pi_2d * ABS(g0_nodal(num_FS(i_gll))) )
 
@@ -937,6 +931,8 @@ use serial_library
 
         enddo  ! i_gll 
     enddo  ! i_elmtfs
+
+
 
 
 

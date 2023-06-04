@@ -1,10 +1,8 @@
 module sea_level 
-    use global 
-    use set_precision
-    implicit none 
+implicit none 
 
-    contains 
-
+contains 
+!_______________________________________________________________________________
     
 
 ! Probably not worth using as it is SLOW
@@ -497,12 +495,14 @@ subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
     logical :: overwrite
     ! Params should be the faceID ON FS, nodeID, height, overwrite
 
-    ! Process overwrite: 
-    if (overwrite_int.eq.0.or.overwrite_int.eq.1) then 
-        overwrite = overwrite_int
+    ! Process overwrite:
+    if (overwrite_int.eq.0) then
+      overwrite = .false.
+    elseif (overwrite_int.eq.1) then 
+      overwrite = .true.
     else 
-        write(*,*)'ERROR: OVERWRITE FLAG FOR SL GLL POINT MUST BE 1/0. Value given: ', overwrite_int
-        stop 
+      write(*,*)'ERROR: OVERWRITE FLAG FOR SL GLL POINT MUST BE 1/0. Value given: ', overwrite_int
+      stop 
     endif 
 
     if(myrank.eq.0.and.verbose_bool)then
@@ -593,16 +593,14 @@ end subroutine update_ocean_function
 !-------------------------------------------------------------------------------
 
 subroutine calculate_SL_A_per_proc(nodalsl, overwrite_old, verbose)
-    ! Calculates the area covered by ocean (integral of ocean func
-    ! over the solid surface)
-    use global
-    use element
-    use mpi
-    use set_precision_mpi
-    use free_surface
-    use integration
-    use nondimensionpar
-    use math_constants
+! Calculates the area covered by ocean (integral of ocean func
+! over the solid surface)
+use global
+use element
+use free_surface
+use integration
+use nondimensionpar
+use math_constants
 #if (USE_MPI)
 use mpi_library
 #else
@@ -709,9 +707,9 @@ end subroutine calculate_SL_A_per_proc
 subroutine update_SL_area(nodalsl, overwrite_old, verbose)
     
 use set_precision
+use global
 use nondimensionpar
 use math_constants
-use set_precision_mpi
 #if (USE_MPI)
 use mpi_library
 use math_library_mpi

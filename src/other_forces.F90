@@ -1,6 +1,6 @@
 ! Holds all the bits for forces that aren't traction: 
 module other_forces 
-
+use shared
 implicit none
 
 contains
@@ -33,7 +33,7 @@ call write_ifproc0(logunit)
 
 call earthquake_load(neq,errcode,errtag)
 call sync_process
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 if(steptype==FREQSTEP)then
   !WARNING: make it general for nsrc
@@ -46,7 +46,7 @@ subroutine compute_magnetic_traction(errcode, errtag)
 
 use global
 use output_to_user
-use mpi_library ! but what about serial version 
+!use mpi_library ! but what about serial version 
 use mtraction
 
 integer :: errcode
@@ -55,8 +55,8 @@ character(len=250) :: errtag
 ! apply magnetic traction
 log_msg = trim('applying magnetic traction...') ;   call write_ifproc0(logunit)
 call apply_mtraction(errcode,errtag)
-call sync_process
-call control_error(errcode,errtag,stdout,myrank)
+!call sync_process
+call control_error(errcode,errtag,stdout)
 if(myrank==0)then
   write(logunit,*)'complete!',maxval(abs(extload))
   flush(logunit)
@@ -69,7 +69,7 @@ subroutine compute_electrical_load(errcode, errtag)
 
 use global
 use output_to_user
-use mpi_library ! but what about serial version 
+!use mpi_library ! but what about serial version 
 use electrical
 
 integer :: errcode
@@ -77,9 +77,9 @@ character(len=250) :: errtag
 
 log_msg = trim('computing electrical load...') ;   call write_ifproc0(logunit)
 call electrical_load(errcode,errtag)
-call sync_process
-call control_error(errcode,errtag,stdout,myrank)
-
+!call sync_process
+call control_error(errcode,errtag,stdout)
+!print*,'in electrical:',maxval(abs(extload))
 end subroutine compute_electrical_load
 !===============================================================================    
 
@@ -89,9 +89,6 @@ subroutine compute_split_node_load(t, i_step, sfac, errcode, errtag)
     use fault 
     use math_constants
  
-    ! SHOULD BE SERIAL LIBRARY.F90 if running serial compilation 
-    use mpi_library
-
     implicit none 
     ! IO Variables
     real(kind=kreal)              :: t
@@ -123,8 +120,8 @@ subroutine compute_split_node_load(t, i_step, sfac, errcode, errtag)
         endif
         ! The "sync" here is very important because some processors arrive this 
         ! stage faster than other. This may hang going to control_error routine!
-        call sync_process
-        call control_error(errcode,errtag,stdout,myrank)
+        !call sync_process
+        call control_error(errcode,errtag,stdout)
       endif
 
       if(srate)then

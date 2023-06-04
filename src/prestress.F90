@@ -4,11 +4,12 @@
 module prestress
 
 contains 
-    
+!_______________________________________________________________________________    
 
 subroutine calculate_prestress(errcode, errtag, ksp_iter)
 ! USES 
 use global
+use shared
 use preprocess
 use math_constants
 use output_to_user
@@ -82,7 +83,7 @@ if(isstress0)then
         du=ZERO
         call ksp_pcg_solver(neq,nelmt,storekmat,du,extload,   &
         dprecon,gdof_elmt,ksp_iter,errcode,errtag)
-        call control_error(errcode,errtag,stdout,myrank)
+        call control_error(errcode,errtag,stdout)
 
             du(0)=ZERO
 

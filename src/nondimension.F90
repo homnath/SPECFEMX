@@ -106,7 +106,7 @@ subroutine calc_nondimension_pars
 
   ! USES
   use global
-  use math_library_mpi
+  use math_constants,only:PI,GRAV_CONS
   use nondimensionpar
   implicit none 
   ! IO variables
