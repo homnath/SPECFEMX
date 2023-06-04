@@ -764,6 +764,9 @@ integer :: ggdof_elmt(NNDOF, ngll)
 <<<<<<< Updated upstream
 =======
 
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 integer :: finaldof(NEDOF), nuphi_dof, theta_dof, h
 
@@ -821,11 +824,9 @@ do i_elmt=1, nelmt
     write(*,*)'  irow, jcol: ', irow, jcol
 
 
-<<<<<<< Updated upstream
+
     if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                         
-=======
-    if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                      
->>>>>>> Stashed changes
+
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
       if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
@@ -833,6 +834,7 @@ do i_elmt=1, nelmt
         mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
         flush(logunit)
         stop                                                                     
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
       endif                        
       
@@ -843,6 +845,8 @@ do i_elmt=1, nelmt
       CHKERRA(ierr)    
     endif                                                                        
 =======
+=======
+>>>>>>> Stashed changes
       endif                           
       
       write(*,*)'  set: ', finaldof(irow), finaldof(jcol),storekmat(i,j,ielmt)
