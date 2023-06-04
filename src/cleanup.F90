@@ -7,6 +7,7 @@ subroutine run_cleanup_specfemx(errtag, errcode)
 
 use global
 use local 
+use shared
 use gll_library, only: cleanup_gll1d
 use element
 use model
@@ -33,18 +34,18 @@ if(ISDISP_DOF)then
   endif
   ! clean up                                                                       
   call cleanup_model(errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   
   call cleanup_gll1d()
   
   call cleanup_hexface(errcode,errtag)                                             
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   
   call cleanup_integration(errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   
   call cleanup_integration2d(errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   
   call cleanup_free_surface()
   

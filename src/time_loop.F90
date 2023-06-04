@@ -5,7 +5,7 @@ module time_loop
     implicit none 
 
     contains 
-
+!_______________________________________________________________________________
 
     subroutine calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
         ! Calculates the time or frequency step for the time marching.
@@ -47,6 +47,7 @@ module time_loop
         endif
         
     end subroutine calc_time_step
+!-------------------------------------------------------------------------------
  
 
 subroutine reset_nodal_arrays_loads(nodalslrate)
@@ -66,10 +67,10 @@ subroutine reset_nodal_arrays_loads(nodalslrate)
       nodalslrate = ZERO 
     endif
 end subroutine reset_nodal_arrays_loads
+!-------------------------------------------------------------------------------
 
 subroutine set_elasto_visco_stiffness_matrix(i_step, dt, isscale_ang_freq, & 
-                                                ang_freq, scale_ang_freq2, & 
-                                                istep0)
+                                             ang_freq, scale_ang_freq2,istep0)
 use global 
 use matrix_vector
 #if (USE_MPI)
@@ -94,7 +95,7 @@ real(kind=kreal)   :: ang_freq, scale_ang_freq2, dt
 ! Local: 
 integer            :: errcode
 character(len=250) :: errtag 
-
+logical            :: reuse_pc_bool,freq_bool  
 
 ! Code: 
 if(steptype.eq.FREQSTEP)then
@@ -106,8 +107,10 @@ if(steptype.eq.FREQSTEP)then
         
     ! Set Petsc stiffness matrix
     if(solver_type.eq.petsc_solver)then
-        call set_petsc_stiffness(isscale_ang_freq, &  
-        ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.true.)  
+      reuse_pc_bool=.false.
+      freq_bool=.true.
+      call set_petsc_stiffness(isscale_ang_freq, &  
+      ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)  
     endif
 
 else ! TIMESTEPPING
@@ -142,8 +145,6 @@ else ! TIMESTEPPING
                 write(*,*)' --> Combined SL and normal Kmats'
               endif
         endif
-
-                
     
         ! Add the matrix to petsc: 
         if(myrank.eq.0.and.verbose_bool)then
@@ -151,18 +152,16 @@ else ! TIMESTEPPING
         endif
 
         if(solver_type.eq.petsc_solver)then
+          reuse_pc_bool=.false.
+          freq_bool=.false.
             call set_petsc_stiffness(isscale_ang_freq, &  
-            ang_freq, scale_ang_freq2, reuse_pc_bool=.false.,freq_bool=.false.)   
+            ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)   
         endif
 
         if(myrank.eq.0.and.verbose_bool)then
             write(*,*)' ✓ Done'
             write(*,*)
         endif
-        
-
-
-
 
         ! DO NOT DELETE - HAS VISCOELASTIC CONTENT
         ! ORIGINAL VERSION - BUT FOR SL WE NEED ADAPTIVE KMAT 

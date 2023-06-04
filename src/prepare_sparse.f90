@@ -5,7 +5,8 @@ contains
 subroutine prepare_sparse()
 use math_library,only:i_uniinv,i8_uniinv
 use math_library_mpi,only:maxscal,minscal
-use mpi_library,only:check_allocate,sync_process
+use shared,only:check_allocate
+use mpi_library,only:sync_process
 use global
 implicit none
 integer,parameter :: kint8=selected_int_kind(13)

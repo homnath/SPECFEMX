@@ -16,6 +16,7 @@ subroutine create_spec_elem(tot_nelmt,max_nelmt,min_nelmt, &
 
 ! USES
 use global
+use shared
 use output_to_user
 #if (USE_MPI)
 use mpi_library
@@ -35,7 +36,7 @@ integer :: tot_nelmt,max_nelmt,min_nelmt,tot_nnode,max_nnode,min_nnode
 
 ! Code: 
   call hex2spec(ndim,ngnode,nelmt,nnode,ngllx,nglly,ngllz,errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
 
   tot_nelmt=sumscal(nelmt); tot_nnode=sumscal(nnode)
   max_nelmt=maxscal(nelmt); max_nnode=maxscal(nnode)
@@ -60,12 +61,6 @@ integer :: tot_nelmt,max_nelmt,min_nelmt,tot_nnode,max_nnode,min_nnode
   return
 
 end subroutine create_spec_elem
-
-
-
-
-
-
 
 
 ! This subroutine convert all hexahedral meshes (8-noded) to spectral elements

@@ -12,6 +12,7 @@ subroutine specfem3d()
 use nondimensionpar
 use global
 use local
+use shared
 use output_to_user
 use string_library,only : parse_file
 use math_constants
@@ -20,7 +21,6 @@ use gll_library
 use shape_library
 use infinite_element
 use math_library
-use element,only:hex8_gnode
 use dof
 use fault
 use weakform
@@ -37,7 +37,6 @@ use map_location
 use earthquake
 use electrical
 use source_function
-use cmtsolution,only:source_tshift,source_hdur
 #if (USE_MPI)
 use mpi_library
 use ghost_library_mpi
@@ -79,19 +78,17 @@ use initialise_arrays
 !use relaxation_time
 implicit none
 
-character(len=250) :: myfname=' => specfem3d.f90'
+character(len=250) :: myfname=' => main.f90'
 character(len=500) :: errsrc
 
 ! istat: status indicator for allocation (can be used in other contexts)
 integer :: istat
 
 ! do-loop indices
-integer :: i_dof,i_elmt,i_eq,i_gll,i_mat,i_nliter,i_node,i_comp,j_dof,j_node
-integer :: ielmt,imat,idof,iedof!element ID for gdof, node, etc.
+integer :: i_dof,i_eq,i_node
 
 real(kind=kreal),dimension(nst),parameter :: unit_voigt=(/one,one,one,ZERO,    &
 ZERO,ZERO /)!Voigt representation for vector
-real(kind=kreal) :: jacw !determinant of Jacobian*gll_weight
 real(kind=kreal) :: dt,dt_vp ! time step
 
 real(kind=kreal) :: sfac ! slip factor
@@ -121,8 +118,6 @@ real(kind=kreal) :: f
 !du: incremental solution
 !u: solution (summed over du)
 real(kind=kreal) :: uerr
-
-integer :: i
 
 ! Source frequency function
 !eld: elastic displacement on all nodes of the element
@@ -163,7 +158,6 @@ real(kind=kreal) :: freq,ang_freq,scale_ang_freq2
 
 ! Viscoelastic parameters
 integer :: nmatblk_elas
-real(kind=kreal) :: min_relaxtime,max_relaxtime
 
 ! Time at current time step
 real(kind=kreal) :: t
@@ -174,7 +168,6 @@ real(kind=kreal) :: step !current step (t or f)
 !Factor for time unit conversion
 real(kind=kreal) :: tunitfac
 
-integer :: i_maxwell
 ! q0: initial state variable for viscoelastic rheology
 real(kind=kreal),allocatable :: q0(:,:)
 
@@ -223,7 +216,7 @@ call sync_process()
 if( iseqsource .and. (eqsource_type.eq.3 .or. eqsource_type.eq.4) )then
   call prepare_fault(errcode,errtag)
   call sync_process
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   if(myrank.eq.0)then 
     write(*,*)'Created split fault'
   endif 
@@ -339,8 +332,11 @@ if(steptype.eq.FREQSTEP)then
   endif
 endif
 
-! Compute elastic mass matrix once and for all 
-call compute_mass_elastic(storemmat,errcode,errtag)
+! Compute elastic mass matrix once and for all.
+! TODO: this must be computed only for dynamic simulations.
+if (ISDISP_DOF) then
+  call compute_mass_elastic(storemmat,errcode,errtag)
+endif
 
 if(isplastic)then
   ! Compute minimum pseudo-time step for viscoplasticity
@@ -434,26 +430,26 @@ loop_step: do i_step=istep0,nstep
   ! Calculate the change in ice for this timestep
   ! and save icerate to ensight
   if(is_ICE)then 
-      call sync_process()
-      nodalicerate = ZERO
-      call set_ice_rate(nodalice, nodalicerate, i_step)
-      
-      ! Calculate change in Ice mass expected
-      call calculate_ice_change_volume(nodalicerate)
-      call sync_process()
-      call summarise_ice_vol_change()
+    call sync_process()
+    nodalicerate = ZERO
+    call set_ice_rate(nodalice, nodalicerate, i_step)
+    
+    ! Calculate change in Ice mass expected
+    call calculate_ice_change_volume(nodalicerate)
+    call sync_process()
+    call summarise_ice_vol_change()
 
-      ! Save the Icerate 
-      if(savedata%icerate)then 
-        ! Save at the timestep before because this is being used to calculate THIS timestep
-        call write_icerate_to_ensight(nodalicerate, i_step=i_step-1)
-        
-        ! But then for the final setup we need something like: 
-        if(i_step.eq.nstep)then 
-          call write_icerate_to_ensight(nodalicerate*zero, i_step=i_step)
-        endif 
+    ! Save the Icerate 
+    if(savedata%icerate)then 
+      ! Save at the timestep before because this is being used to calculate THIS timestep
+      call write_icerate_to_ensight(nodalicerate, i_step=i_step-1)
+      
+      ! But then for the final setup we need something like: 
+      if(i_step.eq.nstep)then 
+        call write_icerate_to_ensight(nodalicerate*zero, i_step=i_step)
       endif 
-  endif 
+    endif 
+  endif !is_ICE 
 
   ! Set the stiffness matrix
   call set_elasto_visco_stiffness_matrix(i_step, dt, isscale_ang_freq, & 
@@ -464,7 +460,7 @@ loop_step: do i_step=istep0,nstep
   !WE Reads and adds the traction to the extload variable
   if((istraction.or.isfstraction).and.i_step==1)then
     call apply_traction(errcode,errtag,i_step)
-    call control_error(errcode,errtag,stdout,myrank)
+    call control_error(errcode,errtag,stdout)
   endif
   ! Other types of forces: 
   if(trim(devel_example).eq.'axial_rod')then
@@ -481,11 +477,12 @@ loop_step: do i_step=istep0,nstep
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
     call compute_cmt_load(freq)
     !print*,myrank,'CMT extload:',maxval(abs(extload))
+  endif
   ! electrical current prescribed at points
   if(isecurrent.and.i_step==1)then
     call compute_electrical_load(errcode,errtag)
+    !print*,'in main:',maxval(abs(extload))
   endif
-  endif 
 
   ! Calculate ice load: 
   if (is_ICE)then 
@@ -614,11 +611,13 @@ if(solver_type.eq.petsc_solver)then
 endif
 
 call cleanup_fault()
-deallocate(egdof,egdofu)
+if(allocated(egdof))deallocate(egdof)
+if(allocated(egdofu))deallocate(egdofu)
 if(allocated(gdofu))deallocate(gdofu)
 deallocate(extload,load,resload,rhoload,ubcload)
 deallocate(du,u)
-deallocate(nodalu,bcnodalv)
+if(allocated(nodalu))deallocate(nodalu)
+if(allocated(bcnodalv))deallocate(bcnodalv)
 if(ISPOT_DOF)then
   deallocate(nodalphi)
 endif

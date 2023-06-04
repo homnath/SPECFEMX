@@ -11,6 +11,7 @@ subroutine process_user_input(cmd, tdate, ttime, tzone, path, &
 ! USES
 use global
 use package_version
+use shared
 use string_library
 use input 
 #if(USE_MPI)
@@ -40,7 +41,7 @@ call get_command_argument(0, prog)
 if (command_argument_count() <= 0) then
   errcode=-1
   errtag='ERROR: no input file!'
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
 endif
 
 call get_command_argument(1, arg1)
@@ -85,7 +86,7 @@ if(myrank==0)then
   open(unit=logunit,file=trim(log_file),status='replace',action='write',iostat=ios)
   if(ios.ne.0)then
     write(errtag,'(a)')'ERROR: cannot open log file: '//trim(log_file)
-    call control_error(errcode,errtag,stdout,myrank)
+    call control_error(errcode,errtag,stdout)
   endif
   write(logunit,'(a)')'--------------------------------------------'
   write(logunit,'(a)')'Result summary produced by '//&
@@ -120,12 +121,12 @@ endif
 ! read input data
 call read_input(inp_fname,errcode,errtag)
 call sync_process()
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! check method
 if (trim(method)/='sem')then
   write(errtag,'(a)')'ERROR: wrong input for SPECFEM3D!'
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
 else
   !write(logunit, '(a)')'Correct method: sem'
 endif

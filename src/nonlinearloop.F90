@@ -36,6 +36,7 @@ subroutine run_solver(scale_ang_freq2, ksp_iter, errcode,  &
 ! USES
 use global 
 use set_precision
+use shared
 use output_to_user
 
 #if (USE_MPI)
@@ -73,12 +74,12 @@ use solver_petsc
           call ksp_cg_solver(neq,nelmt,storekmat,du,resload,     &
           gdof_elmt,ksp_iter,errcode,errtag)
           du=ndscale*du
-          call control_error(errcode,errtag,stdout,myrank)
+          call control_error(errcode,errtag,stdout)
         else
           ! pcg solver
           call ksp_pcg_solver(neq,nelmt,storekmat,du,resload,    &
           dprecon,gdof_elmt,ksp_iter,errcode,errtag)
-          call control_error(errcode,errtag,stdout,myrank)
+          call control_error(errcode,errtag,stdout)
         endif
     else
          ! petsc solver 
