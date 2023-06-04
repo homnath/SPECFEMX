@@ -761,6 +761,10 @@ implicit none
 
 integer :: i,i_elmt,ielmt,j,n,ndzero ,igll, ictr ,r  , iloop                                         
 integer :: ggdof_elmt(NNDOF, ngll)                                                     
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 integer :: finaldof(NEDOF), nuphi_dof, theta_dof, h
 
 PetscInt irow,jcol                                                               
@@ -817,7 +821,11 @@ do i_elmt=1, nelmt
     write(*,*)'  irow, jcol: ', irow, jcol
 
 
+<<<<<<< Updated upstream
     if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                         
+=======
+    if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                      
+>>>>>>> Stashed changes
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
       if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
@@ -825,6 +833,7 @@ do i_elmt=1, nelmt
         mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
         flush(logunit)
         stop                                                                     
+<<<<<<< Updated upstream
       endif                        
       
       write(*,*)'  set: ', finaldof(irow), finaldof(jcol),storekmat(i,j,ielmt)
@@ -833,6 +842,17 @@ do i_elmt=1, nelmt
       PetscCallA(MatSetValues(Amat, 1, finaldof(irow), 1, finaldof(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr))
       CHKERRA(ierr)    
     endif                                                                        
+=======
+      endif                           
+      
+      write(*,*)'  set: ', finaldof(irow), finaldof(jcol),storekmat(i,j,ielmt)
+      
+
+      call MatSetValues(Amat, 1, finaldof(irow), 1, finaldof(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr)
+      CHKERRA(ierr)                                                              
+    endif 
+    
+>>>>>>> Stashed changes
     enddo                                                                        
   enddo   
 enddo    
