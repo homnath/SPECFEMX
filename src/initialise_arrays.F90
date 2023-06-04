@@ -52,6 +52,8 @@ if(ISPOT_DOF)then
     write(*,*)'ERROR: cannot allocate memory!'
     stop
     endif
+
+    nodalphi=ZERO
 endif
 
 return 

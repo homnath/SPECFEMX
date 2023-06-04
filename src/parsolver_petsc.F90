@@ -753,22 +753,15 @@ end subroutine petsc_set_ksp_operator
 !===============================================================================
 
 subroutine petsc_set_stiffness_matrix()
-  ! WHERE WE ACTUALLY SET THE STIFFNESS MATRIX
 use global
 use math_library_mpi,only:sumscal
 use ieee_arithmetic
 implicit none
 
 integer :: i,i_elmt,ielmt,j,n,ndzero ,igll, ictr ,r  , iloop                                         
-integer :: ggdof_elmt(NNDOF, ngll)                                                     
-<<<<<<< Updated upstream
-=======
-
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-integer :: finaldof(NEDOF), nuphi_dof, theta_dof, h
+integer :: ggdof_elmt(NEDOF)                                                     
+integer :: tmp_elmt(NNDOF, ngll)                                                     
+integer :: nuphi_dof, theta_dof, h
 
 PetscInt irow,jcol                                                               
 Vec   vdiag                                                                      
@@ -781,52 +774,42 @@ real(kind=8) :: xval
 !  - Note that MatSetValues() uses 0-based row and column numbers
 !  in Fortran as well as in C (as set here in the array "col").
 
-! set all vals to 0
-call MatZeroEntries(Amat,ierr) 
+call MatZeroEntries(Amat,ierr) ! set all vals to 0
 CHKERRA(ierr)
 call sync_process 
 rval=1.0
 
+
+
 ! entirely in solid                                                              
 do i_elmt=1, nelmt       
-  write(*,*)'IELMT: ', i_elmt
 
   ! Get global DOF indices for this element
-  ielmt=i_elmt                                                                   
-  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))    
+  ielmt=i_elmt   
+  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))    
 
-  write(*,*)'  ggdof_elmt:'
+  
+  ! IF RUNNING SEA LEVEL SIMULATION WE NEED THIS - DONT DELETE!
+  if(ISSL_DOF)then
+    ! Reshape slightly
+    tmp_elmt=reshape(ggdof_elmt,(/nndof, ngll/)) 
+    ! Reorders the u and phi DOFs into a 1D array
+    nuphi_dof = nndofu+nndofphi
+    ggdof_elmt = 0 
+    ggdof_elmt(1:(nuphi_dof)*ngll) = reshape(tmp_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
+    ! Add the sea level DOFs
+    ggdof_elmt((nuphi_dof)*ngll + 1:(nndof)*ngll) = tmp_elmt(nndof, :)
+  endif 
 
-  do h=1,nndof
-    write(*,*)'  IELMT: ', ggdof_elmt(h, :)
-  enddo 
-
-  ! Reorders the u and phi DOFs into a 1D array
-  nuphi_dof = nndofu+nndofphi
-  write(*,*)'  nuphi_dof: ', nuphi_dof
-
-  finaldof = 0 
-  finaldof(1:(nuphi_dof)*ngll) = reshape(ggdof_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
-
-  ! Add the sea level DOFs
-  finaldof((nuphi_dof)*ngll + 1:(nndof)*ngll) = ggdof_elmt(nndof, :)
   ! petsc index starts from 0   
-  finaldof=finaldof-1 
-
-  write(*,*)'  finaldof: ', finaldof
-
-
+  ggdof_elmt=ggdof_elmt-1 
 
   do i=1,NEDOF                                                                   
     do j=1,NEDOF                                                                 
     irow=i; jcol=j 
 
-    write(*,*)'  irow, jcol: ', irow, jcol
 
-
-
-    if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                         
-
+    if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
       if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
@@ -834,40 +817,30 @@ do i_elmt=1, nelmt
         mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
         flush(logunit)
         stop                                                                     
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      endif                        
-      
-      write(*,*)'  set: ', finaldof(irow), finaldof(jcol),storekmat(i,j,ielmt)
-
-      ! WE TO HNG - Why PetscCallA - throws error? 
-      PetscCallA(MatSetValues(Amat, 1, finaldof(irow), 1, finaldof(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr))
-      CHKERRA(ierr)    
-    endif                                                                        
-=======
-=======
->>>>>>> Stashed changes
       endif                           
-      
-      write(*,*)'  set: ', finaldof(irow), finaldof(jcol),storekmat(i,j,ielmt)
-      
+            
 
-      call MatSetValues(Amat, 1, finaldof(irow), 1, finaldof(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr)
+      call MatSetValues(Amat, 1, ggdof_elmt(irow), 1, ggdof_elmt(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr)
       CHKERRA(ierr)                                                              
     endif 
     
->>>>>>> Stashed changes
     enddo                                                                        
   enddo   
 enddo    
 
-PetscCallA(MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr))
-PetscCallA(MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr))
+
+
+call MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
+CHKERRA(ierr)
+call MatAssemblyEnd(Amat,MAT_FINAL_ASSEMBLY,ierr)
+CHKERRA(ierr)
 
 if(symmetric_solver)then
-  PetscCallA(MatSetOption(Amat,MAT_SYMMETRIC,PETSC_TRUE,ierr))                            
+  call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_TRUE,ierr)                            
+  CHKERRA(ierr)
 else
-  PetscCallA(MatSetOption(Amat,MAT_SYMMETRIC,PETSC_FALSE,ierr))                            
+  call MatSetOption(Amat,MAT_SYMMETRIC,PETSC_FALSE,ierr)                            
+  CHKERRA(ierr)  
 endif
 
 !! check symmetry                                                                
@@ -885,19 +858,21 @@ endif
 !if(myrank==0)print*,'matrix setting & assembly complete11!'                     
 !call sync_process                                                               
                                                                                  
-PetscCallA(MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr))                               
-PetscCallA(MatGetDiagonal(Amat,vdiag,ierr))                                             
-PetscCallA(VecGetLocalSize(vdiag,n,ierr))                                               
-PetscCallA(VecGetArrayF90(vdiag,diag_array,ierr))                                       
+call MatCreateVecs(Amat,vdiag,PETSC_NULL_VEC,ierr)                               
+call MatGetDiagonal(Amat,vdiag,ierr)                                             
+call VecGetLocalSize(vdiag,n,ierr)                                               
+CHKERRA(ierr)                                                                    
+call VecGetArrayF90(vdiag,diag_array,ierr)                                       
+CHKERRA(ierr)                                                                    
 ndzero=count(diag_array==0.)                                                     
 if(ndzero.gt.0)then                                                              
   write(logunit,*)'WARNING: NZEROs in diagonal:',myrank,n, &
   count(diag_array==0.),minval(abs(diag_array)),maxval(abs(diag_array))                                
   flush(logunit)
 endif                                                                            
-PetscCallA(VecRestoreArrayF90(vdiag,diag_array,ierr))                                   
-call sync_process                                                                
-PetscCallA(VecDestroy(vdiag,ierr))
+call VecRestoreArrayF90(vdiag,diag_array,ierr)                                   
+call sync_process                                                        
+call VecDestroy(vdiag,ierr)
                                                       
 end subroutine petsc_set_stiffness_matrix
 !===============================================================================

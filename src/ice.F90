@@ -850,105 +850,94 @@ use serial_library
     ! but leave that til later.  
 
 
-    do iproc=0,nproc
+    do i_elmtfs=1,nelmt_fs
+
+        ! GET SOME DETAILS ABOUT THE ELEMENT 
+        call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4) ! face number, number of GLL on face, gauss weights, derivative of shape funcs
+        num4     = gnum4_fs(:, i_elmtfs)           ! node IDs for corners 
+        coord    = g_coord(:,num4)                 ! node coordinates
+        gid_elmt = id_elem_fs(i_elmtfs)            ! global element ID 
+        num_FS   = gnum_fs(:, i_elmtfs)            ! Global node IDs of the GLL pts on FS 
+
+        ! DOF IDs for the nodes in matrix (property, gll pt) where property goes from 1 - 5 (ux,uy,uz,phi,theta)
+        fgdof(:, 1:nfgll) = reshape(gdof(:, g_num(hexface(iface)%node, gid_elmt)),(/nndof, maxngll2d/))
 
 
-        if (myrank.eq.iproc)then
-            write(*,*)'------------ RANK ', myrank
+        do i_gll = 1, nfgll 
 
-            do i_elmtfs=1,nelmt_fs
+            nodeid = rgnum_fs(i_gll, i_elmtfs)
 
-                ! GET SOME DETAILS ABOUT THE ELEMENT 
-                call get_fs_details(i_elmtfs, iface, nfgll, gw, dshape4) ! face number, number of GLL on face, gauss weights, derivative of shape funcs
-                num4     = gnum4_fs(:, i_elmtfs)           ! node IDs for corners 
-                coord    = g_coord(:,num4)                 ! node coordinates
-                gid_elmt = id_elem_fs(i_elmtfs)            ! global element ID 
-                num_FS   = gnum_fs(:, i_elmtfs)            ! Global node IDs of the GLL pts on FS 
+            ! Calculate the magnitude of the 2D jacobian 
+            dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
+            dx_deta = matmul(coord,dshape4(2,:,i_gll))
+            ! Calc normal and therefore jac dec (2D) on the fly
+            face_normal(1) = dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
+            face_normal(2) = dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+            face_normal(3) = dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+            pi_2d          = gw(i_gll) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jac
 
-                ! DOF IDs for the nodes in matrix (property, gll pt) where property goes from 1 - 5 (ux,uy,uz,phi,theta)
-                fgdof(:, 1:nfgll) = reshape(gdof(:, g_num(hexface(iface)%node, gid_elmt)),(/nndof, maxngll2d/))
+            !face_normal_len =  sqrt(dot_product(face_normal,face_normal))
 
+            ! We need the dot product of the vertical with the normal to the surface 
+            ! The sign is not relevant becaause the water is always pushing down from the top surface
+            !vertical    = zero
+            !vertical(3) = one
 
-                do i_gll = 1, nfgll 
-
-                    nodeid = rgnum_fs(i_gll, i_elmtfs)
-
-                    ! Calculate the magnitude of the 2D jacobian 
-                    dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
-                    dx_deta = matmul(coord,dshape4(2,:,i_gll))
-                    ! Calc normal and therefore jac dec (2D) on the fly
-                    face_normal(1) = dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
-                    face_normal(2) = dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
-                    face_normal(3) = dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
-                    pi_2d          = gw(i_gll) * sqrt(dot_product(face_normal,face_normal)) ! Weights*jac
-
-                    !face_normal_len =  sqrt(dot_product(face_normal,face_normal))
-
-                    ! We need the dot product of the vertical with the normal to the surface 
-                    ! The sign is not relevant becaause the water is always pushing down from the top surface
-                    !vertical    = zero
-                    !vertical(3) = one
-
-                    ! Normalise the length of the face normal to get unit normal to the free surface
-                    !unit_normal = face_normal/face_normal_len
-                    !cos_theta   = ABS(dot_product(unit_normal,vertical) ) 
+            ! Normalise the length of the face normal to get unit normal to the free surface
+            !unit_normal = face_normal/face_normal_len
+            !cos_theta   = ABS(dot_product(unit_normal,vertical) ) 
 
 
-                    ! Calculate the coefficient for phi and u that is shared
-                    ! Note that u values also need to be multiplied by background gravity
-                    val =( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - eps_area*oceanf(i_elmtfs, i_gll) 
-                    val = val * pi_2d !* cos_theta
+            ! Calculate the coefficient for phi and u that is shared
+            ! Note that u values also need to be multiplied by background gravity
+            val =( (ONE - oceanf(i_elmtfs, i_gll)) * nodalicerate(nodeid)) - eps_area*oceanf(i_elmtfs, i_gll) 
+            val = val * pi_2d !* cos_theta
 
-                    ! Displacement for direction j: + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi * \nabla\Phi_j
-                    do j = 1, NDIM    
-                        dof = fgdof(j, i_gll) 
-                        if (dof.gt.0)then 
-                            dof = dof + 1   ! For some reason! 
+            ! Displacement for direction j: + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi * \nabla\Phi_j
+            do j = 1, NDIM    
+                dof = fgdof(j, i_gll) 
+                if (dof.gt.0)then 
+                    !dof = dof !+ 1   ! For some reason! 
 
-                            iceload(dof) = iceload(dof) + (val *  (-grav0_nodal(j, num_FS(i_gll))) )
-                            
-                            if (savedata%iceload)then 
-                                nodal_iceload_u(j,nodeid) = nodal_iceload_u(j, nodeid) + (val *  (-grav0_nodal(j, num_FS(i_gll)) ) )
-                            endif 
-                        endif  
-                    enddo
-
+                    iceload(dof) = iceload(dof) + (val *  (-grav0_nodal(j, num_FS(i_gll))) )
                     
-                    ! Phi:  + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi
-                    dof = fgdof(4, i_gll) 
-                    if (dof.gt.0)then 
-                        dof = dof + 1   ! For some reason! 
-
-                        iceload(dof) = iceload(dof) + val  
-                        if (savedata%iceload)then 
-                            nodal_iceload_phi(nodeid) = nodal_iceload_phi(nodeid) + val
-                        endif 
+                    if (savedata%iceload)then 
+                        nodal_iceload_u(j,nodeid) = nodal_iceload_u(j, nodeid) + (val *  (-grav0_nodal(j, num_FS(i_gll)) ) )
                     endif 
+                endif  
+            enddo
+
+            
+            ! Phi:  + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi
+            dof = fgdof(4, i_gll) 
+            if (dof.gt.0)then 
+                !dof = dof !+ 1   ! For some reason! 
+
+                iceload(dof) = iceload(dof) + val  
+                if (savedata%iceload)then 
+                    nodal_iceload_phi(nodeid) = nodal_iceload_phi(nodeid) + val
+                endif 
+            endif 
 
 
 
-                    ! Theta: + epsilon/A * g * pi2d
-                    dof = fgdof(5, i_gll)
-                    if (dof.gt.0)then 
-                        dof = dof + 1   ! For some reason! 
-                        write(*,*) dof 
+            ! Theta: + epsilon/A * g * pi2d
+            dof = fgdof(5, i_gll)
+            if (dof.gt.0)then 
+                !dof = dof !+ 1   ! For some reason! 
 
-                        iceload(dof) = iceload(dof) - (eps_area * pi_2d * ABS(g0_nodal(num_FS(i_gll))) )
+                iceload(dof) = iceload(dof) - (eps_area * pi_2d * ABS(g0_nodal(num_FS(i_gll))) )
 
-                        if (savedata%iceload)then 
-                            nodal_iceload_sl(nodeid) = nodal_iceload_sl(nodeid) - (eps_area * pi_2d * ABS(g0_nodal(num_FS(i_gll))))
-                        endif 
-                    endif
+                if (savedata%iceload)then 
+                    nodal_iceload_sl(nodeid) = nodal_iceload_sl(nodeid) - (eps_area * pi_2d * ABS(g0_nodal(num_FS(i_gll))))
+                endif 
+            endif
 
-        
 
-                enddo  ! i_gll 
-            enddo  ! i_elmtfs
 
-        endif 
+        enddo  ! i_gll 
+    enddo  ! i_elmtfs
 
-        call sync_process()
-    enddo 
 
 
     ! Multiply whole of the vector by rho_i 
