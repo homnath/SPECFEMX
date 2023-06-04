@@ -760,7 +760,8 @@ use ieee_arithmetic
 implicit none
 
 integer :: i,i_elmt,ielmt,j,n,ndzero ,igll, ictr ,r  , iloop                                         
-integer :: ggdof_elmt(NEDOF)                                                     
+integer :: ggdof_elmt(NNDOF, ngll)                                                     
+integer :: finaldof(NEDOF), nuphi_dof, theta_dof, h
 
 PetscInt irow,jcol                                                               
 Vec   vdiag                                                                      
@@ -774,25 +775,49 @@ real(kind=8) :: xval
 !  in Fortran as well as in C (as set here in the array "col").
 
 ! set all vals to 0
-PetscCallA(MatZeroEntries(Amat,ierr))
-call sync_process
+call MatZeroEntries(Amat,ierr) 
+CHKERRA(ierr)
+call sync_process 
 rval=1.0
 
 ! entirely in solid                                                              
 do i_elmt=1, nelmt       
+  write(*,*)'IELMT: ', i_elmt
 
   ! Get global DOF indices for this element
   ielmt=i_elmt                                                                   
-  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))    
+  ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))    
 
+  write(*,*)'  ggdof_elmt:'
+
+  do h=1,nndof
+    write(*,*)'  IELMT: ', ggdof_elmt(h, :)
+  enddo 
+
+  ! Reorders the u and phi DOFs into a 1D array
+  nuphi_dof = nndofu+nndofphi
+  write(*,*)'  nuphi_dof: ', nuphi_dof
+
+  finaldof = 0 
+  finaldof(1:(nuphi_dof)*ngll) = reshape(ggdof_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
+
+  ! Add the sea level DOFs
+  finaldof((nuphi_dof)*ngll + 1:(nndof)*ngll) = ggdof_elmt(nndof, :)
   ! petsc index starts from 0   
-  ggdof_elmt=ggdof_elmt-1 
+  finaldof=finaldof-1 
+
+  write(*,*)'  finaldof: ', finaldof
+
+
 
   do i=1,NEDOF                                                                   
     do j=1,NEDOF                                                                 
     irow=i; jcol=j 
 
-    if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
+    write(*,*)'  irow, jcol: ', irow, jcol
+
+
+    if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                         
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
       if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
@@ -800,8 +825,13 @@ do i_elmt=1, nelmt
         mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
         flush(logunit)
         stop                                                                     
-      endif                                                                     
-      PetscCallA(MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),storekmat(i,j,ielmt),ADD_VALUES,ierr))
+      endif                        
+      
+      write(*,*)'  set: ', finaldof(irow), finaldof(jcol),storekmat(i,j,ielmt)
+
+      ! WE TO HNG - Why PetscCallA - throws error? 
+      PetscCallA(MatSetValues(Amat, 1, finaldof(irow), 1, finaldof(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr))
+      CHKERRA(ierr)    
     endif                                                                        
     enddo                                                                        
   enddo   
