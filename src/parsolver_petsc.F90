@@ -827,7 +827,7 @@ real(kind=kreal),intent(in) :: storekmat(:,:,:)
 integer :: i,i_elmt,ielmt,j,n,ndzero ,igll, ictr ,r  , iloop                                         
 integer :: ggdof_elmt(NNDOF, ngll)                                                     
 
-integer :: finaldof(NEDOF), nuphi_dof, theta_dof
+integer :: finaldof(NEDOF), nuphi_dof, theta_dof, h
 
 PetscInt irow,jcol                                                               
 Vec   vdiag                                                                      
@@ -849,13 +849,22 @@ rval=1.0
 
 ! entirely in solid                                                              
 do i_elmt=1, nelmt       
+  write(*,*)'IELMT: ', i_elmt
 
   ! Get global DOF indices for this element
   ielmt=i_elmt                                                                   
   ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/nndof, ngll/))    
 
+  write(*,*)'  ggdof_elmt:'
+
+  do h=1,nndof
+    write(*,*)'  IELMT: ', ggdof_elmt(h, :)
+  enddo 
+
   ! Reorders the u and phi DOFs into a 1D array
   nuphi_dof = nndofu+nndofphi
+  write(*,*)'  nuphi_dof: ', nuphi_dof
+
   finaldof = 0 
   finaldof(1:(nuphi_dof)*ngll) = reshape(ggdof_elmt(1:nuphi_dof, :),(/nuphi_dof*ngll/)) 
 
@@ -864,10 +873,16 @@ do i_elmt=1, nelmt
   ! petsc index starts from 0   
   finaldof=finaldof-1 
 
+  write(*,*)'  finaldof: ', finaldof
+
+
 
   do i=1,NEDOF                                                                   
     do j=1,NEDOF                                                                 
     irow=i; jcol=j 
+
+    write(*,*)'  irow, jcol: ', irow, jcol
+
 
     if(finaldof(irow).ge.0.and.finaldof(jcol).ge.0)then                      
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
@@ -877,7 +892,11 @@ do i_elmt=1, nelmt
         mat_id(ielmt),xval,minval(abs(storekmat)),maxval(abs(storekmat))         
         flush(logunit)
         stop                                                                     
-      endif                                                                     
+      endif                           
+      
+      write(*,*)'  set: ', finaldof(irow), finaldof(jcol),storekmat(i,j,ielmt)
+      
+
       call MatSetValues(Amat, 1, finaldof(irow), 1, finaldof(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr)
       CHKERRA(ierr)                                                              
     endif 
