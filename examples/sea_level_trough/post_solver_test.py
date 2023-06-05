@@ -61,7 +61,8 @@ if __name__ == "__main__":
                         dpath_stable=a.pstable,
                         proc_list=PROC_LIST,
                         casetype='body',
-                        supress_warnings =a.SW)
+                        supress_warnings =a.SW, 
+                        precision=a.PREC)
 
         run_test(tester=TESTER,  verb=a.V, vars=a.VAR, nsteps=a.TS)
 
@@ -77,6 +78,7 @@ if __name__ == "__main__":
                         dpath_stable=a.pstable,
                         proc_list=PROC_LIST,
                         casetype='fs',
-                        supress_warnings =a.SW)
+                        supress_warnings =a.SW, 
+                        precision=a.PREC)
 
         run_test(tester=TESTER,  verb=a.V, vars=a.VAR, nsteps=a.TS)
