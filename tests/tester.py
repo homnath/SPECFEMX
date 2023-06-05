@@ -275,6 +275,9 @@ def parse_args():
     parser.add_argument('-test_fs', '--test_fs', action='store_true', help='Test variable values on free surface body')
     parser.add_argument('-suppress_warnings', '--SW', action='store_true', help='Supress printed warnings if vars not loaded')
 
+    parser.add_argument('-precision', '--PREC', type=float, default=1e-10,
+                        help='Test ID e.g. test1 or uptrough (str)')
+
     # Check the args that have been parsed by user
     a = parser.parse_args()
 
@@ -288,6 +291,7 @@ def parse_args():
     print(f" Test body vars.  :     {a.test_body}")
     print(f" Test fs vars.    :     {a.test_fs}\n")
     print(f" Test ID          :     {a.ID}")
+    print(f" Precision        :     {a.PREC}")
     print(f" Min proc in range:     {a.Nmin}")
     print(f" Max proc in range:     {a.Nmax}")
     print(f" Verbosity level  :     {a.V}")
