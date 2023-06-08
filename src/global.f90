@@ -402,6 +402,7 @@ integer,allocatable :: node_finite(:),node_trinfinite(:),node_infinite(:)
 ! stepping (time or frequency) parameters                                                 
 integer,parameter :: TIMESTEP=0, FREQSTEP=1                                      
 integer :: steptype,nstep                                                        
+real(kind=kreal) :: step !current step (t or f)
 real(kind=kreal) :: step0,step1,dstep
 
 ! Control parameters

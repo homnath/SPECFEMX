@@ -16,7 +16,7 @@ module time_loop
         use nondimensionpar
         ! IO variables
         real(kind=kreal) :: freq, ang_freq, scale_ang_freq2
-        real(kind=kreal) :: t, dt, step
+        real(kind=kreal) :: t, dt
         integer :: i_step
 
         step=step0+dstep*real(i_step,kreal)
@@ -224,10 +224,6 @@ else ! TIMESTEPPING
 
     !    endif ! Petsc solver
     !endif ! istep
-        
-        
-
-
 
 endif ! if(steptype.eq.FREQSTEP)
 

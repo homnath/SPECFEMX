@@ -235,10 +235,11 @@ else
 endif
 
 ! Add 1 time step to add initial field.
-!if(isplastic.and.nstep.le.1)then
+! WARNING: ot MUST be checked
+if(isplastic.and.nstep.le.1)then
   ns=ns+1
   dstep=one
-!endif
+endif
 add_tag=''
 call write_ensight_casefile_long(case_file,geo_file,add_tag,isgeo_change, &
 ts,ns,fs,fi,twidth,errcode,errtag)

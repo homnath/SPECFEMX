@@ -1396,7 +1396,7 @@ source: do i_src=1,nsource
     derivmat(9,3:nedofu:3)=deriv(3,:) !dNz/dz
 
     ! it may be a better idea to define material properties for the fault
-    ! separately from the model properpties
+    ! separately from the model properties
     ! however, in the statement below, model properties are interpolated on
     ! the fault surface
     ! interpolate material properties at a source point

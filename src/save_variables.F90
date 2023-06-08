@@ -148,7 +148,7 @@ use serial_library
 #endif 
 
   ! IO variables
-  integer :: i_step
+  integer,intent(in) :: i_step
   ! Local variables  
   integer :: i_comp
 

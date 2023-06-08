@@ -37,6 +37,7 @@ use map_location
 use earthquake
 use electrical
 use source_function
+use station
 #if (USE_MPI)
 use mpi_library
 use ghost_library_mpi
@@ -163,7 +164,6 @@ integer :: nmatblk_elas
 real(kind=kreal) :: t
 integer :: i_step,istep
 integer :: istep0 !first step
-real(kind=kreal) :: step !current step (t or f)
 
 !Factor for time unit conversion
 real(kind=kreal) :: tunitfac
@@ -327,8 +327,8 @@ istep0=1
 if(steptype.eq.FREQSTEP)then
   istep0=0
   if(myrank.eq.0)then
-    print*,'Step type: FREQUENCY'
-    print*,'f0, f1, df (Hz):',step0,step1,dstep
+    write(logunit,'(a)')'Step type: FREQUENCY'
+    write(logunit,'(a,1x,e13.6,1x,e13.6,1x,e13.6)')'f0, f1, df (Hz):',step0,step1,dstep
   endif
 endif
 
@@ -350,7 +350,11 @@ if(isbodyload)then
   call compute_bodyload(selfload,selfweight=isselfweight)
 endif 
 
-
+! Prepare stations
+if(isstation)then
+  call locate_station(errcode,errtag)
+  call open_station_files()
+endif
 
 call sync_process()
 
@@ -363,8 +367,6 @@ if(is_ICE)then
   call prepare_ice(nodalice, nodalicerate)
   call set_original_ice_level(nodalice)
 endif 
-
-
 
 ! Initialise Sea Level 
 if(is_SL)then 
@@ -405,8 +407,9 @@ if(ISSL_DOF)then
   call save_pot_variables(i_step=istep0-1)
   call save_displacement_variables(i_step=istep0-1)
 endif 
-call save_pot_variables(i_step=istep0-1)
-call save_displacement_variables(i_step=istep0-1)
+! WARNING
+! TMP call save_pot_variables(i_step=istep0-1)
+! TMP call save_displacement_variables(i_step=istep0-1)
 
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
@@ -465,8 +468,7 @@ loop_step: do i_step=istep0,nstep
 
   ! Set the stiffness matrix
   call set_elasto_visco_stiffness_matrix(i_step, dt, isscale_ang_freq, & 
-  ang_freq, scale_ang_freq2, & 
-  istep0)  
+  ang_freq, scale_ang_freq2,istep0)  
   
   !apply traction boundary conditions for first timestep
   !WE Reads and adds the traction to the extload variable
@@ -568,7 +570,11 @@ loop_step: do i_step=istep0,nstep
   if(ISDISP_DOF)then
     call save_displacement_variables(i_step=i_step)
   endif
-
+ 
+  if(isstation)then
+    call compute_station(errcode,errtag)
+    call write_station_files(step)
+  endif
 
 
   ! Save potential variables to Ensight
@@ -607,6 +613,7 @@ enddo loop_step ! i_step time/frequency stepping loop
 ! ++++++++++++++++ END OF TIME LOOPING CODE ++++++++++++++++++++++++
 
 ! ----------------------------- CLEANUP --------------------------------
+if(isstation)call close_station_files
 if(myrank==0)then 
   write(*,*); write(*,*)'Completed timesteps. Cleaning up... '
 endif 
