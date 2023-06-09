@@ -1190,9 +1190,9 @@ source: do i_src=1,nsource
   ! Find the element which contains this earthquake source.
   is_located=.false.
   
-  print*,myrank, source_x(1),pmodel_minx,pmodel_maxx
-  print*,myrank, source_x(2),pmodel_miny,pmodel_maxy
-  print*,myrank, source_x(3),pmodel_minz,pmodel_maxz
+  !print*,myrank, source_x(1),pmodel_minx,pmodel_maxx
+  !print*,myrank, source_x(2),pmodel_miny,pmodel_maxy
+  !print*,myrank, source_x(3),pmodel_minz,pmodel_maxz
 
   ! Check if the source is within the model range.
   prange:if(source_x(1).lt.NONDIM_L*pmodel_minx .or. source_x(1).gt.NONDIM_L*pmodel_maxx .or. & 
@@ -1397,7 +1397,7 @@ source: do i_src=1,nsource
     derivmat(9,3:nedofu:3)=deriv(3,:) !dNz/dz
 
     ! it may be a better idea to define material properties for the fault
-    ! separately from the model properpties
+    ! separately from the model properties
     ! however, in the statement below, model properties are interpolated on
     ! the fault surface
     ! interpolate material properties at a source point
@@ -1476,7 +1476,7 @@ source: do i_src=1,nsource
   !  ! add average load per source
   !  load=load+sload/real(n_felmt,kreal)
   !else
-    load=load+sload
+    extload=extload+sload
   !endif
 enddo source ! i_src
 deallocate(isnode,iselmt)

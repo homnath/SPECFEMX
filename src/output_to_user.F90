@@ -1,6 +1,8 @@
 module output_to_user
     
-    contains 
+contains
+!_______________________________________________________________________________
+
     subroutine write_ifproc0(unit)
         ! Writes to log file only if processor rank = 0
         use global, only: logunit, myrank, log_msg
@@ -14,9 +16,7 @@ module output_to_user
         flush(unit)
 
     end subroutine
-
-
-
+!-------------------------------------------------------------------------------
 
     subroutine print_model_details
     use global
@@ -48,8 +48,6 @@ module output_to_user
         write(logunit,*)
         flush(logunit)
 
-
-
     endif
     
     ngllxy=ngllx*nglly                                                               
@@ -58,7 +56,7 @@ module output_to_user
     maxngll2d=max(ngllxy,ngllyz,ngllzx)
     
     end subroutine print_model_details 
-
+!-------------------------------------------------------------------------------
 
 
 
@@ -80,6 +78,7 @@ module output_to_user
         endif
 
     end subroutine log_ksp_iteration
+!-------------------------------------------------------------------------------
 
 
 ! Prints error if the memory can not be allocated
@@ -93,6 +92,7 @@ subroutine check_memory_alloc(istat, fileval)
         stop
     endif
 end subroutine check_memory_alloc
+!-------------------------------------------------------------------------------
 
 
 subroutine log_KSP_summary()
@@ -108,6 +108,7 @@ subroutine log_KSP_summary()
         flush(logunit)
     endif
 end subroutine log_KSP_summary
-
+!-------------------------------------------------------------------------------
 
 end module output_to_user
+!===============================================================================

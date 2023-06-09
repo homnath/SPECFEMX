@@ -752,7 +752,6 @@ subroutine calculate_ice_change_volume(nodalicerate)
             face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
 
             ! Project to the vertical (multiply by 0, 0, 1 for z as vertical): 
-            ! UNSURE ABOUT THIS??? 
             face_normal(1) = zero; 
             face_normal(2) = zero;
             detjac2d=sqrt(dot_product(face_normal,face_normal))       
@@ -798,8 +797,10 @@ use serial_library
     integer                        :: fgdof(nndof, maxngll2d), errcode ! face global degrees of freedom
 
     ! for projection to face normal: 
-    real(kind=kreal) :: vertical(3), unit_normal(3),face_normal_len, cos_theta
+    real(kind=kreal) :: vertical(3), unit_normal(3), face_normal_len, cos_theta
 
+    ! Debug: 
+    integer :: iproc
 
 
     ! Code: 
@@ -824,7 +825,7 @@ use serial_library
 
 
     ! Epsilon/Area
-    call calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, nodalicerate)
+    call calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, nodalicerate)
     call sync_process()
     ! Sum up Epsilon over all of the nodes and copy to local epsilon
     sumepsilon = sumscal(epsilon)
@@ -842,9 +843,7 @@ use serial_library
     eps_area = epsilon/SLarea
 
 
-    ! Now calculate the actual iceload  - TODO there may be a way to combine the two loops
-    ! and calculate epsilon, then apply it at the end, which would be more efficient
-    ! but leave that til later.  
+
     do i_elmtfs=1,nelmt_fs
 
         ! GET SOME DETAILS ABOUT THE ELEMENT 
@@ -892,7 +891,6 @@ use serial_library
             do j = 1, NDIM    
                 dof = fgdof(j, i_gll) 
                 if (dof.gt.0)then 
-                    dof = dof + 1   ! For some reason! 
 
                     iceload(dof) = iceload(dof) + (val *  (-grav0_nodal(j, num_FS(i_gll))) )
                     
@@ -906,7 +904,6 @@ use serial_library
             ! Phi:  + ( (1-OF)*I_dot  - epsilon/A * OF  )* pi
             dof = fgdof(4, i_gll) 
             if (dof.gt.0)then 
-                dof = dof + 1   ! For some reason! 
 
                 iceload(dof) = iceload(dof) + val  
                 if (savedata%iceload)then 
@@ -918,7 +915,7 @@ use serial_library
             ! Theta: + epsilon/A * g * pi2d
             dof = fgdof(5, i_gll)
             if (dof.gt.0)then 
-                dof = dof + 1   ! For some reason! 
+
 
                 iceload(dof) = iceload(dof) - (eps_area * pi_2d * ABS(g0_nodal(num_FS(i_gll))) )
 
@@ -926,8 +923,14 @@ use serial_library
                     nodal_iceload_sl(nodeid) = nodal_iceload_sl(nodeid) - (eps_area * pi_2d * ABS(g0_nodal(num_FS(i_gll))))
                 endif 
             endif
+
+
+
         enddo  ! i_gll 
     enddo  ! i_elmtfs
+
+
+
 
 
     ! Multiply whole of the vector by rho_i 
@@ -1026,7 +1029,7 @@ subroutine write_iceload_to_ensight(i_step)
 end subroutine write_iceload_to_ensight
 
 
-subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, nodalicerate)
+subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, nodalicerate)
     use free_surface
     use global
     use set_precision
@@ -1035,11 +1038,11 @@ subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, face_normal, 
     integer                        :: num4(4)
     real(kind=kreal)               :: gw(:), nodalicerate(:)        
     real(kind=kreal)               :: dshape4(:,:,:)
-    real(kind=kreal)               :: coord(ndim,4), face_normal(3), epsilon
+    real(kind=kreal)               :: coord(ndim,4),  epsilon
 
     ! local vars: 
     integer :: i_elmtfs, iface, nfgll, i_gll
-    real(kind=kreal) :: dx_dxi(NDIM), dx_deta(NDIM), pi_2d, val 
+    real(kind=kreal) :: dx_dxi(NDIM), dx_deta(NDIM), pi_2d, val, face_normal(3) 
 
     ! First calculate the average ice rate load change (epsilon): 
     epsilon = zero

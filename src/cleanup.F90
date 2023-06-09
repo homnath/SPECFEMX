@@ -7,6 +7,7 @@ subroutine run_cleanup_specfemx(errtag, errcode)
 
 use global
 use local 
+use shared
 use gll_library, only: cleanup_gll1d
 use element
 use model
@@ -33,18 +34,18 @@ if(ISDISP_DOF)then
   endif
   ! clean up                                                                       
   call cleanup_model(errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   
   call cleanup_gll1d()
   
   call cleanup_hexface(errcode,errtag)                                             
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   
   call cleanup_integration(errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   
   call cleanup_integration2d(errcode,errtag)
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   
   call cleanup_free_surface()
   
@@ -52,8 +53,7 @@ if(ISDISP_DOF)then
 end subroutine run_cleanup_specfemx 
 !-------------------------------------------------------------------------------
 
-subroutine run_cleanup_specfem3d(strain_elmt, strain_nodal,  &
-                                 evpt, gdofu)
+subroutine run_cleanup_specfem3d()
 ! USES
 use global
 use local
@@ -80,10 +80,6 @@ use solver_petsc
 implicit none 
 ! IO variables
 
-integer,allocatable :: gdofu(:)
-real(kind=kreal), allocatable :: strain_elmt(:,:,:), strain_nodal(:,:),  &
-                                 evpt(:,:,:)
-
   !CODE:
 
   ! cleanup solver
@@ -101,8 +97,8 @@ real(kind=kreal), allocatable :: strain_elmt(:,:,:), strain_nodal(:,:),  &
   endif
   
   call cleanup_fault()
-  deallocate(egdof,egdofu)
-  if(allocated(gdofu))deallocate(gdofu)
+  !deallocate(egdof,egdofu)
+  !if(allocated(gdofu))deallocate(gdofu)
   deallocate(extload,load,resload,rhoload,ubcload)
   deallocate(du,u)
   deallocate(nodalu,bcnodalv)

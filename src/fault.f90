@@ -99,7 +99,6 @@ pfault_nface=0
 fsurface_plus: do
   read(11,*,iostat=ios)pfault_svec
   if(ios/=0)exit fsurface_plus
-  print*,'ohh:',pfault_svec
   ! Nondimensionalise
   pfault_svec=NONDIM_L*pfault_svec
   count_fsurf=count_fsurf+1
@@ -391,8 +390,6 @@ if(fault_nface.gt.0)then
   endif
 endif
 
-print*,'Ahh:',plus_or_minus,slip_vec,pfault_svec
-print*,'slip_vec:',slip_vec
 !allocate(kmat(nedof,nedof))
 allocate(kmat(nedofu,nedofu))
 allocate(slip_gll(NDIM,ngll))
@@ -426,7 +423,6 @@ do i_face=1,fault_nface
  
   !kmat=storekmat(:,:,ielmt)
   kmat=storekmat(edofu,edofu,ielmt)
-  if(maxval(abs(kmat)).gt.0)print*,'HIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII'
   iedof=0
   do i_gll=1,ngll
     do i=1,nndofu
@@ -438,7 +434,6 @@ do i_face=1,fault_nface
   enddo
 enddo
 
-print*,'Hello1 ha:',maxval(abs(slipload))
 deallocate(kmat)
 deallocate(slip_gll)
 deallocate(egdof)

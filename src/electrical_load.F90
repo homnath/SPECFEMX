@@ -39,20 +39,19 @@ character(len=250),intent(out) :: errtag
 
 integer,parameter :: nmax_line=100 ! maximum number of lines in the eqsource
 !file
-integer :: i_elmt,i_line,ielmt,imid,inum,ios,istat,ix
+integer :: i_elmt,ielmt,imid,inum,ios
 integer :: num(nenode),egdofphi(nedofphi)
 
 real(kind=kreal) :: coord(ndim,8),jac(ndim,ndim),xp(ndim),xip(ndim)
 real(kind=kreal) :: detjac
 
-real(kind=kreal) :: proj
 real(kind=kreal) :: located_x(ndim),source_x(ndim),source_xi(ndim)
-real(kind=kreal) :: deriv(ndim,ngll),eload(nedofphi)
+real(kind=kreal) :: eload(nedofphi)
 
 integer :: mdomain
 
 logical :: is_located
-integer :: this_src_located,total_src_located
+integer :: total_src_located
 integer,allocatable:: isrc_located(:)
 integer :: niter
 real(kind=kreal) :: errx,errxd,minerr
@@ -82,11 +81,8 @@ real(kind=kreal) :: all_minerr(1,0:nproc-1)
 integer :: ipass_strict,nfail_strict
 logical :: isinside
 
-character(len=1) :: tchar
-character(len=80) :: token
 character(len=80) :: fname
 character(len=80) :: data_path
-character(len=250) :: pfile
 
 errtag="ERROR: unknown!"
 errcode=-1
@@ -133,9 +129,9 @@ source: do i_src=1,nsource
   ! Find the element which contains this electrical source.
   is_located=.false.
   
-  print*,myrank, source_x(1),pmodel_minx,pmodel_maxx
-  print*,myrank, source_x(2),pmodel_miny,pmodel_maxy
-  print*,myrank, source_x(3),pmodel_minz,pmodel_maxz
+  !print*,myrank, source_x(1),pmodel_minx,pmodel_maxx
+  !print*,myrank, source_x(2),pmodel_miny,pmodel_maxy
+  !print*,myrank, source_x(3),pmodel_minz,pmodel_maxz
 
   ! Check if the source is within the model range.
   prange:if(source_x(1).lt.NONDIM_L*pmodel_minx .or. source_x(1).gt.NONDIM_L*pmodel_maxx .or. & 
@@ -343,7 +339,7 @@ source: do i_src=1,nsource
   !  ! add average load per source
   !  load=load+sload/real(n_felmt,kreal)
   !else
-    load=load+sload
+    extload=extload+sload
   !endif
 enddo source ! i_src
 deallocate(isnode,iselmt)

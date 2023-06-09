@@ -1,0 +1,6 @@
+Trough model with gaussian melt. Regardless of how many timesteps there are, the results are: 
+
+Code calculates value of 2.247941673 (m)
+Where the analytical value is 2.248163333274533 (m) 
+
+This represents an error of 0.0221 centimeters, or 0.2 mm for a sea level rise of  1.248 meters 

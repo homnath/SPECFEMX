@@ -511,7 +511,7 @@ endif
 
 
 deallocate(num)
-write(logunit, *)'Completed set_model_properties...'
+if(myrank.eq.0)write(logunit, *)'Completed set_model_properties...'
 
 errcode=0
 end subroutine set_model_properties
@@ -526,7 +526,6 @@ subroutine convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
   use global
   use math_constants
   use shape_library,only:shape_function_hex8p
-
 
   ! IO variables
   integer :: i_blk, ios
@@ -549,8 +548,6 @@ subroutine convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
   real(kind=kreal) :: vp,vs,rho
   real(kind=kreal) :: shape_hex8(8)
  
-
-
   ! CODE: 
     ! Read file 
   write(logunit, *)'Converting tomo. model to pointwise...'
@@ -683,7 +680,7 @@ subroutine convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
       deallocate(grid_vp,grid_vs,grid_rho)
 
 end subroutine convert_tomo_to_point_model
-
+!-------------------------------------------------------------------------------
 
 subroutine calc_model_coord_extents(tot_nelmt,max_nelmt,min_nelmt, &
                                     tot_nnode,max_nnode,min_nnode, &
@@ -758,7 +755,9 @@ if(infbc)then
     flush(logunit)
   endif
 else
-  write(logunit,*)'No infinite bc (infbc = F)...'
+  if(myrank.eq.0)then
+    write(logunit,*)'No infinite bc (infbc = F)...'
+  endif
   pmodel_minx=minval(g_coord(1,:))
   pmodel_maxx=maxval(g_coord(1,:))
   pmodel_miny=minval(g_coord(2,:))
@@ -801,8 +800,6 @@ if(myrank==0)then
   write(logunit,*)
   flush(logunit)
 endif
-
-
 
 ! Reassign pole coordinates if it is "center" of the model.
 ! NOTE: check if the center should be taken for the finite region only.

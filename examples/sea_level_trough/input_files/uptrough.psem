@@ -1,0 +1,35 @@
+# THIS FILE WAS AUTOWRITTEN USING write_psem_file.py - WE
+
+preinfo: nproc=40, method='sem', &
+         ngllx=3, nglly=3,  &
+         ngllz=3, nenode=8,      &
+         ngnode=8, inp_path='./input/uptrough/', &
+         out_path='./output_uptrough/', pot_type='gravity',&
+          pot_dof=1, disp_dof=1, grav0=1          
+
+mesh: xfile='uptrough_coord_x', &
+      yfile='uptrough_coord_y', &
+      zfile='uptrough_coord_z', &
+      confile='uptrough_connectivity', &
+      fsfile='uptrough_free_surface', &
+      idfile='uptrough_material_id', &
+      gfile='uptrough_ghost'
+
+bc: ubc=1,                &
+    uxfile='uptrough_ssbcux', &
+    uyfile='uptrough_ssbcuy', &
+    uzfile='uptrough_ssbcuz' 
+
+material: matfile='uptrough_material_list',density=1 
+
+sealevel: slfile='uptrough_SL', savesl0=1, saveOF=1, solvesl=1 
+
+ice: icefile='uptrough_ice', iceratefile='uptrough_icerate', saveiceload=1,  saveice0=1, saveicerate=1 
+
+control: ksp_tol=1e-6, ksp_maxiter=1000, nl_tol=1e-4, nl_maxiter=1 
+
+save: disp=1,  strain=1, fsplot=1, gpot=1, agrav=1 
+
+step: type=0, step=1.0,  nstep=2
+
+devel: nondim=0

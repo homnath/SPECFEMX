@@ -100,7 +100,7 @@ errsrc=trim(myfname)//' => compute_rmat_term1'
 nst=ubound(rmat_term1,1)
 if(nst.ne.3)then
   write(*,*)'ERROR: wrong size of the term1!'//trim(errsrc)
-  print*,'hello!',nst
+  print*,'NST:',nst
   stop
 endif
 nod=ubound(interpf,1)
@@ -176,7 +176,7 @@ errsrc=trim(myfname)//' => compute_rmat_term3'
 nst=ubound(rmat_term3,1)
 if(nst.ne.1)then
   write(*,*)'ERROR: wrong size of the term4!'//trim(errsrc)
-  print*,'hello!',nst
+  print*,'NST:',nst
   stop
 endif
 nod=ubound(interpf,1)
@@ -210,7 +210,7 @@ errsrc=trim(myfname)//' => compute_rmat_term4'
 nst=ubound(rmat_term4,1)
 if(nst.ne.1)then
   write(*,*)'ERROR: wrong size of the term4!'//trim(errsrc)
-  print*,'hello!',nst
+  print*,'NST:',nst
   stop
 endif
 nod=ubound(dinterpf,2)
@@ -327,7 +327,7 @@ errsrc=trim(myfname)//' => compute_wmat_term2'
 nst=ubound(wmat_term2,2)
 if(nst.ne.3)then
   write(*,*)'ERROR: wrong size of the term2!'//trim(errsrc)
-  print*,'hello!',nst
+  print*,'NST:',nst
   stop
 endif
 nod=ubound(interpf,1)
@@ -357,7 +357,7 @@ errsrc=trim(myfname)//' => compute_wmat_term3'
 nst=ubound(wmat_term3,2)
 if(nst.ne.1)then
   write(*,*)'ERROR: wrong size of the term3!'//trim(errsrc)
-  print*,'hello!',nst
+  print*,'NST:',nst
   stop
 endif
 nod=ubound(dinterpf,2)
@@ -388,7 +388,7 @@ errsrc=trim(myfname)//' => compute_wmat_term4'
 nst=ubound(wmat_term4,2)
 if(nst.ne.1)then
   write(*,*)'ERROR: wrong size of the term4!'//trim(errsrc)
-  print*,'hello!',nst
+  print*,'NST:',nst
   stop
 endif
 nod=ubound(interpf,1)
@@ -503,7 +503,7 @@ errsrc=trim(myfname)//' => compute_rmat_sPE'
 nst=ubound(rmat_sPE,1)
 if(nst.ne.3)then
   write(*,*)'ERROR: wrong size of the sPE!'//trim(errsrc)
-  print*,'hello!',nst
+  print*,'NST:',nst
   stop
 endif
 nod=ubound(interpf,1)

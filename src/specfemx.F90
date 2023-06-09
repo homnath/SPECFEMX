@@ -10,6 +10,7 @@ program specfemx
 
   ! Import necessary modules.
 use global
+use shared
 use nondimensionpar
 use nondimension
 use package_version
@@ -55,12 +56,9 @@ integer :: gnum_quad4(4),node_quad4(4)
 
 character(len=250) :: arg1,arg2,inp_fname,prog
 character(len=150) :: path
-character(len=80) :: buffer ! this must be 80 characters long
 character(len=20) :: ext,format_str
 character(len=250) :: case_file,geo_file
 character(len=250) :: infcase_file,infgeo_file,trinfcase_file,trinfgeo_file
-character(len=250) :: fscase_file,fsgeo_file
-character(len=250) :: fspcase_file,fspgeo_file
 ! switch to check if the geometry file changes with time steps, for example,
 ! multistage excavation
 logical :: isgeo_change
@@ -120,7 +118,7 @@ call calc_model_coord_extents(tot_nelmt,max_nelmt,min_nelmt, &
 
 ! Initialize model - allocates shearmod/bulkmod/massdensity arrays
 call initialize_model(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! STILL NOT SURE WHAT THIS IS FOR! 
 isgeo_change=.false.
@@ -185,23 +183,23 @@ call print_model_details()
 
 ! prepare hexes
 call prepare_hex(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! prepare hex faces
 call prepare_hexface(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! prepare integration
 call prepare_integration(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! prepare surface (2D) integration
 call prepare_integration2d(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! Set model properties
 call set_model_properties(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! Nondimensionalisation 
 call set_nondimension_refs
@@ -211,7 +209,7 @@ call calc_nondimension_pars
 ! Information is later used to determine the elevation 
 ! of the source point and to plot the free surface files.
 call prepare_free_surface(errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 call sync_process()
 ! Calculate all of the nodes 
 allnodesfs = sumscal(nnode_fs)
@@ -236,8 +234,8 @@ else
   geo_file=trim(file_head)//'_step'//wild_char(1:twidth)//trim(ptail)//'.geo'
 endif
 
-! Add 1 time step to plot elastic and plastic results together.
-
+! Add 1 time step to add initial field.
+! WARNING: ot MUST be checked
 if(isplastic.and.nstep.le.1)then
   ns=ns+1
   dstep=one
@@ -245,14 +243,12 @@ endif
 add_tag=''
 call write_ensight_casefile_long(case_file,geo_file,add_tag,isgeo_change, &
 ts,ns,fs,fi,twidth,errcode,errtag)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 
 ! Save the mesh to the EnSight files. 
-call save_mesh_ensight(infcase_file,infgeo_file,trinfcase_file, &
-                       trinfgeo_file,isgeo_change,add_tag, twidth, &
-                       fscase_file,fsgeo_file, fspcase_file,fspgeo_file, &
+call save_mesh_ensight(isgeo_change,add_tag, twidth, &
                        ns,fi,fs,ts, errcode, errtag, format_str, &
-                       case_file,geo_file, ipart, spart,spart_fs, buffer, &
+                       ipart, spart,spart_fs, &
                        node_hex8, gnum_hex8, gnum_quad4,node_quad4)
 call sync_process()
 
@@ -267,16 +263,17 @@ call determine_solver(errcode, errtag)
 
  
 ! lets make a separate file: 
-if(myrank.eq.0)then
-out_file = trim(file_head)//'.output'
-  open(unit=outunit,file=trim(out_file),status='replace',action='write',iostat=ios)
-  if(ios.ne.0)then
-    print*,ios,trim(out_file)
-    write(errtag,'(a)')'ERROR: cannot open log file: '//trim(out_file)
-    call control_error(errcode,errtag,stdout,myrank)
-  endif
-endif 
-
+if(ISSL_DOF)then 
+  if(myrank.eq.0)then
+    out_file = trim(file_head)//'.output'
+    open(unit=outunit,file=trim(out_file),status='replace',action='write',     &
+    iostat=ios)
+    if(ios.ne.0)then
+      write(errtag,'(a)')'ERROR: cannot open log file: '//trim(out_file)
+      call control_error(errcode,errtag,stdout)
+    endif
+  endif 
+endif !ISSL_DOF
 
 ! Now, call main routine...
 if(myrank.eq.0)then 

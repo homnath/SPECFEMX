@@ -5,7 +5,8 @@ contains
 subroutine prepare_sparse()
 use math_library,only:i_uniinv,i8_uniinv
 use math_library_mpi,only:maxscal,minscal
-use mpi_library,only:check_allocate,sync_process
+use shared,only:check_allocate
+use mpi_library,only:sync_process
 use global
 implicit none
 integer,parameter :: kint8=selected_int_kind(13)
@@ -40,15 +41,15 @@ errsrc=trim(myfname)//' => prepare_sparse'
 if(myrank==0) then
   write(logunit,*) '++++++++++++++++++++++++++++++++++++++++'
   write(logunit,*) '       preparing sparse matrix...'
-
 endif
 
 nmax=nelmt*(NEDOF*NEDOF)
 
-write(logunit,*)'NEDOF : ', NEDOF
-write(logunit,*)'nelmt : ', nelmt
-write(logunit,*)'nmax  : ', nmax
-
+if(myrank.eq.0)then
+  write(logunit,*)'NEDOF : ', NEDOF
+  write(logunit,*)'nelmt : ', nelmt
+  write(logunit,*)'nmax  : ', nmax
+endif
 allocate(col0(nmax),row0(nmax),gcol0(nmax),grow0(nmax),stat=ierr)
 call check_allocate(ierr,errsrc)
 

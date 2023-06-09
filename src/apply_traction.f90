@@ -108,7 +108,7 @@ if(istraction)then
         !lngdof=gdof(idofu,g_num(hex8_gnode(inode),ielmt))
 
         lngdof=gdof(idofu,gnum_fs(igll, fs_elem_id( ielmt))) 
-        load(lngdof)=load(lngdof)+q
+        extload(lngdof)=extload(lngdof)+q
 
         write(logunit,*)'Added traction at gnum: ', gnum_fs(igll, fs_elem_id( ielmt))
         write(logunit,*)'                  gdof: ', lngdof
@@ -120,8 +120,6 @@ if(istraction)then
         nodaltraction(:,nodalids(1)) = nodaltraction(:,nodalids(1)) + q
 
         write(logunit,*)'Added nodaltraction at gnum: ', nodalids(1)
-
-
         
       enddo
       trac_stat=.true.
@@ -187,7 +185,7 @@ if(istraction)then
         enddo
 
         ! Add traction contribution to load
-        load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
+        extload(fgdof(1:nfdof))=extload(fgdof(1:nfdof))+ftracload(1:nfdof)
 
 
         ! reshape the traction addition vector into a (NDIM x MAXNGLL2D)
@@ -255,7 +253,7 @@ if(istraction)then
           ftracload(3:nfdof:3)=ftracload(3:nfdof:3)+ &
           q(3)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) ! *face_normal(3) !only in Z direction
        enddo
-       load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
+       extload(fgdof(1:nfdof))=extload(fgdof(1:nfdof))+ftracload(1:nfdof)
      enddo
      trac_stat=.true.
     elseif(tractype==23)then ! torsion
@@ -336,7 +334,7 @@ if(istraction)then
           ftracload(3:nfdof:3)=ftracload(3:nfdof:3)+ &
           q(3)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll) ! *face_normal(3) !only in Z direction
        enddo
-       load(fgdof(1:nfdof))=load(fgdof(1:nfdof))+ftracload(1:nfdof)
+       extload(fgdof(1:nfdof))=extload(fgdof(1:nfdof))+ftracload(1:nfdof)
      enddo
      trac_stat=.true.
     else
@@ -443,7 +441,7 @@ if(isfstraction0.and.nnode_fs>0)then
       detjac=sqrt(dot_product(face_normal,face_normal))
       face_normal=hexface_sign(iface)*face_normal/detjac
 
-      load(igdofu)=load(igdofu)+detjac*gll_weights(i_gll)*q
+      extload(igdofu)=extload(igdofu)+detjac*gll_weights(i_gll)*q
       
     enddo
   enddo
@@ -635,12 +633,12 @@ endif !(isfstraction)
 
       ! Save the traction: 
 if (savedata%traction)then
-  write(logunit,*)' min Traction extload: ', minval(load)
-  write(logunit,*)' max Traction extload: ', maxval(load)
-  write(logunit,*)' min nodaltraction : ',   minval(nodaltraction)
-  write(logunit,*)' max nodaltraction : ',   maxval(nodaltraction)
+  write(*,*)' min Traction extload: ', minval(load)
+  write(*,*)' max Traction extload: ', maxval(load)
+  write(*,*)' min nodaltraction : ',   minval(nodaltraction)
+  write(*,*)' max nodaltraction : ',   maxval(nodaltraction)
 
-  write(logunit,*)'Saving traction - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
+  write(*,*)'Saving traction - currently using nodalu as the vector for whole mesh (instead of free surface) as a proxy...not real.'
   call write_vector_to_file(nnode,nodalu,ext='traction',istep=0) 
   ! On the free surface
   if(savedata%fsplot)then

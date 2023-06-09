@@ -12,6 +12,7 @@ subroutine specfem3d()
 use nondimensionpar
 use global
 use local
+use shared
 use output_to_user
 use string_library,only : parse_file
 use math_constants
@@ -20,7 +21,6 @@ use gll_library
 use shape_library
 use infinite_element
 use math_library
-use element,only:hex8_gnode
 use dof
 use fault
 use weakform
@@ -37,7 +37,7 @@ use map_location
 use earthquake
 use electrical
 use source_function
-use cmtsolution,only:source_tshift,source_hdur
+use station
 #if (USE_MPI)
 use mpi_library
 use ghost_library_mpi
@@ -79,19 +79,17 @@ use initialise_arrays
 !use relaxation_time
 implicit none
 
-character(len=250) :: myfname=' => specfem3d.f90'
+character(len=250) :: myfname=' => main.f90'
 character(len=500) :: errsrc
 
 ! istat: status indicator for allocation (can be used in other contexts)
 integer :: istat
 
 ! do-loop indices
-integer :: i_dof,i_elmt,i_eq,i_gll,i_mat,i_nliter,i_node,i_comp,j_dof,j_node
-integer :: ielmt,imat,idof,iedof!element ID for gdof, node, etc.
+integer :: i_dof,i_eq,i_node
 
 real(kind=kreal),dimension(nst),parameter :: unit_voigt=(/one,one,one,ZERO,    &
 ZERO,ZERO /)!Voigt representation for vector
-real(kind=kreal) :: jacw !determinant of Jacobian*gll_weight
 real(kind=kreal) :: dt,dt_vp ! time step
 
 real(kind=kreal) :: sfac ! slip factor
@@ -122,8 +120,6 @@ real(kind=kreal) :: f
 !u: solution (summed over du)
 real(kind=kreal) :: uerr
 
-integer :: i
-
 ! Source frequency function
 !eld: elastic displacement on all nodes of the element
 !eload: elastic load on element
@@ -131,11 +127,6 @@ integer :: i
 !ubcload: load contributed by displacement BC
 !load: like resload. Not currently used
 
-!strain_elmt: strain for all elements
-!stress_elmt: stress for each element
-!stress_nodal: nodal stress for all elements in processor
-real(kind=kreal),allocatable :: strain_elmt(:,:,:),strain_nodal(:,:),      &
-stress_elmt(:,:,:),stress_nodal(:,:),evpt(:,:,:)
 !bcnodalv: prescribed BC nodal variables
 !nodalu: nodal displacement for all nodes (not just BC)
 
@@ -168,18 +159,15 @@ real(kind=kreal) :: freq,ang_freq,scale_ang_freq2
 
 ! Viscoelastic parameters
 integer :: nmatblk_elas
-real(kind=kreal) :: min_relaxtime,max_relaxtime
 
 ! Time at current time step
 real(kind=kreal) :: t
 integer :: i_step,istep
 integer :: istep0 !first step
-real(kind=kreal) :: step !current step (t or f)
 
 !Factor for time unit conversion
 real(kind=kreal) :: tunitfac
 
-integer :: i_maxwell
 ! q0: initial state variable for viscoelastic rheology
 real(kind=kreal),allocatable :: q0(:,:)
 
@@ -228,7 +216,7 @@ call sync_process()
 if( iseqsource .and. (eqsource_type.eq.3 .or. eqsource_type.eq.4) )then
   call prepare_fault(errcode,errtag)
   call sync_process
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
   if(myrank.eq.0)then 
     write(*,*)'Created split fault'
   endif 
@@ -242,9 +230,7 @@ call initialise_local_arrays()
 call sort_gdofs_and_bc()
 call initialise_equation_arrays()
 ! Calculate any prestress 
-call calculate_prestress(strain_elmt, strain_nodal,       &
-                         stress_elmt, stress_nodal,       & 
-                         errcode, errtag, ksp_iter, istat)
+call calculate_prestress(errcode, errtag, ksp_iter)
    
 ! compute node valency and assemble all node_valency across processors
 call calculate_valency()
@@ -341,13 +327,16 @@ istep0=1
 if(steptype.eq.FREQSTEP)then
   istep0=0
   if(myrank.eq.0)then
-    print*,'Step type: FREQUENCY'
-    print*,'f0, f1, df (Hz):',step0,step1,dstep
+    write(logunit,'(a)')'Step type: FREQUENCY'
+    write(logunit,'(a,1x,e13.6,1x,e13.6,1x,e13.6)')'f0, f1, df (Hz):',step0,step1,dstep
   endif
 endif
 
-! Compute elastic mass matrix once and for all 
-call compute_mass_elastic(storemmat,errcode,errtag)
+! Compute elastic mass matrix once and for all.
+! TODO: this must be computed only for dynamic simulations.
+if (ISDISP_DOF) then
+  call compute_mass_elastic(storemmat,errcode,errtag)
+endif
 
 if(isplastic)then
   ! Compute minimum pseudo-time step for viscoplasticity
@@ -361,15 +350,23 @@ if(isbodyload)then
   call compute_bodyload(selfload,selfweight=isselfweight)
 endif 
 
+! Prepare stations
+if(isstation)then
+  call locate_station(errcode,errtag)
+  call open_station_files()
+endif
+
 call sync_process()
 
 ! Initialise ice: 
 if(is_ICE)then
+
+  ! Ensure correct normals
+  call check_surface_normals()
   ! Prepare the ice stuff and set the user-inputted initial condition
   call prepare_ice(nodalice, nodalicerate)
   call set_original_ice_level(nodalice)
 endif 
-
 
 ! Initialise Sea Level 
 if(is_SL)then 
@@ -391,25 +388,28 @@ if(is_SL)then
   call summarise_SL_input(nodalsl)                       
 endif 
 
-
-
 ! Write initial (pre-looping) values to istep = 0
-if(myrank.eq.0)then
-  write(*,*)' Saving initial values to ensight: '
-endif   
-if(savedata%ice)then 
-  call write_ice_to_ensight(nodalice, i_step=istep0-1)
+! necessary for SL to see initial ice load etc...maybe not necessary for 
+! other applications? 
+if(ISSL_DOF)then
+  if(myrank.eq.0)then
+    write(*,*)' Saving initial values to ensight: '
+  endif   
+  if(savedata%ice)then 
+    call write_ice_to_ensight(nodalice, i_step=istep0-1)
+  endif 
+  if(savedata%sl)then
+    call write_SL_to_ensight(nodalsl, i_step=istep0-1)
+  endif 
+  if(savedata%oceanf)then
+    call write_OF_to_ensight(i_step=istep0-1)
+  endif 
+  call save_pot_variables(i_step=istep0-1)
+  call save_displacement_variables(i_step=istep0-1)
 endif 
-if(savedata%sl)then
-  call write_SL_to_ensight(nodalsl, i_step=istep0-1)
-endif 
-if(savedata%oceanf)then
-  call write_OF_to_ensight(i_step=istep0-1)
-endif 
-call save_pot_variables(i_step=istep0-1)
-call save_displacement_variables(strain_elmt, strain_nodal, &
-                                 stress_elmt, stress_nodal, & 
-                                 i_step=istep0-1)
+! WARNING
+! TMP call save_pot_variables(i_step=istep0-1)
+! TMP call save_displacement_variables(i_step=istep0-1)
 
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
@@ -427,7 +427,7 @@ loop_step: do i_step=istep0,nstep
   if(myrank.eq.0)then   
     write(*,*)
     write(*,*)
-    write(*,'(a,i0,a)')' ~~~~~~~~~~~~~~~~~~~~ TIMESTEP ', i_step, ' ~~~~~~~~~~~~~~~~~~~~'
+    write(*,'(a,i0,a,i0,a)')' ~~~~~~~~~~~~~~~~~~~~ TIMESTEP ', i_step, '/',nstep ,' ~~~~~~~~~~~~~~~~~~~~'
   endif 
 
 
@@ -445,37 +445,36 @@ loop_step: do i_step=istep0,nstep
   ! Calculate the change in ice for this timestep
   ! and save icerate to ensight
   if(is_ICE)then 
-      call sync_process()
-      nodalicerate = ZERO
-      call set_ice_rate(nodalice, nodalicerate, i_step)
-      
-      ! Calculate change in Ice mass expected
-      call calculate_ice_change_volume(nodalicerate)
-      call sync_process()
-      call summarise_ice_vol_change()
+    call sync_process()
+    nodalicerate = ZERO
+    call set_ice_rate(nodalice, nodalicerate, i_step)
+    
+    ! Calculate change in Ice mass expected
+    call calculate_ice_change_volume(nodalicerate)
+    call sync_process()
+    call summarise_ice_vol_change()
 
-      ! Save the Icerate 
-      if(savedata%icerate)then 
-        ! Save at the timestep before because this is being used to calculate THIS timestep
-        call write_icerate_to_ensight(nodalicerate, i_step=i_step-1)
-        
-        ! But then for the final setup we need something like: 
-        if(i_step.eq.nstep)then 
-          call write_icerate_to_ensight(nodalicerate*zero, i_step=i_step)
-        endif 
+    ! Save the Icerate 
+    if(savedata%icerate)then 
+      ! Save at the timestep before because this is being used to calculate THIS timestep
+      call write_icerate_to_ensight(nodalicerate, i_step=i_step-1)
+      
+      ! But then for the final setup we need something like: 
+      if(i_step.eq.nstep)then 
+        call write_icerate_to_ensight(nodalicerate*zero, i_step=i_step)
       endif 
-  endif 
+    endif 
+  endif !is_ICE 
 
   ! Set the stiffness matrix
   call set_elasto_visco_stiffness_matrix(i_step, dt, isscale_ang_freq, & 
-  ang_freq, scale_ang_freq2, & 
-  istep0)  
+  ang_freq, scale_ang_freq2,istep0)  
   
   !apply traction boundary conditions for first timestep
   !WE Reads and adds the traction to the extload variable
   if((istraction.or.isfstraction).and.i_step==1)then
     call apply_traction(errcode,errtag,i_step)
-    call control_error(errcode,errtag,stdout,myrank)
+    call control_error(errcode,errtag,stdout)
   endif
   ! Other types of forces: 
   if(trim(devel_example).eq.'axial_rod')then
@@ -492,11 +491,12 @@ loop_step: do i_step=istep0,nstep
   if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
     call compute_cmt_load(freq)
     !print*,myrank,'CMT extload:',maxval(abs(extload))
+  endif
   ! electrical current prescribed at points
   if(isecurrent.and.i_step==1)then
     call compute_electrical_load(errcode,errtag)
+    !print*,'in main:',maxval(abs(extload))
   endif
-  endif 
 
   ! Calculate ice load: 
   if (is_ICE)then 
@@ -539,8 +539,7 @@ loop_step: do i_step=istep0,nstep
   call run_nonlinear_solver(isscale_ang_freq,         &
                             ksp_iter, scale_ang_freq2, nl_iter, ksp_tot, uerr, &
                             nl_isconv, nodalslrate, dt_vp, &
-                            strain_elmt, evpt, &
-                            f, stress_elmt, i_step, dt, q0)
+                            f, i_step, dt, q0)
 
 
   ! Now need to remove the sea level contribution to the kmat so we can reuse it 
@@ -569,9 +568,12 @@ loop_step: do i_step=istep0,nstep
 
   ! Save displacement variables to Ensight
   if(ISDISP_DOF)then
-    call save_displacement_variables(strain_elmt, strain_nodal, &
-                                    stress_elmt, stress_nodal, & 
-                                    i_step=i_step)
+    call save_displacement_variables(i_step=i_step)
+  endif
+ 
+  if(isstation)then
+    call compute_station(errcode,errtag)
+    call write_station_files(step)
   endif
 
 
@@ -611,6 +613,7 @@ enddo loop_step ! i_step time/frequency stepping loop
 ! ++++++++++++++++ END OF TIME LOOPING CODE ++++++++++++++++++++++++
 
 ! ----------------------------- CLEANUP --------------------------------
+if(isstation)call close_station_files
 if(myrank==0)then 
   write(*,*); write(*,*)'Completed timesteps. Cleaning up... '
 endif 
@@ -628,11 +631,13 @@ if(solver_type.eq.petsc_solver)then
 endif
 
 call cleanup_fault()
-deallocate(egdof,egdofu)
+if(allocated(egdof))deallocate(egdof)
+if(allocated(egdofu))deallocate(egdofu)
 if(allocated(gdofu))deallocate(gdofu)
 deallocate(extload,load,resload,rhoload,ubcload)
 deallocate(du,u)
-deallocate(nodalu,bcnodalv)
+if(allocated(nodalu))deallocate(nodalu)
+if(allocated(bcnodalv))deallocate(bcnodalv)
 if(ISPOT_DOF)then
   deallocate(nodalphi)
 endif

@@ -1,0 +1,18 @@
+FORMAT
+type:  ensight gold
+
+GEOMETRY
+model:    vfault_proc28.geo
+
+VARIABLE
+vector per node: 1 displacement vfault_step*_proc28.dis
+
+tensor symm per node: 1 strain vfault_step*_proc28.eps
+
+TIME
+time set: 1
+number of steps: 2
+filename start number: 0
+filename increment: 1
+time values:  0.00000E+00
+ 1.00000E+00

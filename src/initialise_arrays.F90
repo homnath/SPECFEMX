@@ -1,11 +1,12 @@
 module initialise_arrays 
-use mpi_library,only:check_allocate
+use shared,only:check_allocate
 implicit none
 contains 
 !_______________________________________________________________________________
 
 subroutine initialise_global_arrays()
 use global
+use math_constants,only:ZERO
 implicit none 
 
 ! Local variables
@@ -25,6 +26,16 @@ if (istat/=0)then
     write(*,*)'ERROR: cannot allocate memory!'
     stop
 endif
+if(ISDISP_DOF)then
+  if(savedata%stress.or.isplastic)then
+      allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
+      stress_elmt=ZERO
+  endif
+  if(savedata%strain)then
+      allocate(strain_elmt(nst,ngll,nelmt),strain_nodal(nst,nnode))
+      strain_elmt=ZERO
+  endif
+endif
 
 if(ISSL_DOF)then
     allocate(nodalustore(nndofu,nnode), stat=istat)
@@ -41,6 +52,8 @@ if(ISPOT_DOF)then
     write(*,*)'ERROR: cannot allocate memory!'
     stop
     endif
+
+    nodalphi=ZERO
 endif
 
 return 
@@ -79,6 +92,7 @@ subroutine initialise_equation_arrays()
 use global 
 use math_constants
 use set_precision
+use shared,only:check_allocate
 implicit none 
 
 integer :: istat

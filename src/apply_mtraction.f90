@@ -177,7 +177,7 @@ mtraction: do
       ftracload(1:nfdofphi)=ftracload(1:nfdofphi)- &
       dot_product(M,face_normal)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll)
     enddo ! i_gll
-    load(fgdof(1:nfdofphi))=load(fgdof(1:nfdofphi))+ftracload(1:nfdofphi)
+    extload(fgdof(1:nfdofphi))=extload(fgdof(1:nfdofphi))+ftracload(1:nfdofphi)
     deallocate(Mgll)
   enddo ! i_face
   trac_stat=.true.

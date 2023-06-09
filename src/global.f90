@@ -356,6 +356,14 @@ real(kind=kreal) :: eqkx,eqky,eqkz
 ! First three components are axial components. Last three components are
 ! shear components.
 integer,parameter :: NST=6
+!strain_elmt: strain for all elements
+!stress_elmt: stress for each element
+!stress_nodal: nodal stress for all elements in processor
+real(kind=kreal), allocatable :: strain_elmt(:,:,:), &
+                                 strain_nodal(:,:),  &
+                                 stress_elmt(:,:,:), & 
+                                 stress_nodal(:,:),  &
+                                 evpt(:,:,:)
 character(len=250) :: file_head,inp_path,out_path,part_path, SL_path
 ! displacement BC, ghost, traction, and water surface files
 character(len=250) :: confile,idfile
@@ -394,6 +402,7 @@ integer,allocatable :: node_finite(:),node_trinfinite(:),node_infinite(:)
 ! stepping (time or frequency) parameters                                                 
 integer,parameter :: TIMESTEP=0, FREQSTEP=1                                      
 integer :: steptype,nstep                                                        
+real(kind=kreal) :: step !current step (t or f)
 real(kind=kreal) :: step0,step1,dstep
 
 ! Control parameters
@@ -553,8 +562,6 @@ integer :: outunit=8
 integer :: stdout=6
 
 character(len=250) :: log_msg
-
-
 
 ! _________________________ ICE PARAMETERS _________________________
 character(len=250) :: icefile,iceratefile                ! Input file name 
