@@ -19,10 +19,11 @@ contains
 
 subroutine initialize_model(errcode,errtag)
 use global,only:myrank,NDIM,ngll,nelmt,ISDISP_DOF,ISPOT_DOF, &
-                POT_TYPE,PGRAVITY,PMAGNETIC,PELECTRIC, &
-                isbulkmod,isshearmod,ismassdens,ismagnetization,iselectric, &
+                POT_TYPE,PGRAVITY,PMAGNETIC,PELECTRIC,PCHARGE, &
+                isbulkmod,isshearmod,ismassdens, &
+                ismagnetization,iselectric,ischarge, &
                 bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt,&
-                econductivity_elmt,logunit
+                econductivity_elmt,charge_density_elmt,logunit
 use math_constants,only:ZERO
 implicit none
 integer,intent(out) :: errcode
@@ -37,6 +38,7 @@ isshearmod=.false.
 ismassdens=.false.
 ismagnetization=.false.
 iselectric=.false.
+ischarge=.false.
 if(ISDISP_DOF)then
   isbulkmod=.true.
   isshearmod=.true.
@@ -58,11 +60,17 @@ if(ISPOT_DOF.and.POT_TYPE==PMAGNETIC)then
   allocate(magnetization_elmt(NDIM,ngll,nelmt))
   magnetization_elmt=ZERO
 endif
-! Elctrical conductivity
+! Electrical conductivity
 if(ISPOT_DOF.and.POT_TYPE==PELECTRIC)then
   iselectric=.true.
   allocate(econductivity_elmt(ngll,nelmt))
   econductivity_elmt=ZERO
+endif
+! Charge density
+if(ISPOT_DOF.and.POT_TYPE==PCHARGE)then
+  ischarge=.true.
+  allocate(charge_density_elmt(ngll,nelmt))
+  charge_density_elmt=ZERO
 endif
 errcode=0
 
@@ -76,9 +84,10 @@ end subroutine initialize_model
 subroutine cleanup_model(errcode,errtag)
 use global,only:NDIM,ngll,nelmt,ISDISP_DOF,ISPOT_DOF, &
                 POT_TYPE,PGRAVITY,PMAGNETIC, &
-                isbulkmod,isshearmod,ismassdens,ismagnetization,iselectric, &
+                isbulkmod,isshearmod,ismassdens, &
+                ismagnetization,iselectric,ischarge, &
                 bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt, &
-                econductivity_elmt
+                econductivity_elmt,charge_density_elmt
 use math_constants,only:ZERO
 
 implicit none
@@ -93,6 +102,7 @@ if(isshearmod)deallocate(shearmod_elmt)
 if(ismassdens)deallocate(massdens_elmt)
 if(ismagnetization)deallocate(magnetization_elmt)
 if(iselectric)deallocate(econductivity_elmt)
+if(ischarge)deallocate(charge_density_elmt)
 errcode=0
 end subroutine cleanup_model
 !===============================================================================
@@ -118,7 +128,8 @@ character(len=80),allocatable :: spart(:) ! this must be 80 characters long
 character(len=250) :: out_fname
 
 integer :: i
-real(kind=kreal),allocatable :: rho_elmt(:),M_elmt(:,:),Mmag_elmt(:),econd_elmt(:)
+real(kind=kreal),allocatable :: rho_elmt(:),M_elmt(:,:),Mmag_elmt(:), &
+econd_elmt(:),erho_elmt(:)
 
 errtag="ERROR: unknown!"
 errcode=-1
@@ -133,6 +144,7 @@ if(ismassdens)then
     rho_elmt(i_elmt)=rho_blk(iblk)
   enddo
 endif
+
 ! Magnetization
 if(ismagnetization)then
   !allocate(M_elmt(NDIM,nelmt))
@@ -158,6 +170,19 @@ if(iselectric)then
     iblk=mat_id(i_elmt)
     if(iselectric_blk(iblk))then
       econd_elmt(i_elmt)=econductivity_blk(iblk)
+    endif
+  enddo
+endif
+
+! Charge Density
+if(ischarge)then
+  allocate(erho_elmt(nelmt))
+  erho_elmt=ZERO
+
+  do i_elmt=1,nelmt
+    iblk=mat_id(i_elmt)
+    if(ischarge_blk(iblk))then
+      erho_elmt(i_elmt)=charge_density_blk(iblk)
     endif
   enddo
 endif
@@ -221,6 +246,19 @@ if(iselectric)then
     write(out_fname,'(a)')trim(out_path)//trim(file_head)//'_original'//trim(ptail)//'.econ'
     call write_ensight_perelementSCALAS(out_fname,ensight_hex8,ipart,spart, &
     nelmt,real(econd_elmt))
+  endif
+  deallocate(econd_elmt)
+endif
+! Charge Density
+if(ischarge)then
+  if(infbc)then
+    write(out_fname,'(a)')trim(out_path)//trim(file_head)//'_original'//trim(ptail)//'.erho'
+    call write_ensight_perelementSCALAS_part1(out_fname,ensight_hex8,ipart,spart,1, &
+    nelmt_finite,elmt_finite,nelmt,real(erho_elmt))
+  else
+    write(out_fname,'(a)')trim(out_path)//trim(file_head)//'_original'//trim(ptail)//'.erho'
+    call write_ensight_perelementSCALAS(out_fname,ensight_hex8,ipart,spart, &
+    nelmt,real(erho_elmt))
   endif
   deallocate(econd_elmt)
 endif
@@ -746,7 +784,7 @@ if(infbc)then
     write(logunit,'(a,i0)')'   --> min. nodes per processor   : ',min_nnode
     write(logunit,'(a,i0)')'   --> max. nodes per processor   : ',max_nnode
     write(logunit,*)
-    write(logunit,'(a,g0.6,1x,g0.6),a')'   --> Maximum x extent       : [',model_minx,model_maxx, ']'
+    write(logunit,'(a,g0.6,1x,g0.6,a)')'   --> Maximum x extent       : [',model_minx,model_maxx, ']'
     write(logunit,'(a,g0.6,1x,g0.6)')' y extent min max: ',model_miny,model_maxy
     write(logunit,'(a,g0.6,1x,g0.6)')' z extent min max: ',model_minz,model_maxz
     write(logunit,'(a,g0.6,1x,g0.6)')' min/max coord: ',mincoord,maxcoord

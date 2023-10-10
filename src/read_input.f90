@@ -56,7 +56,7 @@ integer :: id,ind,ios,narg,slen
 integer :: bc_stat,preinfo_stat,mesh_stat,material_stat,step_stat,control_stat,&
 bodyload_stat,stress0_stat,traction_stat,mtraction_stat,water_stat,&
 save_stat,eqsource_stat,ecurrent_stat,benchmark_stat,station_stat,devel_stat,  &
-mag_stat,electric_stat,sl_stat
+mag_stat,electric_stat,charge_stat,sl_stat
 integer :: mat_count
 integer :: ielmt,i_node,inode,imat,tmp_nelmt,tmp_nnode !,mat_domain
 
@@ -89,6 +89,8 @@ real(kind=kreal) :: M0
 real(kind=kreal) :: inc,dec,azim
 ! magnitude of the electrical conductivity
 real(kind=kreal) :: econductivity
+! magnitude of the charge density
+real(kind=kreal) :: charge_density
 
 errtag="ERROR: unknown!"
 errcode=-1
@@ -128,6 +130,7 @@ benchmark_stat=0
 devel_stat=0
 mag_stat=0
 electric_stat=0
+charge_stat=0
 
 ISDISP_DOF=.true.
 ISPOT_DOF=.false.
@@ -381,6 +384,11 @@ do
         trim(strval).eq.'ELECTRIC')then
         POT_TYPE=PELECTRIC
         POT_STRING='electric'
+      elseif(trim(strval).eq.'charge' .or. &
+        trim(strval).eq.'Charge' .or. &
+        trim(strval).eq.'CHARGE')then
+        POT_TYPE=PCHARGE
+        POT_STRING='charge'
       else
         write(errtag,*)'ERROR: unsupported "pot_type": ',trim(strval)
         return
@@ -1009,6 +1017,10 @@ do
         call seek_integer('epot',issave,args,narg,istat)
         if(istat==0 .and. issave==1)savedata%epot=.true.
       endif
+      if(POT_TYPE==PCHARGE)then
+        call seek_integer('epot',issave,args,narg,istat)
+        if(istat==0 .and. issave==1)savedata%epot=.true.
+      endif
     endif
     if(infbc)then
       call seek_integer('inf',issave,args,narg,istat)
@@ -1085,11 +1097,6 @@ do
 
     cycle
   endif 
-
-
-
-
-
 
 ! read sea level part
   if (trim(token)=='sealevel:')then
@@ -1843,13 +1850,53 @@ if(POT_TYPE==PELECTRIC)then
     endif
 
   enddo
-  ! check magnetic status
+  ! check electric status
   if (electric_stat /= 1)then
     write(errtag,'(a)')'ERROR: cannot read electrical conductivity information! make sure &
     &the "electrical_conductivity:" information is added in the material list file.'
     return
   endif
 endif
+
+! read electrical charge information
+if(POT_TYPE==PCHARGE)then
+  do i_line=1,NMAXLINE
+    read(11,'(a)',iostat=ios)line
+    ! This will read a line and proceed to next line
+    if (ios/=0)exit
+    ! check for blank and comment line
+    if (isblank(line) .or. iscomment(line,'#'))cycle
+
+    call first_token(line,token)
+    if (trim(token)=='charge_density:')then
+      if(mag_stat==1)then
+        write(errtag,*)'ERROR: copy of line type "charge_density:" not permitted!'
+        return
+      endif
+      read(11,*)nmatblk_charge
+      allocate(charge_density_blk(nmatblk_charge))
+      allocate(ischarge_blk(nmatblk))
+      charge_density_blk=ZERO
+      ischarge_blk=.false.
+      do i=1,nmatblk_charge
+        read(11,*)imat,charge_density
+        charge_density_blk(i)=charge_density
+        ischarge_blk(imat)=.true.
+      enddo
+      
+      charge_stat=1
+      cycle
+    endif
+
+  enddo
+  ! check charge status
+  if (charge_stat /= 1)then
+    write(errtag,'(a)')'ERROR: cannot read charge density information! make sure &
+    &the "charge_density:" information is added in the material list file.'
+    return
+  endif
+endif
+
 ! infinite elements 
 if(infbc)then
   if(isfrom_partmesh .or. .not.ismpi .or. (ismpi.and.nproc.eq.1))then

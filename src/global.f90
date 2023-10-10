@@ -33,6 +33,8 @@ real(kind=kreal),parameter :: GRAV_CONS=6.67430e-11_kreal
 ! vacuum permeability, permeability of free space, permeability of vacuum,
 ! or magnetic constant
 real(kind=kreal),parameter :: MAG_CONS=FOUR*PI*1.0e-7_kreal
+! vacuum permittivity
+real(kind=kreal),parameter :: VACUUM_PERMITTIVITY=8.8541878128e-12 ! F m−1
 end module math_constants
 !===============================================================================
 
@@ -156,8 +158,10 @@ integer,parameter :: NDIM2=NDIM*NDIM
 
 ! degrees of freedoms
 logical :: ISPOT_DOF,ISDISP_DOF
-integer,parameter :: PGRAVITY=1,PMAGNETIC=2,PELECTRIC=3
-! potential type: 1: 'gravity' and 2: 'magnetic'
+integer,parameter :: PGRAVITY=1,PMAGNETIC=2,PELECTRIC=3,PCHARGE=4
+
+! potential type: 1: 'gravity' and 2: 'magnetic', 3: 'eletrical current', 4:
+! 'electrical charge'
 integer :: POT_TYPE
 character(len=20) :: POT_STRING
 ! background gravity
@@ -266,7 +270,7 @@ real(kind=kreal) :: maxsize_elmt,sqmaxsize_elmt ! maximum size of the element ac
 
 ! model properties
 ! bulk modulus, shear modulus, mass density, magnetization
-logical :: isbulkmod,isshearmod,ismassdens,ismagnetization,iselectric
+logical :: isbulkmod,isshearmod,ismassdens,ismagnetization,iselectric,ischarge
 ! minimum, maximum value of density
 real(kind=kreal) :: mindensity,maxdensity
 ! minimum, maximum value of bulk modulus
@@ -293,6 +297,8 @@ real(kind=kreal),allocatable :: g0_nodal(:)
 real(kind=kreal),allocatable :: magnetization_elmt(:,:,:)
 ! electrical conductivity
 real(kind=kreal),allocatable :: econductivity_elmt(:,:)
+! charge density
+real(kind=kreal),allocatable :: charge_density_elmt(:,:)
 integer :: nwmat
 integer,allocatable :: waterid(:)
 logical,allocatable :: water(:)
@@ -323,6 +329,10 @@ logical,allocatable :: ismagnet_blk(:)
 integer :: nmatblk_electric
 real(kind=kreal),allocatable :: econductivity_blk(:)
 logical,allocatable :: iselectric_blk(:)
+
+integer :: nmatblk_charge
+real(kind=kreal),allocatable :: charge_density_blk(:)
+logical,allocatable :: ischarge_blk(:)
 
 ! model types
 character(len=20) :: model_type
@@ -570,7 +580,8 @@ real(kind=kreal), allocatable  :: iceobjs(:,:) !  list of ice objects read in,
 integer ::  nice_obj            !num of ice objs.
 
 
-real(kind=kreal),parameter :: rho_ice_dim = 917.00_kreal !kg/m^3 for 0 Centrigrade https://www.cs.mcgill.ca/~rwest/wikispeedia/wpcd/wp/i/Ice.htm
+real(kind=kreal),parameter :: rho_ice_dim = 917.00_kreal !kg/m^3 
+!for 0 Centrigrade https://www.cs.mcgill.ca/~rwest/wikispeedia/wpcd/wp/i/Ice.htm
 real(kind=kreal)::  rho_ice                              !may be nondimensionalised
 
 
@@ -589,7 +600,8 @@ real(kind=kreal)::  rho_water
 
 
 ! Sea Level variables
-real(kind=kreal), allocatable     :: oceanf(:,:), nodalOF(:) ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
+! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
+real(kind=kreal), allocatable     :: oceanf(:,:), nodalOF(:)
 real(kind=kreal)                  :: SL0_constant  ! Constant initial SL value 
 real(kind=kreal), allocatable     :: icnodalSL(:,:)  ! Initial condition for SL (gll pt on face, element on Free Surf.)
 real(kind=kreal), allocatable     :: nodalsl0(:),  nodalsldisp(:)   ! Store of nodal initial SL 

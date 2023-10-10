@@ -144,7 +144,7 @@ module matrix_vector
     use global
     use element 
     use elastic,only:compute_cmat_elastic
-    use math_constants,only:HALF,ONE,ZERO,FOUR,GRAV_CONS,PI
+    use math_constants,only:HALF,ONE,ZERO,FOUR,GRAV_CONS,VACUUM_PERMITTIVITY,PI
     use math_library,only:determinant,invert,issymmetric
     use weakform
     use shape_library
@@ -334,7 +334,10 @@ module matrix_vector
           endif
 
           if(.not.ISDISP_DOF)then
+            ! Magnetic
             if(POT_TYPE==PMAGNETIC)then
+              ! Code segment below is not taken into account. Magnetization is 
+              ! implemented via magnetic traction. See apply_mtraction.f90.
               if(ismagnet_blk(imat))then
                 ! first compute the divergence of M
                 ! \nabla.M=dxMx+dyMy+dzMz
@@ -347,14 +350,18 @@ module matrix_vector
                 endif
               endif
             endif
+            ! Gravity
             if(POT_TYPE==PGRAVITY)then
               eload(edofphi)=eload(edofphi)+lagrange_gll(i,:)*massdens_elmt(i,ielmt)*jacw
+            endif
+            ! Charge density
+            if(POT_TYPE==PCHARGE)then
+              eload(edofphi)=eload(edofphi)+lagrange_gll(i,:)*charge_density_elmt(i,ielmt)*jacw
             endif
           endif
         endif
     
       enddo !nip
-
 
       ! kmat terms for grad(w).rho*s
       !kmat(edofphi,edofu)=transpose(kmat(edofu,edofphi))
@@ -373,24 +380,33 @@ module matrix_vector
         stop
       endif
   
-
-
       storekmat(:,:,ielmt)=kmat
-      if(.not.ISDISP_DOF .and. ISPOT_DOF .and. POT_TYPE==PGRAVITY)then
-        rhoload(egdof)=rhoload(egdof)+eload
+      if(.not.ISDISP_DOF .and. ISPOT_DOF)then
+        if(POT_TYPE==PGRAVITY .or. POT_TYPE==PCHARGE)then
+          rhoload(egdof)=rhoload(egdof)+eload
+        endif
       endif
     enddo ! i_elmt
 
    
     ! rhoload is computed if only the ISPOT_DOF is TRUE
     ! multiply rhoload by 4*PI*G
-    if(.not.ISDISP_DOF.and.ISPOT_DOF .and. POT_TYPE==PGRAVITY)then
-      if(.not.devel_nondim)then
-        rhoload=FOUR_PI_G*rhoload
-      else
-        rhoload=FOUR*rhoload
-        ! Note: PI*G is nondimensionalized
-      endif
+    if(.not.ISDISP_DOF.and.ISPOT_DOF)then
+      if(POT_TYPE==PGRAVITY)then
+        if(.not.devel_nondim)then
+          rhoload=FOUR_PI_G*rhoload
+        else
+          rhoload=FOUR*rhoload
+          ! Note: PI*G is nondimensionalized
+        endif
+       elseif(POT_TYPE==PCHARGE)then
+        if(.not.devel_nondim)then
+          rhoload=(-ONE/VACUUM_PERMITTIVITY)*rhoload
+        else
+          rhoload=FOUR*rhoload
+          ! Note: PI*G is nondimensionalized
+        endif
+       endif
       rhoload(0)=ZERO
     endif
     

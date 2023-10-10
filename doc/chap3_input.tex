@@ -57,7 +57,7 @@ Only the following arguments under the specified line types are permitted.\\
   \item[out\_path]  : output path where the output data will be stored [string, optional, default $\Rightarrow$ \texttt{\sq{../output}}].
   \item[disp\_dof]  : switch to activate displacement degree of freedom [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 1].
   \item[pot\_dof]  : switch to activate potential (gravity or magnetic) degree of freedom [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
-  \item[pot\_type] : potential type [string, optional,\texttt{\sq{gravity}} = Gravity potential, \texttt{\sq{magnetic}} = Magnetic potential]. It must be provided if \texttt{pot\_dof = 1}.
+  \item[pot\_type] : potential type [string, optional,\texttt{\sq{gravity}} = Gravity potential, \texttt{\sq{magnetic}} = Magnetic potential, \texttt{\sq{electric}} = Electrical potential due to a current, \texttt{\sq{charge}} = Electrical potential due to a charge density]. It must be provided if \texttt{pot\_dof = 1}.
   \item[grav0]  : switch to activate background gravity (Cowling approximation) [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
   \\
 \end{adescription}
@@ -711,6 +711,26 @@ For magnetic anomalies, add the following information in the material list file:
 \texttt{magnetization:}\\
 \emph{NumberOfMagnetizationBlocks\\
 materialID, Magnetization, FlagForInclinationOrLatitude (0=inc or 1=lat), InclinationOrLatitudeAngle, Declination, Azimuth} (SI unit but angle in degrees)\\
+\emph{...\\
+...\\}
+
+\\
+\\
+For electrical potential due to electric current, add the following information in the material list file:\\
+\\
+\texttt{electrical\_conductivty:}\\
+\emph{NumberOfElectricalConductivityBlocks\\
+materialID, Electrical\_Conductivity\\
+\emph{...\\
+...\\}
+
+\\
+\\
+For electrical potential due to electric charge density, add the following information in the material list file:\\
+\\
+\texttt{charge\_density:}\\
+\emph{NumberOfChargeDensityBlocks\\
+materialID, Charge\_Density\\
 \emph{...\\
 ...\\}
 
