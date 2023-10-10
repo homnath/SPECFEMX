@@ -428,7 +428,6 @@ enddo
 deallocate(block)
 
 
-
 ! Write Savedata as a seperate function
 ! Save model only for finite region.
 ! NOTE:
