@@ -1883,7 +1883,7 @@ if(POT_TYPE==PCHARGE)then
         charge_density_blk(i)=charge_density
         ischarge_blk(imat)=.true.
       enddo
-      
+      !print*,'charge density:',maxval(abs(charge_density_blk)) 
       charge_stat=1
       cycle
     endif

@@ -69,7 +69,6 @@ call get_command_argument(2, arg2)
 if(trim(arg2)==('--mesh-only'))then
   ismesh_only=.true.
 endif
-
 ! get input file name
 call get_command_argument(1, inp_fname)
 

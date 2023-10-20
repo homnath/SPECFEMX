@@ -97,13 +97,14 @@ errtag=""; errcode=-1
 ! Start up MPI 
 call start_process()
 
+ismesh_only = .false.
+
 ! Read cmd line/process input file etc ... 
 call process_user_input(cmd, tdate, ttime, tzone, path, &
                         ext, format_str, errcode, errtag, &
                         ismesh_only,arg1,arg2,inp_fname,prog, &
                         cpu_tstart)
 
-ismesh_only = .false.
 
 ! Print info from read input for SL/Ice 
 if(is_SL)then 

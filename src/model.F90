@@ -401,7 +401,6 @@ matblock: do i_blk=1,nmatblk
       endif !(trim(cmodel)=='chakravarthi')
     endif
 
-    
     ! magnetization
     if(ISPOT_DOF.and.POT_TYPE==PMAGNETIC)then
       if(ismagnet_blk(i_blk))then
@@ -414,15 +413,20 @@ matblock: do i_blk=1,nmatblk
         enddo ! i_gll
       endif
     endif
+    
     ! electrial conductivity
     if(ISPOT_DOF.and.POT_TYPE==PELECTRIC)then
       if(iselectric_blk(i_blk))then
         econductivity_elmt(:,block(i_blk)%elmt)= econductivity_blk(i_blk)
       endif
     endif
-
-
-
+    
+    ! electrial charge density
+    if(ISPOT_DOF.and.POT_TYPE==PCHARGE)then
+      if(ischarge_blk(i_blk))then
+        charge_density_elmt(:,block(i_blk)%elmt)=charge_density_blk(i_blk)
+      endif
+    endif
 
   ! tomographic structured grid model
   elseif(type_blk(i_blk).eq.-1)then
@@ -433,10 +437,6 @@ matblock: do i_blk=1,nmatblk
   endif
 
 enddo matblock
-
-
-
-
 
 ! model_type=='gll'
 if(trim(cmodel).eq.'gll')then
@@ -638,8 +638,6 @@ subroutine convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
         read(11,*,iostat=ios)grid_x,grid_vp(i_grid),grid_vs(i_grid),grid_rho(i_grid)
       enddo
       close(11)
-
-
 
       ! check the properties read
       if(minval(grid_vp).lt.grid_vpmin .or. maxval(grid_vp).gt.grid_vpmax)then

@@ -356,7 +356,7 @@ module matrix_vector
             endif
             ! Charge density
             if(POT_TYPE==PCHARGE)then
-              eload(edofphi)=eload(edofphi)+lagrange_gll(i,:)*charge_density_elmt(i,ielmt)*jacw
+              eload(edofphi)=eload(edofphi)-lagrange_gll(i,:)*charge_density_elmt(i,ielmt)*jacw
             endif
           endif
         endif
@@ -401,15 +401,20 @@ module matrix_vector
         endif
        elseif(POT_TYPE==PCHARGE)then
         if(.not.devel_nondim)then
-          rhoload=(-ONE/VACUUM_PERMITTIVITY)*rhoload
+          !rhoload=(-ONE/VACUUM_PERMITTIVITY)*rhoload
+          ! Very small value of \epsilon_0 makes the elements of the matrix
+          ! very small. Therefore, we can multiply the results later.
         else
+          write(*,*)'ERROR: nondimensionalization not implemented for charge density!'
+          stop
           rhoload=FOUR*rhoload
           ! Note: PI*G is nondimensionalized
         endif
        endif
       rhoload(0)=ZERO
     endif
-    
+   
+    !print*,'Test:',maxval(abs(rhoload))
     end subroutine compute_stiffness_elastic
     !===============================================================================
     
