@@ -243,6 +243,7 @@ if(fix_center)then
     if(all(g_coord(:,i_node).eq.(/ZERO,ZERO,ZERO/)))then
       gdof(:,i_node)=0
       bcnodalv(1,i_node)=ZERO
+      write(logunit,*)'Center is fixed!'
     endif
   enddo
 endif
