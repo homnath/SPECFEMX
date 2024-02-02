@@ -383,6 +383,8 @@ logical :: isubc ! truncated BC. 0: No, 1: yes [Default]
 ! Displacement BC defined on the all unique SEM nodes on the free surface.
 ! 0: No [Default], 1: yes
 logical :: isfsubc
+! Fix the center of the Earth (0,0,0)
+logical :: fix_center
 character(len=250) :: ufspath
 character(len=250) :: matfile,uxfile,uyfile,uzfile,ufsfile,gfile, &
 fsfile,wsfile

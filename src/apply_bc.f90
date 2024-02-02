@@ -27,6 +27,7 @@ integer :: nelpart,i_elpart,i_node
 integer :: ielmt,iface,idir
 integer :: mdomain
 real(kind=kreal) :: val
+real(kind=kreal) :: dcoord(NDIM)
 integer :: nfault,nfnode
 integer,allocatable :: ifnode(:)
 character(len=250) :: fname
@@ -235,8 +236,16 @@ if(ISDISP_DOF.and.isubc)then
   close(11)
 endif ! if(ISDISP_DOF)
 
-
-
+! Fix center of the Earth
+if(fix_center)then
+! We assume the center is at (0,0,0)
+  do i_node=1,nnode
+    if(all(g_coord(:,i_node).eq.(/ZERO,ZERO,ZERO/)))then
+      gdof(:,i_node)=0
+      bcnodalv(1,i_node)=ZERO
+    endif
+  enddo
+endif
 
 ! Surface displacement defined on the surface SEM points 
 if(ISDISP_DOF.and.isfsubc.and.nnode_fs>0)then
@@ -326,7 +335,7 @@ errcode=0
 
 return
 end subroutine apply_bc
-!===============================================================================
+!===========================================================================
 
 !WE - applies non-zero boundary conditions originally in specfem3d.f90
 subroutine apply_nonzero_bc()
@@ -389,7 +398,7 @@ subroutine apply_nonzero_bc()
   endif
 
 end subroutine apply_nonzero_bc
-!===============================================================================
+!===========================================================================
 
 end module bc
-!===============================================================================
+!===========================================================================

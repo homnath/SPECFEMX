@@ -267,6 +267,7 @@ isdzval=.false.
 
 isubc=.true.
 isfsubc=.false.
+fix_center=.false.
 
 ! BC value for the infinite-element layer surface, 
 ! which is generally zero
@@ -487,6 +488,17 @@ do
         isubc=.true.
       else
         write(errtag,*)'ERROR: ubc must be 0 or 1!',ival
+        return
+      endif
+    endif
+    call seek_integer('fix_center',ival,args,narg,istat)
+    if(istat==0)then
+      if(ival.eq.0)then
+        fix_center=.false.
+      elseif(ival.eq.1)then
+        fix_center=.true.
+      else
+        write(errtag,*)'ERROR: fix_center must be 0 or 1!',ival
         return
       endif
     endif
