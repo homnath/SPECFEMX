@@ -84,7 +84,11 @@ end subroutine count_elmts
 subroutine split_elas_visco_eids()
 ! Used to save element ID separately for elastic and viscoelastic 
 ! elements. Ids are stored in eid_viscoelas and eid_elas
+#if (USE_MPI)
 use math_library_mpi
+#else
+use math_library_serial
+#endif
 use global!,  only: ngll, nmaxwell, nelmt, mat_domain, mat_id, &
            !        ELASTIC_DOMAIN, ELASTIC_TRINFDOMAIN, &
            !        ELASTIC_INFDOMAIN, VISCOELASTIC_DOMAIN,  & 

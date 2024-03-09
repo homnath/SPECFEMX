@@ -105,7 +105,6 @@ call process_user_input(cmd, tdate, ttime, tzone, path, &
                         ismesh_only,arg1,arg2,inp_fname,prog, &
                         cpu_tstart)
 
-
 ! Print info from read input for SL/Ice 
 if(is_SL)then 
   call print_SL_read()
@@ -136,7 +135,6 @@ fs=0; fi=1
 ns=max(1,nstep)
 twidth=ceiling(log10(real(ns)+1.))
 
-
 ! Write original mesh to Ensight file 
 call write_original_mesh(ipart, spart, npart, &
                          geo_file, infcase_file,& 
@@ -155,7 +153,6 @@ g_num0=g_num
 
 ! precompute gll 1D
 call precompute_gll1d()
-
 
 ! create spectral elements
 call create_spec_elem(tot_nelmt,max_nelmt,min_nelmt, &
@@ -225,7 +222,6 @@ endif
 if(ISSL_DOF)then 
   call sea_level_dof()
 endif 
-
 
 case_file=trim(out_path)//trim(file_head)//trim(ptail)//'.case'
 if(nexcav==0)then

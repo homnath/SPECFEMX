@@ -85,7 +85,6 @@ IF(ISPARALLEL)
      set_precision_mpi.f90
      mpi_library.f90
      math_library_mpi.f90
-     relaxation_time.f90
      ghost_library_mpi.f90
      prepare_sparse.f90
      parsolver.f90)
@@ -128,6 +127,7 @@ ENDIF(ISPARALLEL)
 
 SET(srcboth
    count_elements.F90
+   relaxation_time.F90
    prestress.F90
    prepare_solver.F90
    mesh_spec.F90

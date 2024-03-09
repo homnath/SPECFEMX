@@ -44,9 +44,6 @@ use ghost_library_mpi
 use math_library_mpi
 use sparse
 use parsolver
-use count_elements  !WE
-use relaxation_time !WE
-use other_forces    !WE 
 #if (USE_COMPLEX)
 use parsolver_petsc_complex
 #else
@@ -59,6 +56,9 @@ use sparse_serial
 use solver
 use solver_petsc
 #endif
+use count_elements  !WE
+use relaxation_time !WE
+use other_forces    !WE 
 use prestress
 use bc
 use prepare_solver !WE

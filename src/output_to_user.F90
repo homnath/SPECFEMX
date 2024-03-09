@@ -3,17 +3,16 @@ module output_to_user
 contains
 !_______________________________________________________________________________
 
-    subroutine write_ifproc0(unit)
+    subroutine write_ifproc0
         ! Writes to log file only if processor rank = 0
         use global, only: logunit, myrank, log_msg
 
         implicit none 
-        integer :: unit
 
         if(myrank==0)then
-            write(unit,'(a)') trim(log_msg)
+            write(logunit,'(a)') trim(log_msg)
+            flush(logunit)
         endif
-        flush(unit)
 
     end subroutine
 !-------------------------------------------------------------------------------
@@ -58,8 +57,6 @@ contains
     end subroutine print_model_details 
 !-------------------------------------------------------------------------------
 
-
-
     subroutine log_ksp_iteration(maxdu, ksp_iter, ksp_convreason)
         use global 
         use set_precision
@@ -80,7 +77,6 @@ contains
     end subroutine log_ksp_iteration
 !-------------------------------------------------------------------------------
 
-
 ! Prints error if the memory can not be allocated
 subroutine check_memory_alloc(istat, fileval)
     implicit none 
@@ -97,13 +93,13 @@ end subroutine check_memory_alloc
 
 subroutine log_KSP_summary()
     
-    use global
+    use global,only:logunit,myrank,nstep,nl_maxiter,nl_tol
     use ksp_constants
     implicit none 
     ! open summary file
     if(myrank==0)then
         write(logunit,'(a)')'KSP_MAXITER, KSP_TOL, NL_MAXITER, NL_TOL'
-        write(logunit,'(i0,1x,g0.6,1x,i0,1x,g0.6)')KSP_MAXITER,KSP_RTOL,NL_MAXITER,NL_TOL
+        write(logunit,'(i0,1x,g0.6,1x,i0,1x,g0.6)')KSP_MAXITER,KSP_RTOL
         write(logunit,'(a,i0)')'Number of time steps:',nstep
         flush(logunit)
     endif
