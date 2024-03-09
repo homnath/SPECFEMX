@@ -31,7 +31,7 @@ use prepare_sparse_serial
         call prepare_sparse() 
     ! petsc solver
         call petsc_initialize() 
-        log_msg = 'petsc_initialize: SUCCESS!' ; call write_ifproc0(logunit)
+        log_msg = 'petsc_initialize: SUCCESS!' ; call write_ifproc0
     
     
     ! Create sparse vector, matrix, and preallocate                                                         
@@ -40,7 +40,7 @@ use prepare_sparse_serial
         call petsc_matrix_preallocate_size()                                           
         call petsc_create_matrix()                                                     
         call petsc_create_solver()                                                     
-        log_msg = 'petsc_preallocate_matrix_size: SUCCESS!' ; call write_ifproc0(logunit)
+        log_msg = 'petsc_preallocate_matrix_size: SUCCESS!' ; call write_ifproc0
 
 end subroutine prepare_petsc_solver
 

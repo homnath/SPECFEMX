@@ -89,7 +89,7 @@ use solver_petsc
   
         
         call petsc_set_vector(resload)
-        log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0(logunit)
+        log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0
 
         call sync_process()
 
@@ -97,7 +97,7 @@ use solver_petsc
         !call petsc_print_matrix()
 
         call petsc_solve(du(1:), ksp_iter, ksp_convreason)
-        log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0(logunit)
+        log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0
   
         continue
 

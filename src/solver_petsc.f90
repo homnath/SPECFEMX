@@ -59,6 +59,23 @@ logical,intent(in) :: isscale_freq2
 end subroutine petsc_set_stiffness_matrix_freq
 !=======================================================
 
+subroutine set_petsc_stiffness(isscale_ang_freq, &
+   ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)
+
+! USES 
+use global
+use set_precision
+use output_to_user 
+
+implicit none 
+
+real(kind=kreal) :: ang_freq, scale_ang_freq2
+
+logical reuse_pc_bool, freq_bool, isscale_ang_freq
+
+end subroutine set_petsc_stiffness
+!===============================================================================
+
 subroutine petsc_set_vector(rload)
 !use global,only:l2gdof,nelmt,NEDOF
 use ieee_arithmetic

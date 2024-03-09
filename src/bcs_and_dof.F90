@@ -75,7 +75,7 @@ call control_error(errcode,errtag,stdout)
 ! Finalise the GDOF after BCs have been applied 
 call finalize_gdof(errcode,errtag)
 call control_error(errcode,errtag,stdout)
-log_msg = 'complete!' ; call write_ifproc0(logunit)
+log_msg = 'complete!' ; call write_ifproc0
 
 !call modify_ghost_gdof(num, egdof, egdofu, coord, deriv, jac, bmat, &
 !        eld, eload, bload, vload, nodalu, nodalphi, nodalg, nodalB, nodalphistore, nodalustore)

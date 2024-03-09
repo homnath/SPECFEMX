@@ -29,7 +29,7 @@ integer                      :: errcode
 character(len=250)           :: errtag
 
 log_msg = trim(' Earthquake source type: moment-density tensor')
-call write_ifproc0(logunit)
+call write_ifproc0
 
 call earthquake_load(neq,errcode,errtag)
 call sync_process
@@ -53,7 +53,7 @@ integer :: errcode
 character(len=250) :: errtag
 
 ! apply magnetic traction
-log_msg = trim('applying magnetic traction...') ;   call write_ifproc0(logunit)
+log_msg = trim('applying magnetic traction...') ;   call write_ifproc0
 call apply_mtraction(errcode,errtag)
 !call sync_process
 call control_error(errcode,errtag,stdout)
@@ -75,7 +75,7 @@ use electrical
 integer :: errcode
 character(len=250) :: errtag
 
-log_msg = trim('computing electrical load...') ;   call write_ifproc0(logunit)
+log_msg = trim('computing electrical load...') ;   call write_ifproc0
 call electrical_load(errcode,errtag)
 !call sync_process
 call control_error(errcode,errtag,stdout)

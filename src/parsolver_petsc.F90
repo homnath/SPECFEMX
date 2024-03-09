@@ -1054,13 +1054,13 @@ use output_to_user
         call petsc_set_stiffness_matrix_freq(ang_freq, scale_ang_freq2,  & 
                                              isscale_ang_freq)
         log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;  
-        call write_ifproc0(logunit)
+        call write_ifproc0
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
     else 
         ! TIMESTEPPING 
         if (ISSL_DOF)then 
             log_msg = trim(' petsc_set_stiffness_matrix WITH SEA LEVEL: SUCCESS!') ;
-            call write_ifproc0(logunit)
+            call write_ifproc0
             log_msg = trim(' --> Setting PETSC stiffness symmetry to false') ;
 
             symmetric_solver =.false.
