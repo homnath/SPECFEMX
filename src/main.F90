@@ -222,7 +222,6 @@ if( iseqsource .and. (eqsource_type.eq.3 .or. eqsource_type.eq.4) )then
   endif 
 endif
 
-
 call initialise_global_arrays()
 call initialise_local_arrays()
 
@@ -247,7 +246,6 @@ if(isplastic)then
   allocate(olddu(0:neq),evpt(nst,ngll,nelmt))
 endif
 allocate(ngpart_node(nnode))
-
 
 ! compute stable time step for implicit integration
 dt=dstep
@@ -319,8 +317,7 @@ endif
 !  open(77,file=trim(file_head)//"_strain.dat",action="write",status="replace")
 !endif
 
-
-! Set initial timestep and output to user: 
+! Set initial time/frequency step and output to user: 
 !   1 for time domain.
 !   0 for frequency domain.
 istep0=1
@@ -389,28 +386,36 @@ if(is_SL)then
 endif 
 
 ! Write initial (pre-looping) values to istep = 0
-! necessary for SL to see initial ice load etc...maybe not necessary for 
-! other applications? 
-if(ISSL_DOF)then
-  if(myrank.eq.0)then
-    write(*,*)' Saving initial values to ensight: '
-  endif   
-  if(savedata%ice)then 
-    call write_ice_to_ensight(nodalice, i_step=istep0-1)
+! This is unnecessary for frequency domain, because 
+! there is no 0 frequency step.
+! If RESTART feature is ON, this is unnecessary. 
+if(steptype==TIMESTEP)then
+  ! Save displacement variables to Ensight.
+  if(ISDISP_DOF)then
+    call save_displacement_variables(istep0-1)
+  endif
+  ! Save potential variables to Ensight.
+  if(ISPOT_DOF)then
+    call save_potential_variables(istep0-1)
+  endif
+  ! Save SL varaibles to Ensight.
+  if(ISSL_DOF)then
+    if(myrank.eq.0)then
+      write(*,*)' Saving initial values to ensight: '
+    endif   
+    if(savedata%ice)then 
+      call write_ice_to_ensight(nodalice,istep0-1)
+    endif 
+    if(savedata%sl)then
+      call write_SL_to_ensight(nodalsl,istep0-1)
+    endif 
+    if(savedata%oceanf)then
+      call write_OF_to_ensight(istep0-1)
+    endif 
+    call save_potential_variables(istep0-1)
+    call save_displacement_variables(istep0-1)
   endif 
-  if(savedata%sl)then
-    call write_SL_to_ensight(nodalsl, i_step=istep0-1)
-  endif 
-  if(savedata%oceanf)then
-    call write_OF_to_ensight(i_step=istep0-1)
-  endif 
-  call save_pot_variables(i_step=istep0-1)
-  call save_displacement_variables(i_step=istep0-1)
-endif 
-! WARNING
-! TMP call save_pot_variables(i_step=istep0-1)
-! TMP call save_displacement_variables(i_step=istep0-1)
-
+endif
 !----------------------------------------------------------------------
 ! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
 ! For elastic simulations there is only one timestep. 
@@ -430,17 +435,14 @@ loop_step: do i_step=istep0,nstep
     write(*,'(a,i0,a,i0,a)')' ~~~~~~~~~~~~~~~~~~~~ TIMESTEP ', i_step, '/',nstep ,' ~~~~~~~~~~~~~~~~~~~~'
   endif 
 
-
   ! determine time (dt) or freq (df) step and current time/freq
   call calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
   call reset_nodal_arrays_loads(nodalslrate)
-
 
   ! Update SL area if necessary 
   if(ISSL_DOF)then
       call update_SL_area(nodalsl, overwrite_old=.true., verbose=.true.)
   endif
-
 
   ! Calculate the change in ice for this timestep
   ! and save icerate to ensight
@@ -457,11 +459,11 @@ loop_step: do i_step=istep0,nstep
     ! Save the Icerate 
     if(savedata%icerate)then 
       ! Save at the timestep before because this is being used to calculate THIS timestep
-      call write_icerate_to_ensight(nodalicerate, i_step=i_step-1)
+      call write_icerate_to_ensight(nodalicerate,i_step-1)
       
       ! But then for the final setup we need something like: 
       if(i_step.eq.nstep)then 
-        call write_icerate_to_ensight(nodalicerate*zero, i_step=i_step)
+        call write_icerate_to_ensight(nodalicerate*zero,i_step)
       endif 
     endif 
   endif !is_ICE 
@@ -500,7 +502,7 @@ loop_step: do i_step=istep0,nstep
 
   ! Calculate ice load: 
   if (is_ICE)then 
-    call calc_ice_load(nodalicerate, i_step=i_step)
+    call calc_ice_load(nodalicerate,i_step)
   endif   
 
   ! Apply non-zero boundary conditions to the bcnodalv array 
@@ -541,7 +543,6 @@ loop_step: do i_step=istep0,nstep
                             nl_isconv, nodalslrate, dt_vp, &
                             f, i_step, dt, q0)
 
-
   ! Now need to remove the sea level contribution to the kmat so we can reuse it 
   if(ISSL_DOF)then
     storekmat = storekmat - storekmatSL
@@ -568,7 +569,7 @@ loop_step: do i_step=istep0,nstep
 
   ! Save displacement variables to Ensight
   if(ISDISP_DOF)then
-    call save_displacement_variables(i_step=i_step)
+    call save_displacement_variables(i_step)
   endif
  
   if(isstation)then
@@ -579,7 +580,7 @@ loop_step: do i_step=istep0,nstep
 
   ! Save potential variables to Ensight
   if(ISPOT_DOF)then
-    call save_pot_variables(i_step=i_step)
+    call save_potential_variables(i_step)
   endif
 
   ! Save the ice and water to Ensight
@@ -591,7 +592,7 @@ loop_step: do i_step=istep0,nstep
       call write_SL_to_ensight(nodalsl, i_step)
     endif 
     if(savedata%oceanf)then
-      call write_OF_to_ensight(i_step=i_step)
+      call write_OF_to_ensight(i_step)
     endif   
     if(savedata%ice)then 
       call write_ice_to_ensight(nodalice, i_step)

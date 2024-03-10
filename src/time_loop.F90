@@ -1,10 +1,10 @@
 module time_loop 
-    use global 
-    use sea_level
-    use set_precision
-    implicit none 
+use global 
+use sea_level
+use set_precision
+implicit none 
 
-    contains 
+contains 
 !_______________________________________________________________________________
 
     subroutine calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)

@@ -1,0 +1,12 @@
+Coseismic deformation example
+- Vertical fault.
+- Node split.
+- Serial run.
+
+Before running the program, make sure the following directories exist:
+output/
+partition/
+tmp/
+
+How to run?
+mpirun -n 4 ./bin/pspecfemx ./input/vfault_nsplit_serial.sem

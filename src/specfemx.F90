@@ -232,7 +232,7 @@ else
 endif
 
 ! Add 1 time step to add initial field.
-! WARNING: ot MUST be checked
+! WARNING: This MUST be checked!
 !if(isplastic.and.nstep.le.1)then
 if(nstep.le.1)then
   ns=ns+1
