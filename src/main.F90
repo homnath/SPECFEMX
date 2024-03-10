@@ -568,8 +568,18 @@ loop_step: do i_step=istep0,nstep
   !endif
 
   ! Save displacement variables to Ensight
+  ! Benchmark calculation for elastic result
+  if(i_step.eq.istep0)then
+    if(benchmark_okada .and. ISDISP_DOF)then
+      call compute_okada_solution()
+    endif
+  endif
   if(ISDISP_DOF)then
     call save_displacement_variables(i_step)
+    ! Benchmark calculation for elastic result
+    if(benchmark_okada .and. ISDISP_DOF)then
+      call compute_okada_solution()
+    endif
   endif
  
   if(isstation)then
