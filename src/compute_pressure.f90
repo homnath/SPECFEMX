@@ -20,7 +20,7 @@ integer :: i,j,k,i1,i2,i3,i4,i5,i6,inod,i_elmt,i_face,i_node,ios
 ! water surface segments
 integer :: i_wsurf,nwsurf ! number of water table surfaces
 ! unit weight of water
-real(kind=kreal),parameter :: zero=0.0_kreal,gamw=9.81_kreal !KN/m3
+real(kind=kreal),parameter :: gamw=9.81_kreal !KN/m3
 
 character(len=20) :: format_str!,ptail
 character(len=250) :: fname

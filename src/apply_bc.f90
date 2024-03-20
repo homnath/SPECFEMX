@@ -28,6 +28,7 @@ integer :: ielmt,iface,idir
 integer :: mdomain
 real(kind=kreal) :: val
 real(kind=kreal) :: dcoord(NDIM)
+real(kind=kreal) :: diffx(NDIM),sqfix_radius
 integer :: nfault,nfnode
 integer,allocatable :: ifnode(:)
 character(len=250) :: fname
@@ -236,16 +237,29 @@ if(ISDISP_DOF.and.isubc)then
   close(11)
 endif ! if(ISDISP_DOF)
 
-! Fix center of the Earth
+! Fix center of the Earth.
 if(fix_center)then
 ! We assume the center is at (0,0,0)
-  do i_node=1,nnode
-    if(all(g_coord(:,i_node).eq.(/ZERO,ZERO,ZERO/)))then
-      gdof(:,i_node)=0
-      bcnodalv(1,i_node)=ZERO
-      write(logunit,*)'Center is fixed!'
-    endif
-  enddo
+  if(fix_radius.gt.ZERO)then
+    sqfix_radius = (NONDIM_L*fix_radius)*(NONDIM_L*fix_radius)
+    do i_node=1,nnode
+      ! compute distance
+      diffx=g_coord(:,i_node)-center_coord
+      if(dot_product(diffx,diffx).le.sqfix_radius)then
+        gdof(:,i_node)=0
+        bcnodalv(1,i_node)=ZERO
+        write(logunit,*)'Center is fixed!'
+      endif
+    enddo
+  else
+    do i_node=1,nnode
+      if(all(g_coord(:,i_node).eq.center_coord))then
+        gdof(:,i_node)=0
+        bcnodalv(1,i_node)=ZERO
+        write(logunit,*)'Center is fixed!'
+      endif
+    enddo
+  endif
 endif
 
 ! Surface displacement defined on the surface SEM points 

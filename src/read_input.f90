@@ -268,6 +268,7 @@ isdzval=.false.
 isubc=.true.
 isfsubc=.false.
 fix_center=.false.
+fix_radius=ZERO
 
 ! BC value for the infinite-element layer surface, 
 ! which is generally zero
@@ -501,6 +502,10 @@ do
         write(errtag,*)'ERROR: fix_center must be 0 or 1!',ival
         return
       endif
+    endif
+    if(fix_center)then
+      call seek_real('fix_radius',rval,args,narg,istat)
+      if(istat==0 .and. rval.ne.zero)fix_radius=rval
     endif
     uxfile=get_string('uxfile',args,narg)
     uyfile=get_string('uyfile',args,narg)

@@ -137,7 +137,7 @@ end module earth_constants
 ! This module global parameters/variables
 module global
 use set_precision
-use math_constants,only: ONE
+use math_constants,only: ONE,ZERO
 implicit none
 
 integer(kind=8) :: GPU_pointer
@@ -385,6 +385,8 @@ logical :: isubc ! truncated BC. 0: No, 1: yes [Default]
 logical :: isfsubc
 ! Fix the center of the Earth (0,0,0)
 logical :: fix_center
+real(kind=kreal) :: fix_radius
+real(kind=kreal),dimension(NDIM) :: center_coord=(/ZERO,ZERO,ZERO/)
 character(len=250) :: ufspath
 character(len=250) :: matfile,uxfile,uyfile,uzfile,ufsfile,gfile, &
 fsfile,wsfile
