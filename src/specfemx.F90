@@ -27,10 +27,10 @@ use gll_library,only:precompute_gll1d,cleanup_gll1d
 use free_surface
 use sea_level
 use ice
+use output_to_user
 #if (USE_MPI)
 use mpi_library
 use math_library_mpi
-use output_to_user
 #else
 use serial_library
 use math_library_serial
