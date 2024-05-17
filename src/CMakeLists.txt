@@ -1,6 +1,6 @@
 # REVISION:
-#   HNG, Mar 21,2017; HNG, Sep 06,2011;
 #   WE, Jan 25th 2023; 
+#   HNG, Mar 21,2017; HNG, Sep 06,2011;
 
 # The following may be useful for reference
 # Libraries: 
@@ -21,18 +21,10 @@
 #   If in parallel build, then 'both' library depends on sem and parsem 
 #   If in serial   build, then 'both' library depends on sem and serial 
 
-
-
-cmake_minimum_required(VERSION 3.18)
-
 project(specfemx 
         VERSION 
         1.0
         )
-
-
-message(NOTICE "CMakeLists.txt was last edited on Jan 25th 2023 by WE ")
-message(NOTICE " -->  Some comments added + allows cleanup function call.")
 
 # Source files for sem library
 SET(srcsem
