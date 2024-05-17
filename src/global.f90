@@ -327,7 +327,10 @@ real(kind=kreal),allocatable :: magnetization_blk(:,:),Mmag_blk(:)
 logical,allocatable :: ismagnet_blk(:)
 
 integer :: nmatblk_electric
+integer,allocatable :: econtype_blk(:)
 real(kind=kreal),allocatable :: econductivity_blk(:)
+real(kind=kreal),allocatable :: econductivity1_blk(:),econductivity2_blk(:),econductivity3_blk(:)
+real(kind=kreal),allocatable :: econalpha_blk(:),econbeta_blk(:),econgamma_blk(:)
 logical,allocatable :: iselectric_blk(:)
 
 integer :: nmatblk_charge

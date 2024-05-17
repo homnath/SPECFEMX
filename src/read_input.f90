@@ -1852,7 +1852,13 @@ if(POT_TYPE==PELECTRIC)then
         return
       endif
       read(11,*)nmatblk_electric
-      allocate(econductivity_blk(nmatblk_electric))
+      allocate(econtype_blk(nmatblk_electric))
+      allocate(econductivity1_blk(nmatblk_electric), &
+               econductivity2_blk(nmatblk_electric), &
+               econductivity3_blk(nmatblk_electric))
+      allocate(econalpha_blk(nmatblk_electric), &
+               econbeta_blk(nmatblk_electric), &
+               econgamma_blk(nmatblk_electric))
       allocate(iselectric_blk(nmatblk))
       econductivity_blk=ZERO
       iselectric_blk=.false.
