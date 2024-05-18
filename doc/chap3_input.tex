@@ -719,10 +719,12 @@ For electrical potential due to electric current, add the following information 
 \\
 \texttt{electrical\_conductivty:}\\
 \emph{NumberOfElectricalConductivityBlocks\\
-materialID, Electrical\_Conductivity}\\
+materialID, materialType, Conductivity1, Conductivity2, Conductivity3, $\alpha$, $\beta$, $\gamma$}\\
 ...\\
 ...\\
 \\
+
+\emph{materialType}=0: isotropic and \emph{materialType}=1: anisotropic. For isotropic material, only \emph{Conductivity1} is relevant.
 \\
 For electrical potential due to electric charge density, add the following information in the material list file:\\
 \\

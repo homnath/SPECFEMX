@@ -180,7 +180,12 @@ module matrix_vector
     real(kind=kreal) :: divM,dxMx,dyMy,dzMz
    
     ! electrical conductivity
+    real(kind=kreal) :: alpha,beta,gamma
     real(kind=kreal) :: econgll(ngll)
+    real(kind=kreal) :: econgll_aniso(NDIM,NDIM,ngll)
+    real(kind=kreal) :: econsigma(NDIM,NDIM)
+    real(kind=kreal) :: Rmat(NDIM,NDIM)
+    logical :: iselmt_aniso 
 
     real(kind=kreal) :: bmatu(NST,NEDOFU),wmat_gradphi(NEDOFU,NDIM),      &
     rmat_gradphi(NDIM,NEDOFPHI),wmat_sPE(NEDOFPHI,NDIM),rmat_sPE(NDIM,NEDOFU), &
@@ -233,7 +238,8 @@ module matrix_vector
       if(isinf)ielmt_infinite=ielmt_infinite+1
       num=g_num(:,ielmt)
       imat=mat_id(ielmt)
-      mdomain=mat_domain(imat) 
+      mdomain=mat_domain(imat)
+      iselmt_aniso=.false.
       nip=ngll
     
       ! set magnetization at GLL points
@@ -246,12 +252,45 @@ module matrix_vector
         endif
       endif
       ! set electrical conductivity at GLL points
-      econgll=ZERO
       if(POT_TYPE==PELECTRIC)then
         if(iselectric_blk(imat))then
-          do i_gll=1,ngll
-            econgll(i_gll)=econductivity_elmt(i_gll,ielmt)
-          enddo
+          ! isotropic
+          if(econtype_blk(imat).eq.0)then
+            econgll=ZERO
+            do i_gll=1,ngll
+              econgll(i_gll)=econductivity1_elmt(i_gll,ielmt)
+            enddo
+          ! anisotropic
+          elseif(econtype_blk(imat).eq.1)then
+            iselmt_aniso=.true.
+            econgll_aniso=ZERO
+            econsigma=ZERO
+            Rmat=ZERO
+            do i_gll=1,ngll
+              econsigma(1,1)=econductivity1_elmt(i_gll,ielmt)
+              econsigma(2,2)=econductivity2_elmt(i_gll,ielmt)
+              econsigma(3,3)=econductivity3_elmt(i_gll,ielmt)
+              alpha=econalpha_elmt(i_gll,ielmt)
+              beta=econbeta_elmt(i_gll,ielmt)
+              gamma=econgamma_elmt(i_gll,ielmt)
+              ! first row
+              Rmat(1,1)=cos(alpha)*cos(beta); 
+              Rmat(1,2)=sin(alpha)*cos(beta)*sin(gamma)-sin(beta)*cos(gamma);
+              Rmat(1,3)=sin(alpha)*cos(beta)*cos(gamma)+sin(beta)*sin(gamma);
+              ! second row
+              Rmat(2,1)=cos(alpha)*sin(beta);
+              Rmat(2,2)=sin(alpha)*sin(beta)*sin(gamma)+cos(beta)*cos(gamma);
+              Rmat(2,3)=sin(alpha)*sin(beta)*cos(gamma)-cos(beta)*sin(gamma);
+              ! third row
+              Rmat(3,1)=-sin(alpha);
+              Rmat(3,2)=cos(alpha)*sin(gamma);
+              Rmat(3,3)=cos(alpha)*cos(gamma);
+              econgll_aniso(:,:,i_gll)=matmul(Rmat,matmul(econsigma,transpose(Rmat)))
+            enddo
+          else
+            write(*,*)'ERROR: invail value for econtype_blk!'
+            stop
+          endif
         endif
       endif
 
@@ -328,7 +367,11 @@ module matrix_vector
     
         if(ISPOT_DOF)then
           if(POT_TYPE==PELECTRIC)then
-            kmat(edofphi,edofphi)=kmat(edofphi,edofphi)+matmul(transpose(deriv),deriv)*econgll(i)*jacw
+            if(iselmt_aniso)then
+              kmat(edofphi,edofphi)=kmat(edofphi,edofphi)+matmul(transpose(deriv),matmul(econgll_aniso(:,:,i),deriv))*jacw
+            else
+              kmat(edofphi,edofphi)=kmat(edofphi,edofphi)+matmul(transpose(deriv),deriv)*econgll(i)*jacw
+            endif
           else
             kmat(edofphi,edofphi)=kmat(edofphi,edofphi)+matmul(transpose(deriv),deriv)*jacw
           endif

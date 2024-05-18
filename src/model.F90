@@ -23,7 +23,10 @@ use global,only:myrank,NDIM,ngll,nelmt,ISDISP_DOF,ISPOT_DOF, &
                 isbulkmod,isshearmod,ismassdens, &
                 ismagnetization,iselectric,ischarge, &
                 bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt,&
-                econductivity_elmt,charge_density_elmt,logunit
+                econductivity1_elmt,econductivity2_elmt,econductivity3_elmt, &
+                econalpha_elmt,econbeta_elmt,econgamma_elmt, &
+                econductivity_aniso, &
+                charge_density_elmt,logunit
 use math_constants,only:ZERO
 implicit none
 integer,intent(out) :: errcode
@@ -63,8 +66,19 @@ endif
 ! Electrical conductivity
 if(ISPOT_DOF.and.POT_TYPE==PELECTRIC)then
   iselectric=.true.
-  allocate(econductivity_elmt(ngll,nelmt))
-  econductivity_elmt=ZERO
+  allocate(econductivity1_elmt(ngll,nelmt))
+  econductivity1_elmt=ZERO
+  if(econductivity_aniso)then
+    ! anisotropic
+    allocate(econductivity2_elmt(ngll,nelmt),econductivity3_elmt(ngll,nelmt))
+    econductivity2_elmt=ZERO
+    econductivity3_elmt=ZERO
+    allocate(econalpha_elmt(ngll,nelmt),econbeta_elmt(ngll,nelmt), &
+    econgamma_elmt(ngll,nelmt))
+    econalpha_elmt=ZERO
+    econbeta_elmt=ZERO
+    econgamma_elmt=ZERO
+  endif
 endif
 ! Charge density
 if(ISPOT_DOF.and.POT_TYPE==PCHARGE)then
@@ -87,7 +101,10 @@ use global,only:NDIM,ngll,nelmt,ISDISP_DOF,ISPOT_DOF, &
                 isbulkmod,isshearmod,ismassdens, &
                 ismagnetization,iselectric,ischarge, &
                 bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt, &
-                econductivity_elmt,charge_density_elmt
+                econductivity1_elmt,econductivity2_elmt,econductivity3_elmt, &
+                econalpha_elmt,econbeta_elmt,econgamma_elmt, &
+                econductivity_aniso, &
+                charge_density_elmt
 use math_constants,only:ZERO
 
 implicit none
@@ -101,7 +118,13 @@ if(isbulkmod)deallocate(bulkmod_elmt)
 if(isshearmod)deallocate(shearmod_elmt)
 if(ismassdens)deallocate(massdens_elmt)
 if(ismagnetization)deallocate(magnetization_elmt)
-if(iselectric)deallocate(econductivity_elmt)
+if(iselectric)then
+  deallocate(econductivity1_elmt)
+  if(econductivity_aniso)then
+    deallocate(econductivity1_elmt,econductivity2_elmt,econductivity3_elmt)
+    deallocate(econalpha_elmt,econbeta_elmt,econgamma_elmt)
+  endif
+endif
 if(ischarge)deallocate(charge_density_elmt)
 errcode=0
 end subroutine cleanup_model
@@ -417,7 +440,14 @@ matblock: do i_blk=1,nmatblk
     ! electrial conductivity
     if(ISPOT_DOF.and.POT_TYPE==PELECTRIC)then
       if(iselectric_blk(i_blk))then
-        econductivity_elmt(:,block(i_blk)%elmt)= econductivity_blk(i_blk)
+        econductivity1_elmt(:,block(i_blk)%elmt) = econductivity1_blk(i_blk)
+        if(econductivity_aniso)then
+          econductivity2_elmt(:,block(i_blk)%elmt) = econductivity2_blk(i_blk)
+          econductivity3_elmt(:,block(i_blk)%elmt) = econductivity3_blk(i_blk)
+          econalpha_elmt(:,block(i_blk)%elmt) = econalpha_blk(i_blk)
+          econbeta_elmt(:,block(i_blk)%elmt) = econbeta_blk(i_blk)
+          econgamma_elmt(:,block(i_blk)%elmt) = econgamma_blk(i_blk)
+        endif
       endif
     endif
     

@@ -88,7 +88,7 @@ integer :: incORlat
 real(kind=kreal) :: M0
 real(kind=kreal) :: inc,dec,azim
 ! magnitude of the electrical conductivity
-real(kind=kreal) :: econductivity
+!real(kind=kreal) :: econductivity
 ! magnitude of the charge density
 real(kind=kreal) :: charge_density
 
@@ -1863,11 +1863,16 @@ if(POT_TYPE==PELECTRIC)then
       econductivity_blk=ZERO
       iselectric_blk=.false.
       do i=1,nmatblk_electric
-        read(11,*)imat,econductivity
-        econductivity_blk(i)=econductivity
+        read(11,*)imat,econtype_blk(imat),econductivity1_blk(imat), &
+                econductivity2_blk(imat),econductivity2_blk(imat), &
+                econalpha_blk(imat),econbeta_blk(imat),econgamma_blk(imat)
+        !econductivity_blk(i)=econductivity
         iselectric_blk(imat)=.true.
       enddo
-      
+      econalpha_blk=DEG2RAD*econalpha_blk 
+      econbeta_blk=DEG2RAD*econbeta_blk 
+      econgamma_blk=DEG2RAD*econgamma_blk
+      econductivity_aniso=any(econtype_blk.eq.1)
       electric_stat=1
       cycle
     endif

@@ -296,7 +296,9 @@ real(kind=kreal),allocatable :: g0_nodal(:)
 ! magnetization
 real(kind=kreal),allocatable :: magnetization_elmt(:,:,:)
 ! electrical conductivity
-real(kind=kreal),allocatable :: econductivity_elmt(:,:)
+real(kind=kreal),allocatable :: econductivity1_elmt(:,:), &
+econductivity2_elmt(:,:),econductivity3_elmt(:,:),econalpha_elmt(:,:), &
+econbeta_elmt(:,:),econgamma_elmt(:,:)
 ! charge density
 real(kind=kreal),allocatable :: charge_density_elmt(:,:)
 integer :: nwmat
@@ -332,6 +334,7 @@ real(kind=kreal),allocatable :: econductivity_blk(:)
 real(kind=kreal),allocatable :: econductivity1_blk(:),econductivity2_blk(:),econductivity3_blk(:)
 real(kind=kreal),allocatable :: econalpha_blk(:),econbeta_blk(:),econgamma_blk(:)
 logical,allocatable :: iselectric_blk(:)
+logical :: econductivity_aniso
 
 integer :: nmatblk_charge
 real(kind=kreal),allocatable :: charge_density_blk(:)
