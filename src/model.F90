@@ -192,7 +192,7 @@ if(iselectric)then
   do i_elmt=1,nelmt
     iblk=mat_id(i_elmt)
     if(iselectric_blk(iblk))then
-      econd_elmt(i_elmt)=econductivity_blk(iblk)
+      econd_elmt(i_elmt)=econductivity1_blk(iblk)
     endif
   enddo
 endif

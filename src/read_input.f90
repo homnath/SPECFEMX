@@ -1860,13 +1860,17 @@ if(POT_TYPE==PELECTRIC)then
                econbeta_blk(nmatblk_electric), &
                econgamma_blk(nmatblk_electric))
       allocate(iselectric_blk(nmatblk))
-      econductivity_blk=ZERO
+      econductivity1_blk=ZERO
+      econductivity2_blk=ZERO
+      econductivity3_blk=ZERO
+      econalpha_blk=ZERO
+      econbeta_blk=ZERO
+      econgamma_blk=ZERO
       iselectric_blk=.false.
       do i=1,nmatblk_electric
         read(11,*)imat,econtype_blk(imat),econductivity1_blk(imat), &
                 econductivity2_blk(imat),econductivity2_blk(imat), &
                 econalpha_blk(imat),econbeta_blk(imat),econgamma_blk(imat)
-        !econductivity_blk(i)=econductivity
         iselectric_blk(imat)=.true.
       enddo
       econalpha_blk=DEG2RAD*econalpha_blk 
