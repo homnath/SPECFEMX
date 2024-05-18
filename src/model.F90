@@ -121,7 +121,7 @@ if(ismagnetization)deallocate(magnetization_elmt)
 if(iselectric)then
   deallocate(econductivity1_elmt)
   if(econductivity_aniso)then
-    deallocate(econductivity1_elmt,econductivity2_elmt,econductivity3_elmt)
+    deallocate(econductivity2_elmt,econductivity3_elmt)
     deallocate(econalpha_elmt,econbeta_elmt,econgamma_elmt)
   endif
 endif
