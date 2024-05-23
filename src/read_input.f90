@@ -1869,7 +1869,7 @@ if(POT_TYPE==PELECTRIC)then
       iselectric_blk=.false.
       do i=1,nmatblk_electric
         read(11,*)imat,econtype_blk(imat),econductivity1_blk(imat), &
-                econductivity2_blk(imat),econductivity2_blk(imat), &
+                econductivity2_blk(imat),econductivity3_blk(imat), &
                 econalpha_blk(imat),econbeta_blk(imat),econgamma_blk(imat)
         iselectric_blk(imat)=.true.
       enddo
