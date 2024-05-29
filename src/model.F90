@@ -515,7 +515,9 @@ if(savedata%model)then
   do i_elmt=1,nelmt
     ! Skip transition and infinite elements
     imat=mat_id(i_elmt)
-    if(mat_domain(imat).ge.ELASTIC_TRINFDOMAIN)cycle
+    ! The statement below makes some navalncy 0 causing the 
+    ! "Floating-point exception - erroneous arithmetic operation" when divided by nvalency!
+    ! if(mat_domain(imat).ge.ELASTIC_TRINFDOMAIN)cycle
 
     num=g_num(:,i_elmt)
     bulkmod_node(num) = bulkmod_node(num) + bulkmod_elmt(:,i_elmt)
@@ -528,7 +530,7 @@ if(savedata%model)then
   call assemble_ghosts_nodal_fscalar(bulkmod_node,bulkmod_node)
   call assemble_ghosts_nodal_fscalar(shearmod_node,shearmod_node)
   call assemble_ghosts_nodal_fscalar(rho_node,rho_node)
-
+  
   bulkmod_node = bulkmod_node/nvalency
   shearmod_node = shearmod_node/nvalency
   rho_node = rho_node/nvalency
