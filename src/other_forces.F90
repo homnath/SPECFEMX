@@ -6,7 +6,7 @@ implicit none
 contains
 !_______________________________________________________________________________
 
-subroutine compute_cmt_load(freq)
+subroutine compute_cmt_load(istep,freq)
 
 use global
 use output_to_user
@@ -23,21 +23,29 @@ use math_library_serial
 use cmtsolution,only:source_tshift,source_hdur
     
 implicit none 
-
+integer,intent(in)           :: istep
 real(kind=kreal)             :: freq
 integer                      :: errcode
 character(len=250)           :: errtag
 
-log_msg = trim(' Earthquake source type: moment-density tensor')
-call write_ifproc0
-
-call earthquake_load(neq,errcode,errtag)
-call sync_process
-call control_error(errcode,errtag,stdout)
-
+if(istep.eq.1)then
+  log_msg = trim(' Earthquake source type: moment-density tensor')
+  call write_ifproc0
+  ! First compute only the time/frequency independent factor, eqload0.
+  call earthquake_load(neq,errcode,errtag)
+  call sync_process
+  call control_error(errcode,errtag,stdout)
+endif
 if(steptype==FREQSTEP)then
+  ! Frequency domain
   !WARNING: make it general for nsrc
-  extload=extload*source_frequency_function_complex(freq,source_hdur(1))
+  extload=eqload0*source_frequency_function(freq,source_hdur(1))
+else
+  ! Time domain
+  ! Coseismic or Postseismic. Load at the beginning only.
+  if(istep.eq.1)then
+    extload=extload+eqload0
+  endif
 endif
 end subroutine compute_cmt_load
 !===============================================================================    

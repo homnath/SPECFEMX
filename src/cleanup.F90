@@ -100,6 +100,7 @@ implicit none
   !deallocate(egdof,egdofu)
   !if(allocated(gdofu))deallocate(gdofu)
   deallocate(extload,load,resload,rhoload,ubcload)
+  if(iseqsource)deallocate(eqload0)
   deallocate(du,u)
   deallocate(nodalu,bcnodalv)
   if(ISPOT_DOF)then

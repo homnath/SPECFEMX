@@ -99,6 +99,10 @@ logical            :: reuse_pc_bool,freq_bool
 
 ! Code: 
 if(steptype.eq.FREQSTEP)then
+    ! For frequency-domain simulation, each frequency is indepedent of other.
+    ! Therefore, the extload must be reset.
+    extload = ZERO
+
     ! FREQUENCY STIFFNESS MATRIX 
 
     if(i_step==0)then

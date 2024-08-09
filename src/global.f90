@@ -249,7 +249,7 @@ real(kind=kreal),allocatable :: storekmat(:,:,:), storekmatSL(:,:,:)
 real(kind=kreal), allocatable :: kSL(:,:)!  SL contribution to kmat
 !storemmat: mass matrix for all elements
 real(kind=kreal),allocatable :: storemmat(:,:)
-real(kind=kreal),allocatable :: slipload(:), extload(:), bodyload(:),  &
+real(kind=kreal),allocatable :: slipload(:),eqload0(:),extload(:),bodyload(:), &
                                 selfload(:), viscoload(:),ubcload(:),  &
                                 load(:),resload(:),du(:),u(:),olddu(:),&
                                 rhoload(:),iceload(:),                 & 

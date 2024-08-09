@@ -106,7 +106,7 @@ allocate(load(0:neq),bodyload(0:neq),selfload(0:neq),viscoload(0:neq), &
 resload(0:neq),du(0:neq),u(0:neq),olddu(0:neq),                   &
 slipload(0:neq),extload(0:neq),rhoload(0:neq),ubcload(0:neq),          &
 iceload(0:neq), stat=istat)
-
+if(iseqsource)allocate(eqload0(0:neq))
 call check_allocate(istat,errsrc)
 if(istat/=0)then
   write(logunit,*)'ERROR: cannot allocate memory!',istat
@@ -126,6 +126,7 @@ ubcload   = ZERO
 load      = ZERO
 u         = ZERO
 extload   = ZERO
+if(iseqsource)eqload0   = ZERO
 rhoload   = ZERO
 
 if(ISSL_DOF)then

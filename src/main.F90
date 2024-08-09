@@ -417,7 +417,7 @@ if(steptype==TIMESTEP)then
   endif 
 endif
 !----------------------------------------------------------------------
-! ++++++++++++++++ STARTING TIME LOOPING ++++++++++++++++++++++++
+! ++++++++++++++++ STARTING TIME/FREQUENCY LOOPING ++++++++++++++++++++
 ! For elastic simulations there is only one timestep. 
 if (myrank.eq.0)then 
   write(*,*)
@@ -490,8 +490,8 @@ loop_step: do i_step=istep0,nstep
                                   errcode, errtag)
     !print*,myrank,'NSPLIT extload:',maxval(abs(extload))
   endif 
-  if(iseqsource.and.eqsource_type.lt.3.and.i_step==1)then
-    call compute_cmt_load(freq)
+  if(iseqsource.and.eqsource_type.lt.3)then
+    call compute_cmt_load(i_step,freq)
     !print*,myrank,'CMT extload:',maxval(abs(extload))
   endif
   ! electrical current prescribed at points
