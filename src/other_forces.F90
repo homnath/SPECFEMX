@@ -28,7 +28,9 @@ real(kind=kreal)             :: freq
 integer                      :: errcode
 character(len=250)           :: errtag
 
-if(istep.eq.1)then
+! Note: initial istep=0 for the frequency domain and 1 for the time domain.
+if( (steptype.eq.TIMESTEP .and. istep.eq.1) .or. &
+    (steptype.eq.FREQSTEP .and. istep.eq.0) )then
   log_msg = trim(' Earthquake source type: moment-density tensor')
   call write_ifproc0
   ! First compute only the time/frequency independent factor, eqload0.
