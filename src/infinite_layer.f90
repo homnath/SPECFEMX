@@ -323,7 +323,7 @@ do i=2,nsnode_all
   endif
 enddo
 deallocate(isnode)
-print*,'Hello:',pole_coord0
+print*,'Infinite pole:',pole_coord0
 ! compute mirror nodes
 do i=1,nsnode
   ! pole specifies the reference point for the decaying functions
