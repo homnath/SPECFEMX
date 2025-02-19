@@ -44,7 +44,7 @@ use global! , only: nmaxwell, devel_example, imatve_to_imat, &
 
   ! Can we use a case statement here instead? 
   if(index(tunit,'sec').gt.0 .or. index(tunit,'second').gt.0)then
-  ! Do not convert, because origin unit of relaxtime is second.
+  ! Do not convert, because original unit of relaxtime is second.
   tunitfac=ONE
   elseif(index(tunit,'hr').gt.0 .or. index(tunit,'hour').gt.0)then
   ! Convert second to hour
@@ -86,6 +86,7 @@ use global! , only: nmaxwell, devel_example, imatve_to_imat, &
       relaxtime(:,i_mat)=tunitfac*viscosity_blk(:,i_mat)/ym_blk(imat)
       else  
       !relaxtime(:,i_mat)=tunitfac*TWO*viscosity_blk(:,i_mat)/shearmod_blk(imat)
+      print*,imat,shearmod_blk(imat)
       relaxtime(:,i_mat)=devel_rtfac*tunitfac*viscosity_blk(:,i_mat)/shearmod_blk(imat)
       endif
   !  endif

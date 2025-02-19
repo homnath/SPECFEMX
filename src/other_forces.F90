@@ -42,6 +42,7 @@ if(steptype==FREQSTEP)then
   ! Frequency domain
   !WARNING: make it general for nsrc
   extload=eqload0*source_frequency_function(freq,source_hdur(1))
+  print*,maxval(abs(extload)),range(extload)
 else
   ! Time domain
   ! Coseismic or Postseismic. Load at the beginning only.

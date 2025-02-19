@@ -7,65 +7,64 @@ implicit none
 contains 
 !_______________________________________________________________________________
 
-    subroutine calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
-        ! Calculates the time or frequency step for the time marching.
-        ! USES
-        use global 
-        use set_precision
-        use math_constants 
-        use nondimensionpar
-        ! IO variables
-        real(kind=kreal) :: freq, ang_freq, scale_ang_freq2
-        real(kind=kreal) :: t, dt
-        integer :: i_step
+subroutine calc_time_step(i_step, t, dt, freq, ang_freq, scale_ang_freq2)
+! Calculates the time or frequency step for the time marching.
+! USES
+use global 
+use set_precision
+use math_constants 
+use nondimensionpar
+! IO variables
+real(kind=kreal) :: freq, ang_freq, scale_ang_freq2
+real(kind=kreal) :: t, dt
+integer :: i_step
 
-        step=step0+dstep*real(i_step,kreal)
+step=step0+dstep*real(i_step,kreal)
 
-        if(steptype.eq.TIMESTEP)then
-            ! Time step.
-            t=step
-            dt=dstep
-            if(myrank==0)then
-            write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' t: ',t
-            flush(logunit)
-            endif
-        
-        elseif(steptype.eq.FREQSTEP)then
-            ! Frequency step.
-            freq=step
-            if(myrank==0)then
-            write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' f: ',freq
-            flush(logunit)
-            endif
+if(steptype.eq.TIMESTEP)then
+    ! Time step.
+    t=step
+    dt=dstep
+    if(myrank==0)then
+    write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' t: ',t
+    flush(logunit)
+    endif
 
-            if(devel_nondim)then
-            ang_freq=TWO*freq*DIM_T
-            else
-            ang_freq=TWO*PI*freq
-            endif
-            scale_ang_freq2=ONE/(ang_freq*ang_freq)
-        endif
-        
-    end subroutine calc_time_step
+elseif(steptype.eq.FREQSTEP)then
+    ! Frequency step.
+    freq=step
+    if(myrank==0)then
+    write(logunit,'(a,i0,a,g0.6)')'step: ',i_step,' f: ',freq
+    flush(logunit)
+    endif
+
+    if(devel_nondim)then
+    ang_freq=TWO*freq*DIM_T
+    else
+    ang_freq=TWO*PI*freq
+    endif
+    scale_ang_freq2=ONE/(ang_freq*ang_freq)
+endif
+    
+end subroutine calc_time_step
 !-------------------------------------------------------------------------------
- 
 
 subroutine reset_nodal_arrays_loads(nodalslrate)
-    use global
-    use math_constants
-    real(kind=kreal),allocatable :: nodalslrate(:)
+use global
+use math_constants
+real(kind=kreal),allocatable :: nodalslrate(:)
 
-    nodalu  = ZERO
-    ubcload = ZERO
-    rhoload = ZERO
-  
-    if(ISPOT_DOF)then
-      nodalphi=ZERO
-    endif
-  
-    if(ISSL_DOF)then
-      nodalslrate = ZERO 
-    endif
+nodalu  = ZERO
+ubcload = ZERO
+rhoload = ZERO
+
+if(ISPOT_DOF)then
+  nodalphi=ZERO
+endif
+
+if(ISSL_DOF)then
+  nodalslrate = ZERO 
+endif
 end subroutine reset_nodal_arrays_loads
 !-------------------------------------------------------------------------------
 
@@ -99,94 +98,91 @@ logical            :: reuse_pc_bool,freq_bool
 
 ! Code: 
 if(steptype.eq.FREQSTEP)then
-    ! For frequency-domain simulation, each frequency is indepedent of other.
-    ! Therefore, the extload must be reset.
-    extload = ZERO
+  ! For frequency-domain simulation, each frequency is indepedent of other.
+  ! Therefore, the extload must be reset.
+  extload = ZERO
 
-    ! FREQUENCY STIFFNESS MATRIX 
+  ! FREQUENCY STIFFNESS MATRIX 
 
-    if(i_step==0)then
-        call compute_stiffness_elastic(errcode,errtag)
-    endif
-        
-    ! Set Petsc stiffness matrix
-    if(solver_type.eq.petsc_solver)then
-      reuse_pc_bool=.false.
-      freq_bool=.true.
-      call set_petsc_stiffness(isscale_ang_freq, &  
-      ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)  
-    endif
+  if(i_step==0)then
+      call compute_stiffness_elastic(errcode,errtag)
+  endif
+      
+  ! Set Petsc stiffness matrix
+  if(solver_type.eq.petsc_solver)then
+    reuse_pc_bool=.false.
+    freq_bool=.true.
+    call set_petsc_stiffness(isscale_ang_freq, &  
+    ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)  
+  endif
 
 else ! TIMESTEPPING
+  ! If it is the first timestep we need the elastic stiffness matrix (storekmat)
+  ! It should be constant so we dont need to change it
+  if(i_step.eq.istep0)then
+      if(myrank.eq.0.and.verbose_bool)then
+          write(*,*)'Calculating elastic stiffness matrix...'
+      endif
+      call compute_stiffness_elastic(errcode,errtag)
+      if(myrank.eq.0.and.verbose_bool)then
+          write(*,*)' ✓ Done'
+          write(*,*)
+      endif
+  endif 
 
-        ! If it is the first timestep we need the elastic stiffness matrix (storekmat)
-        ! It should be constant so we dont need to change it
-        if(i_step.eq.istep0)then
-            if(myrank.eq.0.and.verbose_bool)then
-                write(*,*)'Calculating elastic stiffness matrix...'
-            endif
-            call compute_stiffness_elastic(errcode,errtag)
-            if(myrank.eq.0.and.verbose_bool)then
-                write(*,*)' ✓ Done'
-                write(*,*)
-            endif
-        endif 
+  !elseif(i_step==2)then
+    ! Since we use a uniform dt, following routine has to be called only once 
+    ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
+    ! it has to be called for every time steps or every changing time step.
+    ! This will simply overwrite the storekmat for viscoelastic elements.
+  !    call compute_stiffness_viscoelastic(nelmt_viscoelas,             &   
+  !                                        eid_viscoelas, dt, relaxtime,&
+  !                                        storekmat, errcode, errtag)
+  
+      ! If using PETSC solver set stiffness matric                                      
+  !    if(solver_type.eq.petsc_solver)then
 
+  !        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
+  !        ang_freq, scale_ang_freq2, reuse_pc_bool=.true.,freq_bool=.false.)   
 
-
-      !elseif(i_step==2)then
-          ! Since we use a uniform dt, following routine has to be called only once 
-          ! for a linear viscoelastic model. For nonlinear or nonuniform time steps
-          ! it has to be called for every time steps or every changing time step.
-          ! This will simply overwrite the storekmat for viscoelastic elements.
-      !    call compute_stiffness_viscoelastic(nelmt_viscoelas,             &   
-      !                                        eid_viscoelas, dt, relaxtime,&
-      !                                        storekmat, errcode, errtag)
-      
-          ! If using PETSC solver set stiffness matric                                      
-      !    if(solver_type.eq.petsc_solver)then
-
-      !        call set_petsc_stiffness(isscale_ang_freq, storekmat,storemmat,&  
-      !        ang_freq, scale_ang_freq2, reuse_pc_bool=.true.,freq_bool=.false.)   
-
-        
-        ! At all timesteps we need the SL contribution to the kmat: 
-        ! Combine with the main storekmat
-        ! At the end of the timestep we will then remove this so that
-        ! we recover the original storekmat
-        ! I dont think we will have the memory to store two kmats
-        ! we may even need to get rid of the storekmatSL at some point
-        ! And directly add/remove
-        if (ISSL_DOF) then
-            if(myrank.eq.0.and.verbose_bool)then 
-                write(*,*)' --> Calculating sea-level stiffness matrix'
-              endif 
-            call compute_storekmatSL(storekmatSL, kSL)
-            storekmat = storekmat + storekmatSL
-            if(myrank.eq.0.and.verbose_bool)then
-                write(*,*)' --> Combined SL and normal Kmats'
-              endif
-        endif
     
-        ! Add the matrix to petsc: 
+    ! At all timesteps we need the SL contribution to the kmat: 
+    ! Combine with the main storekmat
+    ! At the end of the timestep we will then remove this so that
+    ! we recover the original storekmat
+    ! I dont think we will have the memory to store two kmats
+    ! we may even need to get rid of the storekmatSL at some point
+    ! And directly add/remove
+    if (ISSL_DOF) then
+        if(myrank.eq.0.and.verbose_bool)then 
+            write(*,*)' --> Calculating sea-level stiffness matrix'
+          endif 
+        call compute_storekmatSL(storekmatSL, kSL)
+        storekmat = storekmat + storekmatSL
         if(myrank.eq.0.and.verbose_bool)then
-            write(*,*)'Setting PETSC stiffness matrix...'
-        endif
+            write(*,*)' --> Combined SL and normal Kmats'
+          endif
+    endif
+  
+    ! Add the matrix to petsc: 
+    if(myrank.eq.0.and.verbose_bool)then
+        write(*,*)'Setting PETSC stiffness matrix...'
+    endif
 
-        if(solver_type.eq.petsc_solver)then
-          reuse_pc_bool=.false.
-          freq_bool=.false.
-            call set_petsc_stiffness(isscale_ang_freq, &  
-            ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)   
-        endif
+    if(solver_type.eq.petsc_solver)then
+      reuse_pc_bool=.false.
+      freq_bool=.false.
+        call set_petsc_stiffness(isscale_ang_freq, &  
+        ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)   
+    endif
 
-        if(myrank.eq.0.and.verbose_bool)then
-            write(*,*)' ✓ Done'
-            write(*,*)
-        endif
+    if(myrank.eq.0.and.verbose_bool)then
+        write(*,*)' ✓ Done'
+        write(*,*)
+    endif
 
-        ! DO NOT DELETE - HAS VISCOELASTIC CONTENT
-        ! ORIGINAL VERSION - BUT FOR SL WE NEED ADAPTIVE KMAT 
+    ! DO NOT DELETE - HAS VISCOELASTIC CONTENT
+    ! ORIGINAL VERSION - BUT FOR SL WE NEED ADAPTIVE KMAT 
     !if(i_step==1)then 
     !    if(myrank.eq.0)then
     !        write(*,*)'Calculating elastic stiffness matrix...'
@@ -348,4 +344,4 @@ use math_library_serial
 end subroutine run_convergence_loop
 !-------------------------------------------------------------------------------
 
-end module
+end module time_loop

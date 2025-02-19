@@ -318,7 +318,8 @@ character(len=250) :: out_fname
 real(kind=kreal) :: drho,drho03,depthp,fac
 real(kind=kreal) :: zp 
 
-integer,allocatable :: num(:),nvalency(:)
+integer :: num(ngll)
+integer,allocatable ::nvalency(:)
 real(kind=kreal),allocatable :: bulkmod_node(:),shearmod_node(:),rho_node(:)
 
 character(len=250) :: fname
@@ -332,7 +333,6 @@ type(material_block),dimension(:),allocatable :: block
 errtag="ERROR: unknown!"
 errcode=-1
 
-allocate(num(ngll))
 !! Elastic moduli
 !if(ISDISP_DOF)then
 !  allocate(bulkmod_elmt(ngll,nelmt),shearmod_elmt(ngll,nelmt))
@@ -458,10 +458,10 @@ matblock: do i_blk=1,nmatblk
       endif
     endif
 
-  ! tomographic structured grid model
+  ! read from the tomographic structured grid model
   elseif(type_blk(i_blk).eq.-1)then
-    call convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
-    bulkmod_node, shearmod_node, rho_node, errcode, errtag)
+    call read_tomographic_model(i_blk, errcode, errtag)
+    print*,'outside',minval(shearmod_elmt),maxval(shearmod_elmt)
   else
     print*,'ERROR: unsupported type_blk:',type_blk(i_blk)
   endif
@@ -579,15 +579,13 @@ if(savedata%model)then
 endif
 
 
-deallocate(num)
 if(myrank.eq.0)write(logunit, *)'Completed set_model_properties...'
 
 errcode=0
 end subroutine set_model_properties
 !===============================================================================
 
-subroutine convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
-  bulkmod_node, shearmod_node, rho_node, errcode, errtag)
+subroutine read_tomographic_model(i_blk, errcode, errtag)
   ! WE created this subroutine that was originally part of set_model_properties
   ! May not be functional - may need some edits for input/output variables
 
@@ -597,15 +595,13 @@ subroutine convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
   use shape_library,only:shape_function_hex8p
 
   ! IO variables
-  integer :: i_blk, ios
-  integer,allocatable :: num(:),nvalency(:)
-  real(kind=kreal), allocatable :: bulkmod_node(:), shearmod_node(:),rho_node(:)
+  integer :: i_blk
   integer :: errcode
   character(len=250) :: errtag
 
   ! Local variables
-  integer :: i_elmt, i_grid, i_gll
-  integer :: ic(8)
+  integer :: i_elmt,i_grid,i_gll,ios
+  integer :: ic(8),num(ngll)
   integer :: ix1(3),ix2(3)
   integer :: grid_l1,grid_l2,grid_m1,grid_m2,grid_n1,grid_n2
   integer :: grid_n,grid_nx,grid_ny,grid_nz,grid_nxy
@@ -619,7 +615,7 @@ subroutine convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
  
   ! CODE: 
     ! Read file 
-  write(logunit, *)'Converting tomo. model to pointwise...'
+  write(logunit, *)'Reading tomo. model and interpolating to GLL points...'
 
     open(unit=11,file=trim(inp_path)//trim(mfile_blk(i_blk)),status='old',     &
       action='read',iostat = ios)
@@ -745,8 +741,8 @@ subroutine convert_tomo_to_point_model(i_blk, num , nvalency, ios, &
 
       enddo
       deallocate(grid_vp,grid_vs,grid_rho)
-
-end subroutine convert_tomo_to_point_model
+print*,'inside',minval(shearmod_elmt),maxval(shearmod_elmt)
+end subroutine read_tomographic_model
 !-------------------------------------------------------------------------------
 
 subroutine calc_model_coord_extents(tot_nelmt,max_nelmt,min_nelmt, &

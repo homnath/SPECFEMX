@@ -103,14 +103,14 @@ Vec         nzeror_gvec,nzeror_dvec,nzeror_ovec,iproc_gvec,               &
             interface_gvec,ninterface_dvec,ninterface_ovec,nself_gvec
 PetscInt :: i !,ncol_part,nrow_part
 PetscInt,allocatable :: nzeros(:),ig_array(:) 
-PetscScalar rval
+PetscScalar rval,scal1(1)
 
-PetscInt :: igdof,maxrank0,n,ng,ng0,ng1,np0
+PetscInt :: igdof,int1(1),maxrank0,n,ng,ng0,ng1,np0
 PetscInt,allocatable :: iproc_array(:)
 PetscScalar,pointer :: nzeror_array(:),rproc_array(:)
 PetscScalar,pointer :: nzeror_darray(:),nzeror_oarray(:),rnself_array(:)
-PetscReal :: fac_ni,max_ni,pmax,pmin,rnid,rnioffd,rnd,rnoffd
-
+PetscReal :: fac_ni,max_ni,pmax,pmin
+PetscScalar,dimension(1) :: rnd,rnid,rnioffd,rnoffd
 PetscInt :: ir,ic,igr,igc,ir0,ic0,igr0,igc0
 PetscInt :: nd,noffd
 PetscInt :: i_bool,i_ndof
@@ -212,7 +212,7 @@ iproc_array=int(rproc_array)
 deallocate(rproc_array)
 PetscCallA(VecDestroy(iproc_gvec,ierr))
 ! assign interface ID to each gdofs
-rval=1.0
+scal1=1.0
 ! all DOFs
 do i=1,ngpart                                                                    
    nibool=gpart(i)%nnode                                                         
@@ -221,8 +221,9 @@ do i=1,ngpart
     ibool_interface=gpart(i)%node                                                
     do i_bool=1,nibool                                                           
       do i_ndof=1,NNDOF                                                          
-        igdof=ggdof(i_ndof,ibool_interface(i_bool))-1                            
-        if(igdof.ge.0)call VecSetValues(interface_gvec,1,igdof,rval,           & 
+        igdof=ggdof(i_ndof,ibool_interface(i_bool))-1 
+        int1=igdof
+        if(igdof.ge.0)call VecSetValues(interface_gvec,1,int1,scal1,           & 
         INSERT_VALUES,ierr);                                                     
       enddo                                                                      
     enddo                                                                        
@@ -242,10 +243,11 @@ PetscCallA(VecDestroy(interface_gvec,ierr))
 ! estimate correction for the number of nonzero entries in the diagonal and
 ! nondiagonal portion
 ! self interface
-rval=1.0
+scal1=1.0
 do i=1,neq
-  if(isg_interface(i).eq.1)then    
-    PetscCallA(VecSetValues(nself_gvec,1,l2gdof(i),rval,ADD_VALUES,ierr))
+  if(isg_interface(i).eq.1)then
+    int1=l2gdof(i)
+    PetscCallA(VecSetValues(nself_gvec,1,int1,scal1,ADD_VALUES,ierr))
   endif
 enddo
 PetscCallA(VecAssemblyBegin(nself_gvec,ierr))
@@ -315,11 +317,12 @@ do i=2,nsparse
     count_nsparse=count_nsparse+nd+noffd
     rnd=real(nd)
     rnoffd=real(noffd)
-    PetscCallA(VecSetValues(nzeror_dvec,1,igr0,rnd,ADD_VALUES,ierr))
-    PetscCallA(VecSetValues(nzeror_ovec,1,igr0,rnoffd,ADD_VALUES,ierr))
+    int1=igr0
+    PetscCallA(VecSetValues(nzeror_dvec,1,int1,rnd,ADD_VALUES,ierr))
+    PetscCallA(VecSetValues(nzeror_ovec,1,int1,rnoffd,ADD_VALUES,ierr))
     
-    PetscCallA(VecSetValues(ninterface_dvec,1,igr0,rnid,ADD_VALUES,ierr))
-    PetscCallA(VecSetValues(ninterface_ovec,1,igr0,rnioffd,ADD_VALUES,ierr))
+    PetscCallA(VecSetValues(ninterface_dvec,1,int1,rnid,ADD_VALUES,ierr))
+    PetscCallA(VecSetValues(ninterface_ovec,1,int1,rnioffd,ADD_VALUES,ierr))
 
     ! reset
     nd=0; noffd=0
@@ -367,11 +370,12 @@ do i=2,nsparse
     count_nsparse=count_nsparse+nd+noffd
     rnd=real(nd)
     rnoffd=real(noffd)
-    PetscCallA(VecSetValues(nzeror_dvec,1,igr0,rnd,ADD_VALUES,ierr))
-    PetscCallA(VecSetValues(nzeror_ovec,1,igr0,rnoffd,ADD_VALUES,ierr))
+    int1=igr0
+    PetscCallA(VecSetValues(nzeror_dvec,1,int1,rnd,ADD_VALUES,ierr))
+    PetscCallA(VecSetValues(nzeror_ovec,1,int1,rnoffd,ADD_VALUES,ierr))
 
-    PetscCallA(VecSetValues(ninterface_dvec,1,igr0,rnid,ADD_VALUES,ierr))
-    PetscCallA(VecSetValues(ninterface_ovec,1,igr0,rnioffd,ADD_VALUES,ierr))
+    PetscCallA(VecSetValues(ninterface_dvec,1,int1,rnid,ADD_VALUES,ierr))
+    PetscCallA(VecSetValues(ninterface_ovec,1,int1,rnioffd,ADD_VALUES,ierr))
   endif
 enddo
 deallocate(rnself_lgarray)
@@ -462,9 +466,10 @@ deallocate(ninterface_oarray)
 call sync_process
 
 do i=1,nsparse
-  rval=1.
+  scal1=1.
   igdof=kgrow_sparse(i)-1 ! fortran index
-  PetscCallA(VecSetValues(nzeror_gvec,1,igdof,rval,ADD_VALUES,ierr));
+  int1=igdof
+  PetscCallA(VecSetValues(nzeror_gvec,1,int1,scal1,ADD_VALUES,ierr));
 enddo
 PetscCallA(VecAssemblyBegin(nzeror_gvec,ierr))
 PetscCallA(VecAssemblyEnd(nzeror_gvec,ierr))
@@ -1053,7 +1058,7 @@ use output_to_user
 
         call petsc_set_stiffness_matrix_freq(ang_freq, scale_ang_freq2,  & 
                                              isscale_ang_freq)
-        log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ;  
+        log_msg = trim(' petsc_set_stiffness_matrix (Freq): SUCCESS!') ;  
         call write_ifproc0
         call petsc_set_ksp_operator(reuse_pc=reuse_pc_bool)
     else 
@@ -1065,7 +1070,7 @@ use output_to_user
 
             symmetric_solver =.false.
         else 
-            log_msg = trim(' petsc_set_stiffness_matrix: SUCCESS!') ; 
+            log_msg = trim(' petsc_set_stiffness_matrix (Time): SUCCESS!') ; 
         endif 
 
         if(myrank.eq.0.and.verbose_bool)then

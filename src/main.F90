@@ -490,10 +490,12 @@ loop_step: do i_step=istep0,nstep
                                   errcode, errtag)
     !print*,myrank,'NSPLIT extload:',maxval(abs(extload))
   endif 
+  print*,'before:',maxval(abs(extload))
   if(iseqsource.and.eqsource_type.lt.3)then
     call compute_cmt_load(i_step,freq)
     !print*,myrank,'CMT extload:',maxval(abs(extload))
   endif
+  print*,'after:',maxval(abs(extload))
   ! electrical current prescribed at points
   if(isecurrent.and.i_step==1)then
     call compute_electrical_load(errcode,errtag)
