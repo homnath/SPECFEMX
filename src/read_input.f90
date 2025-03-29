@@ -45,7 +45,7 @@ character(len=250),intent(out) :: errtag
 logical,optional,intent(in) :: ispartmesh
 integer :: read_stat
 logical :: isfrom_partmesh
-character(len=250) :: line
+character(len=250) :: line !="Line initialized"
 character(len=60) :: lineword(9)
 character(len=800) ::tag
 character(len=80) :: strval,token
@@ -1553,11 +1553,7 @@ if(is_ICE)then
     stop
   endif
 
-
 endif
-
-
-
 
 ! Read material id
 fname=trim(data_path)//trim(idfile)//trim(ptail_inp)
@@ -1634,6 +1630,7 @@ do i=1,nmatblk
   ! filled
 
   lineword=""
+  line=''
   read(11,'(a)',iostat=ios)line
   read(line,*,iostat=ios)lineword
 
@@ -1698,7 +1695,7 @@ do i=1,nmatblk
     stop
   endif
 enddo
-
+close(11)
 !! Nondimensionalization is NOT fully implemented for plasticity
 !if(isplastic.and.devel_nondim)then
 !  write(*,'(a,a)')'WARNING: nondim=1 is NOT valid for plastic case!', &

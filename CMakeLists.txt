@@ -32,8 +32,8 @@ ENDIF()
 #  ADD compiler specific flags
 if(CMAKE_Fortran_COMPILER_ID MATCHES Intel)
     set(CMAKE_Fortran_FLAGS         "${CMAKE_Fortran_FLAGS} -xHOST -fpe0 -ftz -assume buffered_io -assume byterecl -align sequence -std08 -diag-disable 6477 -implicitnone -gen-interfaces -warn all -Wall")
-    set(CMAKE_Fortran_FLAGS_DEBUG   "-check all -debug -g -O0 -fp-stack-check -traceback -ftrapuv")
-    set(CMAKE_Fortran_FLAGS_RELEASE "-O3 -ip")
+    set(CMAKE_Fortran_FLAGS_DEBUG   "${CMAKE_Fortran_FLAGS_DEBUG} -check all -check uninit -debug -g -O0 -fp-stack-check -traceback -ftrapuv -fsanitize=memory")
+    set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O3 -ip")
 endif()
 
 if(CMAKE_Fortran_COMPILER_ID MATCHES GNU)
@@ -41,6 +41,10 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES GNU)
     set(CMAKE_Fortran_FLAGS_DEBUG   "-g -O0 -fbacktrace -fbounds-check -frange-check")
     set(CMAKE_Fortran_FLAGS_RELEASE "-O3 -finline-functions")
 endif()
+## Optionally, print flags to check if they are being applied correctly
+#message(STATUS "CMAKE_Fortran_FLAGS: ${CMAKE_Fortran_FLAGS}")
+#message(STATUS "CMAKE_Fortran_FLAGS_DEBUG: ${CMAKE_Fortran_FLAGS_DEBUG}")
+#message(STATUS "CMAKE_Fortran_FLAGS_RELEASE: ${CMAKE_Fortran_FLAGS_RELEASE}")
 
 # Test Fortran compiler
 TRY_COMPILE(TEST_F90 ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src/testf90.f90)
