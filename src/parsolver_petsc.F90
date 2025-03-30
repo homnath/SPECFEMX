@@ -785,8 +785,6 @@ CHKERRA(ierr)
 call sync_process 
 rval=1.0
 
-
-
 ! entirely in solid                                                              
 do i_elmt=1, nelmt       
 
@@ -794,7 +792,6 @@ do i_elmt=1, nelmt
   ielmt=i_elmt   
   ggdof_elmt=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))    
 
-  
   ! IF RUNNING SEA LEVEL SIMULATION WE NEED THIS - DONT DELETE!
   if(ISSL_DOF)then
     ! Reshape slightly
@@ -814,7 +811,6 @@ do i_elmt=1, nelmt
     do j=1,NEDOF                                                                 
     irow=i; jcol=j 
 
-
     if(ggdof_elmt(irow).ge.0.and.ggdof_elmt(jcol).ge.0)then                      
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       xval=storekmat(i,j,ielmt)                                                  
@@ -825,7 +821,6 @@ do i_elmt=1, nelmt
         stop                                                                     
       endif                           
             
-
       call MatSetValues(Amat, 1, ggdof_elmt(irow), 1, ggdof_elmt(jcol), storekmat(i,j,ielmt), ADD_VALUES, ierr)
       CHKERRA(ierr)                                                              
     endif 
@@ -833,8 +828,6 @@ do i_elmt=1, nelmt
     enddo                                                                        
   enddo   
 enddo    
-
-
 
 call MatAssemblyBegin(Amat,MAT_FINAL_ASSEMBLY,ierr)
 CHKERRA(ierr)
@@ -883,6 +876,8 @@ call VecDestroy(vdiag,ierr)
 end subroutine petsc_set_stiffness_matrix
 !===============================================================================
 
+! Stiffness matric for the frequency domain
+! K - \omega^2 M
 subroutine petsc_set_stiffness_matrix_freq(freq,scale_freq2,isscale_freq2)
 use math_library_mpi,only:sumscal
 use ieee_arithmetic
@@ -916,7 +911,7 @@ do i_elmt=1,nelmt
 
   kmat=storekmat(:,:,ielmt)                                                      
   if(steptype.eq.FREQSTEP)then
-    ! populate mdiag for all displacement DOFs.
+    ! populate mdiag with corresponding mass matrix for all displacement DOFs.
     i2=0
     do i_gll=1,ngll
       i1=i2+1
@@ -950,7 +945,8 @@ do i_elmt=1,nelmt
         flush(logunit)
         stop                                                                     
       endif                                                                     
-      PetscCallA(MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),storekmat(i,j,ielmt),ADD_VALUES,ierr))                                      
+      !PetscCallA(MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),storekmat(i,j,ielmt),ADD_VALUES,ierr))                                      
+      PetscCallA(MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),xval,ADD_VALUES,ierr))                                      
     endif                                                                        
     enddo                                                                        
   enddo                                                                          

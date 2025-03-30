@@ -96,7 +96,7 @@ integer            :: errcode
 character(len=250) :: errtag 
 logical            :: reuse_pc_bool,freq_bool  
 
-! Code: 
+! Frequency Domain
 if(steptype.eq.FREQSTEP)then
   ! For frequency-domain simulation, each frequency is indepedent of other.
   ! Therefore, the extload must be reset.
@@ -112,10 +112,11 @@ if(steptype.eq.FREQSTEP)then
   if(solver_type.eq.petsc_solver)then
     reuse_pc_bool=.false.
     freq_bool=.true.
-    call set_petsc_stiffness(isscale_ang_freq, &  
+    call set_petsc_stiffness_freq(isscale_ang_freq, &  
     ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)  
   endif
 
+! Time Domain
 else ! TIMESTEPPING
   ! If it is the first timestep we need the elastic stiffness matrix (storekmat)
   ! It should be constant so we dont need to change it
