@@ -805,8 +805,17 @@ do
     if(eqsource_type==0)then
       slipfile=get_string('slipfile',args,narg)
     elseif(eqsource_type==1)then
+      cmt_mapto='none' ! Default is NONE.
       cmtfile=get_string('cmtfile',args,narg)
-      cmt_mapto=get_string('mapto',args,narg)
+      call seek_string('mapto',strval,args,narg)
+      if (.not. isblank(strval))cmt_mapto=upcase(trim(strval))
+      if(cmt_mapto.ne.'GLOBE' .and. &
+         cmt_mapto.ne.'UTM' .and.   &
+         cmt_mapto.ne.'NONE')then
+         write(errtag,*)'ERROR: invalid option for cmt_mapto!'
+         return
+      endif 
+      !cmt_mapto=get_string('mapto',args,narg)
     elseif(eqsource_type==2)then
       faultfile=get_string('faultfile',args,narg)
       faultmetafile=get_string('faultmetafile',args,narg)

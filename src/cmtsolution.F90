@@ -609,7 +609,7 @@ print*,'testing'
       utmx(1)=long
       utmx(2)=lat
     else
-      write(errtag,*)'ERROR: number of CMT sources mismatch!'
+      write(errtag,*)'ERROR: unrecgonized cmt_mapto option!'
       return
     endif
     ! Nondimentionalize coordinates

@@ -5,11 +5,43 @@
 ! REVISION
 !  HNG, Jul 12,2011; HNG, Apr 09,2010
 ! TODO
-!  - 
+!  -
 module string_library
 use set_precision
 contains
 !-------------------------------------------------------------------------------
+
+! This function converts string to upper case.
+function upcase(str) result(upstr)
+character(len=*), intent(in) :: str
+character(len=len(str)) :: upstr
+integer :: i
+
+do i = 1, len(str)
+  if(iachar(str(i:i)) >= iachar('a') .and. iachar(str(i:i)) <= iachar('z'))then
+    upstr(i:i) = achar(iachar(str(i:i)) - 32)
+  else
+    upstr(i:i) = str(i:i)
+  end if
+end do
+end function upcase
+!===============================================================================
+
+! This function converts string to lower case.
+function lowcase(str) result(lowstr)
+character(len=*), intent(in) :: str
+character(len=len(str)) :: lowstr
+integer :: i
+
+do i = 1, len(str)
+  if(iachar(str(i:i)) >= iachar('A') .and. iachar(str(i:i)) <= iachar('Z'))then
+    lowstr(i:i) = achar(iachar(str(i:i)) + 32)
+  else
+    lowstr(i:i) = str(i:i)
+  end if
+end do
+end function lowcase
+!===============================================================================
 
 ! This function modified from specfem3d
 function count_word(str) result(nword)
@@ -286,7 +318,7 @@ stop
 end function get_string
 !===============================================================================
 
-! seek string value from string list which contain a character '=' that 
+! seek string value from string list which contain a character '=' that
 ! separates variable name and variable vlue
 subroutine seek_string(vname,strval,slist,nvar)
 character(len=*),intent(in) :: vname
