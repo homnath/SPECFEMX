@@ -523,7 +523,7 @@ nonlinear: do i_nliter=1,NL_MAXITER
   ! therefore, NOT u(t+1)=u(t)+du
   ! u contains both diaplacement and/or gravity
   ! displacement
-  if(isplastic)then
+  if(isplastic.or.steptype.eq.FREQSTEP)then
     u=du
   else
     u=u+du

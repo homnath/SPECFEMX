@@ -112,7 +112,7 @@ if(steptype.eq.FREQSTEP)then
   if(solver_type.eq.petsc_solver)then
     reuse_pc_bool=.false.
     freq_bool=.true.
-    call set_petsc_stiffness_freq(isscale_ang_freq, &  
+    call set_petsc_stiffness(isscale_ang_freq, &  
     ang_freq, scale_ang_freq2, reuse_pc_bool,freq_bool)  
   endif
 

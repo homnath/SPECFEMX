@@ -895,7 +895,7 @@ PetscScalar rval
 PetscReal  kmat(NEDOF,NEDOF),mdiag(NEDOFU)
 PetscScalar,pointer :: diag_array(:)                                             
                                                                                  
-real(kind=8) :: xval
+real(kind=8) :: xval(1)
 
 ! Set and assemble matrix.
 !  - Note that MatSetValues() uses 0-based row and column numbers
@@ -918,6 +918,7 @@ do i_elmt=1,nelmt
       i2=i2+NNDOFU
       mdiag(i1:i2) = storemmat(i_gll,ielmt)
     enddo
+    !if(myrank==0)print*,i_elmt,': ',mdiag
     !mdiag=storemmat(:,i_elmt)                                                    
     if(isscale_freq2)then                                                        
       kmat=scale_freq2*kmat                                                      
@@ -939,13 +940,13 @@ do i_elmt=1,nelmt
     !.and.storekmat_intact_ic(i,j,i_elmt).ne.0.0_kreal)then                      
       !xval=storekmat(i,j,ielmt)                                                  
       xval=kmat(i,j)                                                  
-      if(ieee_is_nan(xval).or. .not.ieee_is_finite(xval))then                    
+      if(ieee_is_nan(xval(1)).or. .not.ieee_is_finite(xval(1)))then                    
         write(logunit,*)'ERROR: stiffness matrix has nonfinite value/s!',myrank,ielmt,&
         mat_id(ielmt),xval,minval(abs(kmat)),maxval(abs(kmat))         
         flush(logunit)
         stop                                                                     
       endif                                                                     
-      !PetscCallA(MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),storekmat(i,j,ielmt),ADD_VALUES,ierr))                                      
+      !PetscCallA(MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),storekmat(i,j,ielmt),ADD_VALUES,ierr))
       PetscCallA(MatSetValues(Amat,1,ggdof_elmt(irow),1,ggdof_elmt(jcol),xval,ADD_VALUES,ierr))                                      
     endif                                                                        
     enddo                                                                        

@@ -154,7 +154,7 @@ real(kind=kreal):: maxnodalsl,minnodalsl, mass_imbalance
 ! placeholder array. holds values of gdof_elmt for a given element.
 
 ! Frequency
-logical :: isscale_ang_freq=.true.
+logical :: isscale_ang_freq=.false. !.true.
 real(kind=kreal) :: freq,ang_freq,scale_ang_freq2
 
 ! Viscoelastic parameters
@@ -490,12 +490,12 @@ loop_step: do i_step=istep0,nstep
                                   errcode, errtag)
     !print*,myrank,'NSPLIT extload:',maxval(abs(extload))
   endif 
-  print*,'before:',maxval(abs(extload))
+  print*,'before:',maxscal(maxval(abs(extload)))
   if(iseqsource.and.eqsource_type.lt.3)then
     call compute_cmt_load(i_step,freq)
     !print*,myrank,'CMT extload:',maxval(abs(extload))
   endif
-  print*,'after:',maxval(abs(extload))
+  print*,'after:',maxscal(maxval(abs(extload)))
   ! electrical current prescribed at points
   if(isecurrent.and.i_step==1)then
     call compute_electrical_load(errcode,errtag)
