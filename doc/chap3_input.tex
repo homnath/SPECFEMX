@@ -114,12 +114,19 @@ Only the following arguments under the specified line types are permitted.\\
 \texttt{\underline{eqsource:}}
 \begin{adescription}{nl\_maxiter}
   \item[type]: type of earthquake source [integer, optional, 0 = slip source, 1 = CMT source, 2 = Finite fault, 3 = Slip with split node, default $\Rightarrow$ 0].
-  \item[slipfile]: file name of slip information [string].
-  \item[cmtfile]: file name of CMT information [string].
-  \item[faultslipfile\_plus]: file name of fault slip information for plus side [string].
-  \item[faultslipfile\_minus]: file name of fault slip information for minus side [string].
-  \item[shalf]: switch to use equal,.i.e., half of the slip on each side of the fault [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0]. Only required for slip with split node.
-  \item[taper]: switch to taper the slip on the fault edge [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 1]. Only required for slip with split node.
+  \item[if type = 0: Slip source]
+  \item[  slipfile]: file name of slip information [string].
+  \item[if type = 1: CMTSOLUTION]
+  \item[  cmtfile]: file name of CMT information [string].
+  \item[  mapto]: file name of CMT information [string, optional, \texttt{\sq{GLOBE}} = iGlobal spherical coordinates, \texttt{\sq{UTM}} = UTM coordinates, \texttt{\sq{none}} = None, default $\Rightarrow$ \texttt{\sq{none}}].
+  \item[if type = 2: Finite fault]
+  \item[  faultfile]: file name for the fault information [string].
+  \item[  faultmetafile]: file name for the fault meta file [string].
+  \item[if type = 1: Slip with split node]
+  \item[  faultslipfile\_plus]: file name of fault slip information for plus side [string].
+  \item[  faultslipfile\_minus]: file name of fault slip information for minus side [string].
+  \item[  shalf]: switch to use equal,.i.e., half of the slip on each side of the fault [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0]. Only required for slip with split node.
+  \item[  taper]: switch to taper the slip on the fault edge [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 1]. Only required for slip with split node.
   \\
 \end{adescription}
 
@@ -207,10 +214,16 @@ Only the following arguments under the specified line types are permitted.\\
 \texttt{\underline{save:}}
 \begin{adescription}{porep}
   \item[disp]: displacement field [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[stress]: stress field [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[strain]: strain field [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[pstress]: principal stress field [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
   \item[model]: model properties [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
   \item[porep]: pore water pressure [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
-  \item[gpot]: gravitational or magnetic potential [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[gpot]: gravitational potential [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[mpot]: magnetic potential [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[epot]: electric potential [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
   \item[agrav]: gradient of potential, e.g., acceleration due to gravity [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[magb]: magnetic field, B [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
   \\
 \end{adescription}
 
