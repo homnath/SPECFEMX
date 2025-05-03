@@ -8,25 +8,25 @@ contains
 
 !#######################################################################
 subroutine write_cpu_timer(format_str, cpu_tstart,cpu_tend,telap)
-    ! Writes CPU time to log file for solver elapsed time
-    ! USES
-    use global 
-    use set_precision 
-    implicit none
-    ! IO 
-    real(kind=kreal) :: cpu_tstart,cpu_tend,telap
-    character(len=20) :: format_str
-    ! Local 
+! Writes CPU time to log file for solver elapsed time
+! USES
+use global 
+use set_precision 
+implicit none
+! IO 
+real(kind=kreal) :: cpu_tstart,cpu_tend,telap
+character(len=20) :: format_str
+! Local 
 
-    ! Code: 
+! Code: 
 
-    call cpu_time(cpu_tend)
-    telap=cpu_tend-cpu_tstart
-    if(myrank==0)then
-      write(format_str,*)ceiling(log10(real(telap)+1.))+5 
-      format_str='(a,1x,f'//trim(adjustl(format_str))//'.4)'
-      write(logunit,fmt=format_str)' Solver Elapsed Time:',telap
-    endif
+call cpu_time(cpu_tend)
+telap=cpu_tend-cpu_tstart
+if(myrank==0)then
+  write(format_str,*)ceiling(log10(real(telap)+1.))+5 
+  format_str='(a,1x,f'//trim(adjustl(format_str))//'.4)'
+  write(logunit,fmt=format_str)' Solver Elapsed Time:',telap
+endif
 
 end subroutine write_cpu_timer
 
@@ -56,52 +56,52 @@ use sparse_serial
 use solver
 use solver_petsc
 #endif
-    implicit none
-    
-    ! IO 
-    real(kind=kreal) :: scale_ang_freq2
-    integer :: ksp_iter, errcode, ksp_convreason
-    character(len=250) :: errtag 
-    logical :: isscale_ang_freq
+implicit none
+
+! IO 
+real(kind=kreal) :: scale_ang_freq2
+integer :: ksp_iter, errcode, ksp_convreason
+character(len=250) :: errtag 
+logical :: isscale_ang_freq
 
 
-    ! Code: 
-    if(solver_type.eq.builtin_solver)then
-        ! builtin solver
-        if(solver_diagscale)then
-          ! nondimensionlize load
-          resload=ndscale*resload
-          call ksp_cg_solver(neq,nelmt,storekmat,du,resload,     &
-          gdof_elmt,ksp_iter,errcode,errtag)
-          du=ndscale*du
-          call control_error(errcode,errtag,stdout)
-        else
-          ! pcg solver
-          call ksp_pcg_solver(neq,nelmt,storekmat,du,resload,    &
-          dprecon,gdof_elmt,ksp_iter,errcode,errtag)
-          call control_error(errcode,errtag,stdout)
-        endif
+! Code: 
+if(solver_type.eq.builtin_solver)then
+    ! builtin solver
+    if(solver_diagscale)then
+      ! nondimensionlize load
+      resload=ndscale*resload
+      call ksp_cg_solver(neq,nelmt,storekmat,du,resload,     &
+      gdof_elmt,ksp_iter,errcode,errtag)
+      du=ndscale*du
+      call control_error(errcode,errtag,stdout)
     else
-         ! petsc solver 
-        if(steptype.eq.FREQSTEP.and.isscale_ang_freq)then
-          resload=scale_ang_freq2*resload
-        endif
-  
-        
-        call petsc_set_vector(resload)
-        log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0
-
-        call sync_process()
-
-        !call petsc_print_vector()
-        !call petsc_print_matrix()
-
-        call petsc_solve(du(1:), ksp_iter, ksp_convreason)
-        log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0
-  
-        continue
-
+      ! pcg solver
+      call ksp_pcg_solver(neq,nelmt,storekmat,du,resload,    &
+      dprecon,gdof_elmt,ksp_iter,errcode,errtag)
+      call control_error(errcode,errtag,stdout)
     endif
+else
+     ! petsc solver 
+    if(steptype.eq.FREQSTEP.and.isscale_ang_freq)then
+      resload=scale_ang_freq2*resload
+    endif
+
+    
+    call petsc_set_vector(resload)
+    log_msg=trim(' petsc_set_vector: SUCCESS!');call write_ifproc0
+
+    call sync_process()
+
+    !call petsc_print_vector()
+    !call petsc_print_matrix()
+
+    call petsc_solve(du(1:), ksp_iter, ksp_convreason)
+    log_msg = trim(' petsc_solve: SUCCESS!') ; call write_ifproc0
+
+    continue
+
+endif
 end subroutine run_solver
 !#######################################################################
 
@@ -115,38 +115,38 @@ use math_library_mpi
 use math_library_serial
 #endif 
 
-  implicit none 
+implicit none 
 
-  ! IO 
-  integer,intent(in) :: i_nliter
-  real(kind=kreal),intent(in) :: maxu,maxdu
-  logical,intent(out) :: nl_isconv ! is there nonlinear convergence bool 
-  ! Local
-  real(kind=kreal) :: uerr
+! IO 
+integer,intent(in) :: i_nliter
+real(kind=kreal),intent(in) :: maxu,maxdu
+logical,intent(out) :: nl_isconv ! is there nonlinear convergence bool 
+! Local
+real(kind=kreal) :: uerr
 
-  ! Code: 
-    if(isplastic)then
-        uerr=maxscal(maxval(abs(u-olddu)))/maxu    
-        olddu=u
-    else
-        uerr=ZERO
-        if(maxu.eq.ZERO)then
-        uerr=one
-        else
-        uerr=maxdu/maxu
-        endif
-    endif
+! Code: 
+  if(isplastic)then
+      uerr=maxscal(maxval(abs(u-olddu)))/maxu    
+      olddu=u
+  else
+      uerr=ZERO
+      if(maxu.eq.ZERO)then
+      uerr=one
+      else
+      uerr=maxdu/maxu
+      endif
+  endif
 
 
-    nl_isconv=uerr.le.NL_TOL
-    if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROTOL)then 
-      nl_isconv=.true.
-    endif 
-    
-    if(myrank==0)then
-     write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',uerr,'maxu:',maxu
-     flush(logunit)
-    endif
+  nl_isconv=uerr.le.NL_TOL
+  if(i_nliter>1.and.maxscal(maxval(abs(resload))).le.ZEROTOL)then 
+    nl_isconv=.true.
+  endif 
+  
+  if(myrank==0)then
+   write(logunit,'(a,g0.6,1x,a,g0.6)')' UErr:',uerr,'maxu:',maxu
+   flush(logunit)
+  endif
 
 end subroutine check_convergence
 

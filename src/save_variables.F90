@@ -139,6 +139,7 @@ use global
 use postprocess
 use free_surface
 use math_constants
+use math_library,only:rquick_sort,stress_invariant
 use set_precision
 use nondimensionpar
 #if (USE_MPI)
@@ -151,11 +152,10 @@ implicit none
 ! IO variables
 integer,intent(in) :: i_step
 ! Local variables  
-integer :: i_comp
+integer :: i_comp,i_node
 
 real(kind=kreal):: dm 
-
-! CODE: 
+real(kind=kreal) :: dsbar,lode_theta,sigm
 
 ! plot displacement
 if(savedata%disp)then
@@ -176,9 +176,9 @@ if(savedata%disp)then
   endif
 endif
 
-
-! plot stress
-if(savedata%stress)then
+! stress and/or principal stress
+! First compute the nodal stress
+if(savedata%stress .or. savedata%psigma)then
   call compute_nodal_tensor(stress_elmt,stress_nodal)  
   if(nproc.gt.1)then
     call assemble_ghosts_nodal_vectorn(NST,stress_nodal,stress_nodal)
@@ -187,6 +187,9 @@ if(savedata%stress)then
   do i_comp=1,NST
     stress_nodal(i_comp,:)=stress_nodal(i_comp,:)/real(node_valency,kreal)
   enddo
+endif
+! Plot nodal stress.
+if(savedata%stress)then
   call write_vector_to_file(nnode,DIM_MOD*stress_nodal,&
   ext='sig',istep=i_step)
   ! On the free surface
@@ -200,10 +203,66 @@ if(savedata%stress)then
   endif
   ! Print confirmation
   if(myrank.eq.0.and.verbose_save_var)then
-    write(*,'(a,i6)')'  ✓ Saved stress for step ', i_step
+    write(*,'(a,i6)')'Saved stress for step ', i_step
     write(*,*)
   endif
 endif
+! Plot principal nodal stress.
+if(savedata%psigma)then
+  ! Compute pricipal stress from nodal stress.
+  pstress_nodal=ZERO
+  do i_node=1,nnode
+    call stress_invariant(stress_nodal(:,i_node),sigm,dsbar,lode_theta)
+    pstress_nodal(:,i_node)=sigm+TWO_THIRD*dsbar* &
+          sin((/ lode_theta-TWO_THIRD*PI,lode_theta,lode_theta+TWO_THIRD*PI /))
+    ! put in ascending order (compresson (-) as a major principal stress!)
+    pstress_nodal(:,i_node)=rquick_sort(pstress_nodal(:,i_node),3)
+  enddo
+
+  call write_vector_to_file(nnode,DIM_MOD*pstress_nodal,&
+  ext='psig',istep=i_step)
+  ! On the free surface
+  if(savedata%fsplot)then
+    call write_vector_to_file_freesurf(nnode_fs,DIM_MOD*pstress_nodal(:,gnode_fs),&
+    ext='psig',istep=i_step)
+  endif
+  if(savedata%fsplot_plane)then
+    call write_vector_to_file_freesurf(nnode_fs,DIM_MOD*pstress_nodal(:,gnode_fs),&
+    ext='psig',istep=i_step,plane=.true.)
+  endif
+  ! Print confirmation
+  if(myrank.eq.0.and.verbose_save_var)then
+    write(*,'(a,i6)')'Saved pricipal stress for step ', i_step
+    write(*,*)
+  endif
+endif
+!! plot stress
+!if(savedata%stress)then
+!  call compute_nodal_tensor(stress_elmt,stress_nodal)  
+!  if(nproc.gt.1)then
+!    call assemble_ghosts_nodal_vectorn(NST,stress_nodal,stress_nodal)
+!  endif
+!  ! compute average on the sharing nodes
+!  do i_comp=1,NST
+!    stress_nodal(i_comp,:)=stress_nodal(i_comp,:)/real(node_valency,kreal)
+!  enddo
+!  call write_vector_to_file(nnode,DIM_MOD*stress_nodal,&
+!  ext='sig',istep=i_step)
+!  ! On the free surface
+!  if(savedata%fsplot)then
+!    call write_vector_to_file_freesurf(nnode_fs,DIM_MOD*stress_nodal(:,gnode_fs),&
+!    ext='sig',istep=i_step)
+!  endif
+!  if(savedata%fsplot_plane)then
+!    call write_vector_to_file_freesurf(nnode_fs,DIM_MOD*stress_nodal(:,gnode_fs),&
+!    ext='sig',istep=i_step,plane=.true.)
+!  endif
+!  ! Print confirmation
+!  if(myrank.eq.0.and.verbose_save_var)then
+!    write(*,'(a,i6)')'  ✓ Saved stress for step ', i_step
+!    write(*,*)
+!  endif
+!endif
 
 ! plot strain
 if(savedata%strain)then

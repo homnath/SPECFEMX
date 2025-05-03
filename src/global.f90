@@ -379,6 +379,7 @@ real(kind=kreal), allocatable :: strain_elmt(:,:,:), &
                                  strain_nodal(:,:),  &
                                  stress_elmt(:,:,:), & 
                                  stress_nodal(:,:),  &
+                                 pstress_nodal(:,:),  &
                                  evpt(:,:,:)
 character(len=250) :: file_head,inp_path,out_path,part_path, SL_path
 ! displacement BC, ghost, traction, and water surface files

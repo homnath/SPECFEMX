@@ -30,10 +30,16 @@ if(ISDISP_DOF)then
   if(savedata%stress.or.isplastic)then
       allocate(stress_elmt(nst,ngll,nelmt),stress_nodal(nst,nnode))
       stress_elmt=ZERO
+      stress_nodal=ZERO
+  endif
+  if(savedata%psigma)then
+      allocate(pstress_nodal(NDIM,nnode))
+      pstress_nodal=ZERO
   endif
   if(savedata%strain)then
       allocate(strain_elmt(nst,ngll,nelmt),strain_nodal(nst,nnode))
       strain_elmt=ZERO
+      strain_nodal=ZERO
   endif
 endif
 
