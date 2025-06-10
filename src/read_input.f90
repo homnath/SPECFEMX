@@ -1187,11 +1187,6 @@ do
     cycle
   endif
   
-
-
-
-
-
   ! read development vaiables if any
   if (trim(token)=='devel:')then
 
@@ -1311,9 +1306,6 @@ else
   data_path=trim(inp_path)
 endif
 
-
-
-
 if(myrank==0)then
   write(logunit,'(a)')'reading mesh & material IDs...'
   flush(logunit)
@@ -1374,9 +1366,6 @@ if(iseqsource.and.eqsource_type.eq.3)then
     call recreate_faultslip_file(faultslipfile_minus)
   endif
 endif
-
-
-
 
 ! Read Sea Level file: 
 sl_read_ctr = 0 
@@ -1454,10 +1443,6 @@ if(is_SL)then
     endif 
   enddo 
 endif 
-
-
-
-
 
 ! Read ICE file: 
 ice_read_ctr = 0 
@@ -1643,7 +1628,6 @@ do i=1,nmatblk
   read(11,'(a)',iostat=ios)line
   read(line,*,iostat=ios)lineword
 
-
   imat=str2int(lineword(1))
 
   mat_domain(imat)=str2int(lineword(2))
@@ -1704,7 +1688,7 @@ do i=1,nmatblk
     stop
   endif
 enddo
-close(11)
+!close(11)
 !! Nondimensionalization is NOT fully implemented for plasticity
 !if(isplastic.and.devel_nondim)then
 !  write(*,'(a,a)')'WARNING: nondim=1 is NOT valid for plastic case!', &
@@ -1853,7 +1837,7 @@ if(POT_TYPE==PELECTRIC)then
 
     call first_token(line,token)
     if (trim(token)=='electrical_conductivity:')then
-      if(mag_stat==1)then
+      if(electric_stat==1)then
         write(errtag,*)'ERROR: copy of line type "electrical_conductivity:" not permitted!'
         return
       endif
@@ -1895,7 +1879,6 @@ if(POT_TYPE==PELECTRIC)then
     return
   endif
 endif
-
 ! read electrical charge information
 if(POT_TYPE==PCHARGE)then
   do i_line=1,NMAXLINE
@@ -1907,7 +1890,7 @@ if(POT_TYPE==PCHARGE)then
 
     call first_token(line,token)
     if (trim(token)=='charge_density:')then
-      if(mag_stat==1)then
+      if(charge_stat==1)then
         write(errtag,*)'ERROR: copy of line type "charge_density:" not permitted!'
         return
       endif
@@ -1934,6 +1917,7 @@ if(POT_TYPE==PCHARGE)then
     return
   endif
 endif
+close(11)
 
 ! infinite elements 
 if(infbc)then
@@ -1968,10 +1952,6 @@ do i=1,nmatblk
     !if(myrank==0)print*,'bulkmod & shearmod: ',bulkmod_blk(i),shearmod_blk(i)
   endif
 enddo
-
-
-
-
 
 errcode=0
 if(myrank==0)then

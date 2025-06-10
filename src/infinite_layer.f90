@@ -351,6 +351,10 @@ do i=1,nsnode
     write(errtag,*)'ERROR: reference infinite radius is smaller than the model!'
     return
   endif
+  if(abs(r1).eq.ZERO)then
+    write(errtag,*)'ERROR: infinite surface coincides with the pole!'
+    return
+  endif
   gaminf=r1/(rinf-r1)
   ! division formula
   mirxs(:,i)=((gaminf+one)*xs(:,i)-x0)/gaminf
