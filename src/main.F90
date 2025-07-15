@@ -490,12 +490,10 @@ loop_step: do i_step=istep0,nstep
                                   errcode, errtag)
     !print*,myrank,'NSPLIT extload:',maxval(abs(extload))
   endif 
-  print*,'before:',maxscal(maxval(abs(extload)))
   if(iseqsource.and.eqsource_type.lt.3)then
     call compute_cmt_load(i_step,freq)
     !print*,myrank,'CMT extload:',maxval(abs(extload))
   endif
-  print*,'after:',maxscal(maxval(abs(extload)))
   ! electrical current prescribed at points
   if(isecurrent.and.i_step==1)then
     call compute_electrical_load(errcode,errtag)
@@ -579,16 +577,15 @@ loop_step: do i_step=istep0,nstep
   if(ISDISP_DOF)then
     call save_displacement_variables(i_step)
     ! Benchmark calculation for elastic result
-    if(benchmark_okada .and. ISDISP_DOF)then
-      call compute_okada_solution()
-    endif
+    !if(benchmark_okada .and. ISDISP_DOF)then
+    !  call compute_okada_solution()
+    !endif
   endif
  
   if(isstation)then
     call compute_station(errcode,errtag)
     call write_station_files(step)
   endif
-
 
   ! Save potential variables to Ensight
   if(ISPOT_DOF)then

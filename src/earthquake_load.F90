@@ -28,6 +28,7 @@ use gll_library,only : gll_lagrange3d_point,zwgljd
 use cmtsolution
 use map_location
 use elastic,only:compute_cmat_elastic
+!use weakform,only:compute_bmat_stress
 #if (USE_MPI)
 use mpi_library
 use math_library_mpi
@@ -101,6 +102,8 @@ integer :: f_elmt,n_felmt
 real(kind=kreal),dimension(:,:),allocatable :: dshape_hex8
 real(kind=kreal),dimension(:),allocatable :: lagrange_gll
 real(kind=kreal),dimension(:,:),allocatable :: dlagrange_gll
+
+!real(kind=kreal) :: bmatu(NST,NEDOFU)
 
 real(kind=kreal) :: sload(0:lneq)
 
@@ -1259,7 +1262,7 @@ source: do i_src=1,nsource
     endif
   endif prange
   !print*,'try elements:',i_src,myrank,nelmt_srctry,count(iselmt) 
-
+  !print*,'TEST:',source_x,maxval(g_coord(1,:)),maxval(g_coord(2,:)),maxval(g_coord(3,:))
   n_felmt=0
   minerr=INFTOL
   ! Find the actual element that contains the source.
@@ -1383,6 +1386,7 @@ source: do i_src=1,nsource
                               lagrange_gll,dlagrange_gll)
 
     deriv=matmul(jac,dlagrange_gll) ! use der for gll
+    !call compute_bmat_stress(deriv,bmatu)
     !\nabla w
     derivmat=zero
     derivmat(1,1:nedofu:3)=deriv(1,:) !dNx/dx
@@ -1428,10 +1432,10 @@ source: do i_src=1,nsource
     endif
     !-------------------------------------------------------------------------
 
-    ! Compute/set full moemnt-tensor M
+    ! Compute/set full moment-tensor M.
     if(eqsource_type.eq.0 .or. eqsource_type.eq.2)then
       ! See the comment above for general relation
-      ! For C_ijkl n_k s_l or C:(n s) where (n s) is unsymmertic and hence has 
+      ! For C_ijkl n_k s_l or C:(n s) where (n s) is unsymmetric and hence has 
       ! 9 components, we need to modify cmat
       cmatU(1:nst,1:nst)=cmat
       cmatU(:,7)=cmat(:,4)
@@ -1450,8 +1454,16 @@ source: do i_src=1,nsource
       M(1,8)=M_V(5,1) !Mmat(3,2)
       M(1,9)=M_V(3,1) !Mmat(3,3)
     elseif(eqsource_type.eq.1.or.eqsource_type.eq.11)then
-      ! M is already know for this case
-      M(1,1:6)=M_cmt(:,i_src)
+      ! M is already known for this case
+      !M(1,1:6)=M_cmt(:,i_src)
+      M(1,1)=M_cmt(1,i_src) !Mmat(1,1)
+      M(1,2)=M_cmt(4,i_src) !Mmat(1,2)
+      M(1,3)=M_cmt(6,i_src) !Mmat(1,3)
+
+      M(1,4)=M_cmt(4,i_src) !Mmat(2,1)
+      M(1,5)=M_cmt(2,i_src) !Mmat(2,2)
+      M(1,6)=M_cmt(5,i_src) !Mmat(2,3)
+
       M(1,7)=M_cmt(6,i_src) !Mmat(3,1)
       M(1,8)=M_cmt(5,i_src) !Mmat(3,2)
       M(1,9)=M_cmt(3,i_src) !Mmat(3,3)
@@ -1461,6 +1473,7 @@ source: do i_src=1,nsource
     endif
     ! compute M:\nabla w
     fload=matmul(M,derivmat)
+    !fload=matmul(transpose(bmatu),M_cmt)
     sload(egdofu)=sload(egdofu)+fload(1,:)
     !exit element ! this will place the source in only one element
   endif !(myrank==src_inrank)

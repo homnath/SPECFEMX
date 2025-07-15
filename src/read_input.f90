@@ -1367,6 +1367,15 @@ if(iseqsource.and.eqsource_type.eq.3)then
   endif
 endif
 
+! Make sure the Okada benchmark is currently implemented only for slip source.
+if(benchmark_okada)then
+  if(.not.(iseqsource.and.eqsource_type==0))then
+   write(*,*)'WARNING: Okada benchmark is currently implemented ONLY for slip &
+   &source (eqsource: type=0)!'
+   benchmark_okada=.false.
+  endif
+endif
+
 ! Read Sea Level file: 
 sl_read_ctr = 0 
 if(is_SL)then 

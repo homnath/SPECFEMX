@@ -11,6 +11,7 @@ implicit none
 
 ! Local variables
 integer :: istat 
+
 allocate(gdof(nndof,nnode),gdof_elmt(nedof,nelmt),stat=istat)
 if (istat/=0)then
     write(*,*)'ERROR: cannot allocate memory!'
@@ -112,12 +113,15 @@ allocate(load(0:neq),bodyload(0:neq),selfload(0:neq),viscoload(0:neq), &
 resload(0:neq),du(0:neq),u(0:neq),olddu(0:neq),                   &
 slipload(0:neq),extload(0:neq),rhoload(0:neq),ubcload(0:neq),          &
 iceload(0:neq), stat=istat)
-if(iseqsource)allocate(eqload0(0:neq))
-call check_allocate(istat,errsrc)
 if(istat/=0)then
   write(logunit,*)'ERROR: cannot allocate memory!',istat
   flush(logunit)
   stop
+endif
+if(iseqsource)then
+  allocate(eqload0(0:neq),stat=istat)
+  call check_allocate(istat,errsrc)
+  eqload0 = ZERO
 endif
 
 ! Initialise more loads and u vector
@@ -132,7 +136,6 @@ ubcload   = ZERO
 load      = ZERO
 u         = ZERO
 extload   = ZERO
-if(iseqsource)eqload0   = ZERO
 rhoload   = ZERO
 
 if(ISSL_DOF)then

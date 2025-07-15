@@ -7,8 +7,8 @@ contains
 !_______________________________________________________________________________
 subroutine count_elmts( errcode ) 
 
-  ! Subroutine used to loop through the elements and determine how many
-  ! are viscoelastic vs elastic
+! Subroutine used to loop through the elements and determine how many
+! are viscoelastic vs elastic
   
   
 use global ! uses mat_domain, nelmt mat_id and DOMAIN variables
@@ -33,11 +33,11 @@ integer :: min_nelmt_viscoelas
 integer :: errcode
 
 
-! count elastic and viscoelastic elements
+! Count elastic and viscoelastic elements
 nelmt_elas=0; nelmt_viscoelas=0
 do i_elmt=1,nelmt
   mdomain=mat_domain(mat_id(i_elmt))
-  ! infinite elements included in elastic domain
+  ! Infinite elements included in elastic domain
   if(mdomain==ELASTIC_DOMAIN .or.  &
     mdomain==ELASTIC_TRINFDOMAIN .or.  &
     mdomain==ELASTIC_INFDOMAIN)then

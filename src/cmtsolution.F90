@@ -164,6 +164,7 @@ endif
 allocate(isrc_located(ncmt_source))
 isrc_located=0
 nsrc=0
+! Loop through the CMT sources
 src:do i_src=1,ncmt_source
   istshift=.false.
   ishdur=.false.
@@ -176,7 +177,7 @@ src:do i_src=1,ncmt_source
   ismrt=.false.
   ismrp=.false.
   ismtp=.false.
-print*,'testing'
+  ! Loop through lines of each CMT source
   do i_line=1,nline_cmtsolution
     read(11,'(a)',iostat=ios)line ! This will read a line and proceed to next line
     if (ios/=0)exit src
@@ -629,7 +630,6 @@ print*,'testing'
     ! nondimensionalized. Therefore, the passing coordinates must also be
     ! nondimensionalizaed.
     call free_surface_elevation(utmx,elevation,isrc_located(i_src))
-
     source_coord(3,i_src)=elevation-depth
     !print*,depth,source_coord(3,i_src)  
     !iface=0

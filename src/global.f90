@@ -323,6 +323,7 @@ integer,parameter :: nmaxwell=1
 integer :: nmatblk_viscoelas
 integer,allocatable :: imat_to_imatve(:),imatve_to_imat(:)
 real(kind=kreal),allocatable :: muratio_blk(:,:),viscosity_blk(:,:)
+real(kind=kreal),allocatable :: muratio_elmt(:,:,:),viscosity_elmt(:,:,:)
 
 integer :: nmatblk_magnet
 integer,allocatable :: imat_to_imatmag(:),imatmag_to_imat(:)
@@ -363,12 +364,12 @@ real(kind=kreal) :: eqkx,eqky,eqkz
 
 ! Number of unique stress components. Stress tensor is symmetric and its
 ! components are in order:
-! 1: sxx
-! 2: syy
-! 3: szz
-! 4: sxy
-! 5: syz
-! 6: szx
+! 1: \sigma_{xx}
+! 2: \sigma_{yy}
+! 3: \sigma_{zz}
+! 4: \sigma_{xy}
+! 5: \sigma_{yz}
+! 6: \sigma_{zx}
 ! First three components are axial components. Last three components are
 ! shear components.
 integer,parameter :: NST=6

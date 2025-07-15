@@ -22,7 +22,8 @@ use global,only:myrank,NDIM,ngll,nelmt,ISDISP_DOF,ISPOT_DOF, &
                 POT_TYPE,PGRAVITY,PMAGNETIC,PELECTRIC,PCHARGE, &
                 isbulkmod,isshearmod,ismassdens, &
                 ismagnetization,iselectric,ischarge, &
-                bulkmod_elmt,shearmod_elmt,massdens_elmt,magnetization_elmt,&
+                bulkmod_elmt,shearmod_elmt,massdens_elmt,nmatblk_viscoelas, &
+                magnetization_elmt,&
                 econductivity1_elmt,econductivity2_elmt,econductivity3_elmt, &
                 econalpha_elmt,econbeta_elmt,econgamma_elmt, &
                 econductivity_aniso, &
@@ -48,6 +49,10 @@ if(ISDISP_DOF)then
   allocate(bulkmod_elmt(ngll,nelmt),shearmod_elmt(ngll,nelmt))
   bulkmod_elmt=ZERO
   shearmod_elmt=ZERO
+  ! Viscoelastic
+  if(nmatblk_viscoelas>0)then
+  !allocate(viscosity_elmt(ngll,nelmt,:)
+  endif
 endif
 
 ! Mass density
