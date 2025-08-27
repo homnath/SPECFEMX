@@ -1,0 +1,39 @@
+#pre information
+preinfo: nproc=12, method='sem', ngllx=3, nglly=3, ngllz=3, nenode=8, ngnode=8, &
+inp_path='./input', part_path='./partition', out_path='./output', disp_dof=0, pot_dof=1, pot_type='electric'
+
+#mesh information
+mesh: xfile='fariasmesh1refined_coord_x', yfile='fariasmesh1refined_coord_y', zfile='fariasmesh1refined_coord_z', &
+confile='fariasmesh1refined_connectivity', idfile='fariasmesh1refined_material_id', gfile='fariasmesh1refined_proc12_ghost', fsfile='fariasmesh1refined_infinite_surface'
+
+#boundary conditions
+bc: ubc=0, &
+    uxfile='fariasmesh1refined_ssbcux', &
+    uyfile='fariasmesh1refined_ssbcuy', &
+    uzfile='fariasmesh1refined_ssbcuz', &
+    phifile='fariasmesh1refined_ssbcphi', &
+    infbc=1, &
+      add_infmesh=1, &
+      infrfile='fariasmesh1refined_infinite_surface', &
+      mat_type='define', &
+      imat_inf=3, &
+      pole0='user', &
+      coord0=0.0000 0.0000 0.0000, &
+      pole_type='point', &
+      rinf=50.0, &
+      valinf=0, &
+
+# electrical current
+ecurrent: ecfile='fariasmesh1refined_electrical_current'
+
+#material list
+material: matfile='fariasmesh1refined_material_list',density=1
+
+#control parameters
+control: ksp_tol=1e-7, ksp_maxiter=20000
+
+#save data
+save: cell=1, epot=1
+
+#devel
+devel: nondim=0
