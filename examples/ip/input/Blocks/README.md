@@ -1,1 +1,1 @@
-Single-block example
+Single and multi-block examples
