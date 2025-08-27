@@ -1,4 +1,16 @@
 ! This module contains routines for Okada analytical solution 
+module okada_vars
+use set_precision    
+implicit none
+real(kind=kreal) :: alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
+real(kind=kreal) :: p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3, &
+             uy,vy,wy,uz,vz,wz
+real(kind=kreal) :: xi2,et2,q2,y,d,tt,alx,ale,x11,y11,x32,y32, &
+                ey,ez,fy,fz,gy,gz,hy,hz
+
+end module okada_vars
+!-------------------------------------------------------------------------------
+
 module okada_solution
 use set_precision    
 contains
@@ -6,11 +18,12 @@ contains
 
 subroutine dc3d0(alpha,x,y,z,depth,dip,pot1,pot2,pot3,pot4,                   &
                  ux,uy,uz,uxx,uyx,uzx,uxy,uyy,uzy,uxz,uyz,uzz,iret)
+use okada_vars,only:r
 implicit none
 integer :: iret
 real(kind=kreal) :: aalpha,dd,ddip,du,dua(12),dub(12),duc(12),pp1,pp2,pp3,pp4, &
-r,xx,yy,zz
-real(kind=kreal) :: dummy(8),u(12)
+xx,yy,zz
+real(kind=kreal) :: u(12)
 real(kind=kreal) :: alpha,x,y,z,depth,dip,pot1,pot2,pot3,pot4,                 &
 ux,uy,uz,uxx,uyx,uzx,uxy,uyy,uzy,uxz,uyz,uzz
 integer :: i
@@ -46,7 +59,7 @@ real(kind=kreal),parameter :: f0=0.d0
 !*****               :   =1....singular
 !*****               :   =2....positive z was given
 !
-common /c1/dummy,r
+!common /c1/r
 !-----
 iret=0
 if(z.gt.0.) then
@@ -147,14 +160,14 @@ end subroutine  dc3d0
 !===============================================================================
 
 subroutine ua0(x,y,d,pot1,pot2,pot3,pot4,u)
+use okada_vars,only:alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d, &
+                    p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3,     &
+                    uy,vy,wy,uz,vz,wz
 implicit none
 ! implicit real*8 (a-h,o-z)
 real(kind=kreal),intent(in) :: x,y,d,pot1,pot2,pot3,pot4
 real(kind=kreal),intent(out) :: u(12)
 real(kind=kreal) :: du(12)
-real(kind=kreal) :: alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-real(kind=kreal) :: p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3,            &
-             uy,vy,wy,uz,vz,wz
 real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f3=3.d0
 real(kind=kreal),parameter :: pi2=6.283185307179586d0
 
@@ -171,9 +184,6 @@ integer :: i
 !***** output
 !*****   u(12) : displacement and their derivatives
 !
-common /c0/alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-common /c1/p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3,            &
-       uy,vy,wy,uz,vz,wz
 !-----
 u=f0
 !======================================
@@ -261,6 +271,9 @@ end subroutine ua0
 !===============================================================================
 
 subroutine  ub0(x,y,d,z,pot1,pot2,pot3,pot4,u)
+use okada_vars,only:alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d, &
+                    p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3,     &
+                    uy,vy,wy,uz,vz,wz
 implicit none
 !implicit real*8 (a-h,o-z)
 real(kind=kreal),intent(in) :: x,y,d,z,pot1,pot2,pot3,pot4
@@ -268,18 +281,11 @@ real(kind=kreal),intent(out) :: u(12)
 
 integer :: i
 real(kind=kreal) :: du(12)
-real(kind=kreal) :: alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-real(kind=kreal) :: p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3,         &
-uy,vy,wy,uz,vz,wz
 real(kind=kreal) :: c,rd,d12,d32,d33,d53,d54,fi1,fi2,fi3,fi4,fi5,fj1,fj2,fj3,  &
 fj4,fk1,fk2,fk3
 real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f2=2.d0,f3=3.d0,f4=4.d0,f5=5.d0, &
 f8=8.d0,f9=9.d0
 real(kind=kreal),parameter :: pi2=6.283185307179586d0
-      
-common /c0/alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-common /c1/p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3,            &
-       uy,vy,wy,uz,vz,wz
 !
 !********************************************************************
 !*****    displacement and strain at depth (part-b)             *****
@@ -400,6 +406,8 @@ end subroutine  ub0
 !===============================================================================
 
 subroutine uc0(x,y,d,z,pot1,pot2,pot3,pot4,u)
+use okada_vars,only : alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d, &
+                      p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3
 implicit none
 ! implicit real*8 (a-h,o-z)
 real(kind=kreal),intent(in) :: x,y,d,z,pot1,pot2,pot3,pot4
@@ -407,8 +415,6 @@ real(kind=kreal),intent(out) :: u(12)
 
 integer :: i
 real(kind=kreal) :: du(12)
-real(kind=kreal) :: alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-real(kind=kreal) :: p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3
 real(kind=kreal) :: a7,b5,b7,c,c5,c7,d7,dr5,q2,qr5,qr7,r7
 real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f2=2.d0,f3=3.d0,f5=5.d0,f7=7.d0,     &
                           f10=10.d0,f15=15.d0
@@ -425,8 +431,6 @@ real(kind=kreal),parameter :: pi2=6.283185307179586d0
 !***** output
 !*****   u(12) : displacement and their derivatives
 !
-common /c0/alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-common /c1/p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3
 !-----
 c=d+z
 q2=q*q
@@ -538,6 +542,7 @@ end subroutine  uc0
 subroutine dc3d(alpha,x,y,z,depth,dip,                           &
                 al1,al2,aw1,aw2,disl1,disl2,disl3,               &
                 ux,uy,uz,uxx,uyx,uzx,uxy,uyy,uzy,uxz,uyz,uzz,iret)
+use okada_vars,only : sd,cd
 implicit none 
 integer :: iret
 real(kind=kreal) :: alpha,x,y,z,depth,dip,al1,al2,aw1,aw2,disl1,disl2,disl3,   &
@@ -545,8 +550,8 @@ real(kind=kreal) :: alpha,x,y,z,depth,dip,al1,al2,aw1,aw2,disl1,disl2,disl3,   &
 
 integer :: i,j,k
 integer :: kxi(2),ket(2)
-real(kind=kreal) :: aalpha,cd,d,ddip,dd1,dd2,dd3,q,r12,r21,r22,sd,zz,p
-real(kind=kreal) :: dummy(5),xi(2),et(2)
+real(kind=kreal) :: aalpha,d,ddip,dd1,dd2,dd3,q,r12,r21,r22,zz,p
+real(kind=kreal) :: xi(2),et(2)
 real(kind=kreal) :: u(12),du(12),dua(12),dub(12),duc(12)
 real(kind=kreal),parameter :: f0=0.d0,eps=1.d-6
 
@@ -577,7 +582,6 @@ real(kind=kreal),parameter :: f0=0.d0,eps=1.d-6
 !*****               :   =0....normal
 !*****               :   =1....singular
 !*****               :   =2....positive z was given
-common /c0/dummy,sd,cd
 !-----
 iret=0
 if(z.gt.0.) then
@@ -780,6 +784,9 @@ end subroutine  dc3d
 !===============================================================================
 
 subroutine ua(xi,et,q,disl1,disl2,disl3,u)
+use okada_vars,only : alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d, &
+                      xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,  &
+                      ey,ez,fy,fz,gy,gz,hy,hz
 implicit none
 ! implicit real*8 (a-h,o-z)
 real(kind=kreal) :: xi,et,q,disl1,disl2,disl3
@@ -787,9 +794,6 @@ real(kind=kreal) :: u(12)
 
 integer :: i
 real(kind=kreal) :: du(12)
-real(kind=kreal) :: alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-real(kind=kreal) :: xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,         &
-                ey,ez,fy,fz,gy,gz,hy,hz
 real(kind=kreal) :: qx,qy,xy
 real(kind=kreal),parameter :: f0=0.d0,f2=2.d0,pi2=6.283185307179586d0
 !
@@ -804,9 +808,6 @@ real(kind=kreal),parameter :: f0=0.d0,f2=2.d0,pi2=6.283185307179586d0
 !***** output
 !*****   u(12) : displacement and their derivatives
 !
-common /c0/alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-common /c2/xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,         &
-          ey,ez,fy,fz,gy,gz,hy,hz
 !-----
 u=f0
 xy=xi*y11
@@ -877,6 +878,9 @@ end subroutine  ua
 !===============================================================================
 
 subroutine ub(xi,et,q,disl1,disl2,disl3,u)
+use okada_vars,only : alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d, &
+                      xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,  &
+                      ey,ez,fy,fz,gy,gz,hy,hz
 implicit none
 !implicit real*8 (a-h,o-z)
 real(kind=kreal) :: xi,et,q,disl1,disl2,disl3
@@ -884,9 +888,6 @@ real(kind=kreal) :: u(12)
 
 integer :: i
 real(kind=kreal) :: du(12)
-real(kind=kreal) :: alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-real(kind=kreal) :: xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,         &
-                ey,ez,fy,fz,gy,gz,hy,hz
 real(kind=kreal) :: ai1,ai2,ai3,ai4,aj1,aj2,aj3,aj4,aj5,aj6,ak1,ak2,ak3,ak4,               &
 d11,rd,rd2,x,xy,qx,qy 
 real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f2=2.d0,pi2=6.283185307179586d0
@@ -902,9 +903,6 @@ real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f2=2.d0,pi2=6.283185307179586d0
 !***** output
 !*****   u(12) : displacement and their derivatives
 !
-common /c0/alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-common /c2/xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,         &
-          ey,ez,fy,fz,gy,gz,hy,hz
 !-----
 rd=r+d
 d11=f1/(r*rd)
@@ -1009,6 +1007,9 @@ end subroutine  ub
 !===============================================================================
 
 subroutine uc(xi,et,q,z,disl1,disl2,disl3,u)
+use okada_vars,only : alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d, &
+                      xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,  &
+                      ey,ez,fy,fz,gy,gz,hy,hz
 implicit none
 !implicit real*8 (a-h,o-z)
 real(kind=kreal) :: xi,et,q,z,disl1,disl2,disl3
@@ -1016,9 +1017,6 @@ real(kind=kreal) :: u(12)
 
 integer :: i
 real(kind=kreal) :: du(12)
-real(kind=kreal) :: alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-real(kind=kreal) :: xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,         &
-                ey,ez,fy,fz,gy,gz,hy,hz
 real(kind=kreal) :: c,cdr,cqx,h,ppy,ppz,qq,qqy,qqz,qr,qx,qy,x53,xy,y0,y53,yy0,z0,  &
                 z32,z53 
 real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f2=2.d0,f3=3.d0,pi2=6.283185307179586d0
@@ -1034,9 +1032,6 @@ real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f2=2.d0,f3=3.d0,pi2=6.283185307179
 !***** output
 !*****   u(12) : displacement and their derivatives
 !
-common /c0/alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
-common /c2/xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,         &
-          ey,ez,fy,fz,gy,gz,hy,hz
 !-----
 c=d+z
 x53=(8.d0*r2+9.d0*r*xi+f3*xi2)*x11*x11*x11/r2
@@ -1130,10 +1125,10 @@ end subroutine  uc
 !===============================================================================
 
 subroutine dccon0(alpha,dip)
+use okada_vars,only : alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
 implicit none
 real(kind=kreal) :: alpha,dip
 
-real(kind=kreal) :: alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
 real(kind=kreal) :: p18
 real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f2=2.d0,pi2=6.283185307179586d0
 real(kind=kreal),parameter :: eps=1.d-6
@@ -1148,7 +1143,6 @@ real(kind=kreal),parameter :: eps=1.d-6
 !*****   dip   : dip-angle (degree)
 !### caution ### if cos(dip) is sufficiently small, it is set to zero
 !
-common /c0/alp1,alp2,alp3,alp4,alp5,sd,cd,sdsd,cdcd,sdcd,s2d,c2d
 !-----
 alp1=(f1-alpha)/f2
 alp2= alpha/f2
@@ -1174,13 +1168,13 @@ end subroutine  dccon0
 !===============================================================================
 
 subroutine dccon1(x,y,d)
+use okada_vars,only : sd,cd, &
+                      p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3, &
+                      uy,vy,wy,uz,vz,wz
 implicit none 
 !implicit real*8 (a-h,o-z)
 real(kind=kreal) :: x,y,d
 
-real(kind=kreal) :: dummy(5),sd,cd
-real(kind=kreal) :: p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3,            &
-                uy,vy,wy,uz,vz,wz
 real(kind=kreal) :: r7
 real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f3=3.d0,f5=5.d0,eps=1.d-6
 !
@@ -1192,9 +1186,6 @@ real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f3=3.d0,f5=5.d0,eps=1.d-6
 !*****   x,y,d : station coordinates in fault system
 !### caution ### if x,y,d are sufficiently small, they are set to zero
 !
-common /c0/dummy,sd,cd
-common /c1/p,q,s,t,xy,x2,y2,d2,r,r2,r3,r5,qr,qrx,a3,a5,b3,c3,            &
-          uy,vy,wy,uz,vz,wz
 !-----
 if(dabs(x).lt.eps) x=f0
 if(dabs(y).lt.eps) y=f0
@@ -1233,12 +1224,12 @@ end subroutine  dccon1
 !===============================================================================
 
 subroutine dccon2(xi,et,q,sd,cd,kxi,ket)
+use okada_vars,only : xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,    &
+                      ey,ez,fy,fz,gy,gz,hy,hz
 implicit none
 !implicit real*8 (a-h,o-z)
 real(kind=kreal) :: xi,et,q,sd,cd
 integer :: kxi,ket
-real(kind=kreal) :: xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,         &
-                ey,ez,fy,fz,gy,gz,hy,hz
 real(kind=kreal) :: ret,rxi 
 real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f2=2.d0,eps=1.d-6
 !
@@ -1253,8 +1244,6 @@ real(kind=kreal),parameter :: f0=0.d0,f1=1.d0,f2=2.d0,eps=1.d-6
 !
 !### caution ### if xi,et,q are sufficiently small, they are set to zer0
 !
-common /c2/xi2,et2,q2,r,r2,r3,r5,y,d,tt,alx,ale,x11,y11,x32,y32,         &
-          ey,ez,fy,fz,gy,gz,hy,hz
 !-----
 if(dabs(xi).lt.eps) xi=f0
 if(dabs(et).lt.eps) et=f0

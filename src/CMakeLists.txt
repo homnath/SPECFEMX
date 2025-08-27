@@ -21,10 +21,7 @@
 #   If in parallel build, then 'both' library depends on sem and parsem 
 #   If in serial   build, then 'both' library depends on sem and serial 
 
-project(specfemx 
-        VERSION 
-        1.0
-        )
+project(specfemx VERSION 1.0 LANGUAGES Fortran)
 
 # Source files for sem library
 SET(srcsem
@@ -211,8 +208,6 @@ ENDIF(ISPARALLEL)
 
 # ------------------------ END SPECFEM ------------------------
 
-
-
 # Build specfemx
 #TARGET_LINK_LIBRARIES(specfem ${semall})
 #SET_TARGET_PROPERTIES(specfem PROPERTIES LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
@@ -242,9 +237,6 @@ IF(USE_PETSC)
   TARGET_INCLUDE_DIRECTORIES(both PUBLIC "${PETSC_DIR}/include" "${PETSC_ARCH}/include")
   TARGET_LINK_LIBRARIES(both ${PETSC_ARCH}/lib/libpetsc.so)
 ENDIF(USE_PETSC)
-
-
-
 
 # Build partmesh program
 # partmesh program partitions the mesh for the parallel processing
