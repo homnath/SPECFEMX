@@ -1,1 +1,1 @@
-Single and multi-blocks models
+Single-block example
