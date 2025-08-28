@@ -75,10 +75,12 @@ use matrix_vector
 #if (USE_MPI)
 use parsolver
 use mpi_library
+#if (USE_PETSC)
 #if (USE_COMPLEX)
 use parsolver_petsc_complex
 #else
 use parsolver_petsc
+#endif
 #endif
 #else
 use sparse_serial

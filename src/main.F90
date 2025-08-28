@@ -44,10 +44,12 @@ use ghost_library_mpi
 use math_library_mpi
 use sparse
 use parsolver
+#if (USE_PETSC)
 #if (USE_COMPLEX)
 use parsolver_petsc_complex
 #else
 use parsolver_petsc
+#endif
 #endif
 #else
 use serial_library
