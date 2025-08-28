@@ -145,7 +145,7 @@ SET(srcboth
 # Compiler preprocessor directives
 # Set the property of the srcboth variable so that it uses MPI??? 
 IF(ISPARALLEL)
-  SET_PROPERTY(SOURCE ${srcboth} PROPERTY COMPILE_DEFINITIONS USE_MPI)
+  SET_PROPERTY(SOURCE ${srcboth} PROPERTY COMPILE_DEFINITIONS USE_MPI USE_PETSC)
   #SET_PROPERTY(SOURCE ${srcboth} PROPERTY INCLUDE_DIRECTORIES ${MPI_Fortran_INCLUDE_PATH})
 ENDIF(ISPARALLEL)
 
