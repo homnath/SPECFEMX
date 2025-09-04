@@ -356,8 +356,8 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
     imat=mat_id(ielmt)
     imatve=imat_to_imatve(imat)
 
-    muratio=muratio_blk(:,imatve)
-    tratio=dt/relaxtime(:,imatve)
+    !muratio=muratio_blk(:,imatve)
+    !tratio=dt/relaxtime(:,imatve)
     num=g_num(:,ielmt)
     egdofu=gdof_elmt(edofu,ielmt)
     eld=reshape(nodalu(:,g_num(:,ielmt)),(/nedofu/))
@@ -365,6 +365,8 @@ subroutine visco_stressstrain(nl_iter, nl_isconv, vesigma,  &
     do i_gll=1,ngll ! integration loop
       K=bulkmod_elmt(i_gll,ielmt) 
       G=shearmod_elmt(i_gll,ielmt)
+      muratio=muratio_elmt(:,i_gll,i_elmt)
+      tratio=dt/relaxtime_elmt(:,i_gll,i_elmt)
  
       deriv=storederiv(:,:,i_gll,ielmt)
       jacw=storejw(i_gll,ielmt)

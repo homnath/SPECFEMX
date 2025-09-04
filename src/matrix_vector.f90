@@ -641,12 +641,13 @@ module matrix_vector
     use global,only:myrank,NDIM,nst,ngll,nedof,nedofu,nedofphi,nenode,ngnode,      &
     ngllx,nglly,ngllz,ngll,g_coord,gdof_elmt,g_num,mat_domain,mat_id,massdens_elmt,&
     bulkmod_elmt,shearmod_elmt,rho_blk,ym_blk,imat_to_imatve, &
+    muratio_elmt,relaxtime_elmt, &
     ISDISP_DOF,ISPOT_DOF,storederiv,        &
     POT_TYPE,PGRAVITY,PMAGNETIC,    &
     storejw,devel_nondim,isdxval,isdyval,isdzval, &
     edofu,edofphi,grav0_nodal,dgrav0_elmt,ISGRAV0, &
     muratio_blk,visco_model,VISCO_MAXWELL,VISCO_ZENER,VISCO_GENMAXWELL,nmaxwell
-    use global,only:nelmt_viscoelas,eid_viscoelas,relaxtime,storekmat
+    use global,only:nelmt_viscoelas,eid_viscoelas,relaxtime_elmt,storekmat
     use element,only:hex8_gnode
     use viscoelastic,only:compute_cmat_maxwell,compute_cmat_zener, &
     compute_cmat_genmaxwell
@@ -660,7 +661,7 @@ module matrix_vector
     real(kind=kreal),intent(in) :: dt
     integer,intent(out) :: errcode
     character(len=250),intent(out) :: errtag
-    integer :: i
+    integer :: i_gll
     integer :: i_elmt,ielmt,imat
     integer :: imatve,mdomain
     integer :: num(nenode)
@@ -699,21 +700,25 @@ module matrix_vector
       ielmt=eid_viscoelas(i_elmt)
       imat=mat_id(ielmt)
       imatve=imat_to_imatve(imat)
-      muratio=muratio_blk(:,imatve)
-      ! For a more gneneral case tratio can also be variable within an element
-      tratio=dt/relaxtime(:,imatve)
+      !muratio=muratio_blk(:,imatve)
+      !! For a more gneneral case tratio can also be variable within an element
+      !tratio=dt/relaxtime(:,imatve)
       
       kmatu=zero
-      do i=1,ngll
-        deriv=storederiv(:,:,i,ielmt)
-        jacw=storejw(i,ielmt)
+      do i_gll=1,ngll
+        muratio=muratio_elmt(:,i_gll,ielmt)
+        ! For a more gneneral case tratio can also be variable within an element
+        tratio=dt/relaxtime_elmt(:,i_gll,ielmt)
+        
+        deriv=storederiv(:,:,i_gll,ielmt)
+        jacw=storejw(i_gll,ielmt)
        
-        call compute_cmat_genmaxwell(bulkmod_elmt(i,ielmt),shearmod_elmt(i,ielmt),&
+        call compute_cmat_genmaxwell(bulkmod_elmt(i_gll,ielmt),shearmod_elmt(i_gll,ielmt),&
         tratio,muratio,cmat)
     
         call compute_bmat_stress(deriv,bmatu)
         kmatu=kmatu+matmul(matmul(transpose(bmatu),cmat),bmatu)*jacw
-      enddo !i
+      enddo !i_gll
       storekmat(edofu,edofu,ielmt)=kmatu
     
     enddo ! i_elmt

@@ -220,7 +220,7 @@ integer,allocatable :: mat_id(:)
 integer               :: nelmt_elas
 integer               :: nelmt_viscoelas
 integer, allocatable  :: eid_elas(:), eid_viscoelas(:)
-real(kind=kreal),allocatable :: relaxtime(:,:)
+!real(kind=kreal),allocatable :: relaxtime(:,:)
 real(kind=kreal),allocatable :: relaxtime_elmt(:,:,:)
 
 integer,allocatable :: g_num0(:,:),g_num(:,:),gdof(:,:),ggdof(:,:)

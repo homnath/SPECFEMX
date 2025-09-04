@@ -625,7 +625,7 @@ elseif(eqsource_type==1)then
   write(100,'(a)')'DATASET UNSTRUCTURED_GRID'
   write(100,'(a,1x,i0,1x,a)')'POINTS',ncmt_source,' float'
   do i_p=1,ncmt_source
-    write(100,'(3(f14.6,1x))')DIM_L*source_coord(:,i_p)
+    write(100,'(3(f18.6,1x))')DIM_L*source_coord(:,i_p)
   enddo
   write(100,*)
   write(100,'(a,1x,i0,1x,i0)')'CELLS',ncmt_source,2*ncmt_source

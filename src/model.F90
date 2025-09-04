@@ -22,7 +22,8 @@ use global,only:myrank,NDIM,ngll,nelmt,ISDISP_DOF,ISPOT_DOF, &
                 POT_TYPE,PGRAVITY,PMAGNETIC,PELECTRIC,PCHARGE, &
                 isbulkmod,isshearmod,ismassdens, &
                 ismagnetization,iselectric,ischarge, &
-                bulkmod_elmt,shearmod_elmt,massdens_elmt,nmatblk_viscoelas, &
+                bulkmod_elmt,shearmod_elmt,massdens_elmt, &
+                nmatblk_viscoelas,nmaxwell,muratio_elmt,viscosity_elmt, &
                 magnetization_elmt,&
                 econductivity1_elmt,econductivity2_elmt,econductivity3_elmt, &
                 econalpha_elmt,econbeta_elmt,econgamma_elmt, &
@@ -51,7 +52,8 @@ if(ISDISP_DOF)then
   shearmod_elmt=ZERO
   ! Viscoelastic
   if(nmatblk_viscoelas>0)then
-  !allocate(viscosity_elmt(ngll,nelmt,:)
+    allocate(muratio_elmt(nmaxwell,ngll,nelmt))
+    allocate(viscosity_elmt(nmaxwell,ngll,nelmt))
   endif
 endif
 
@@ -323,6 +325,7 @@ character(len=250) :: out_fname
 real(kind=kreal) :: drho,drho03,depthp,fac
 real(kind=kreal) :: zp 
 
+integer :: i_maxwell
 integer :: num(ngll)
 integer,allocatable ::nvalency(:)
 real(kind=kreal),allocatable :: bulkmod_node(:),shearmod_node(:),rho_node(:)
@@ -390,6 +393,14 @@ matblock: do i_blk=1,nmatblk
     if(ISDISP_DOF)then
       bulkmod_elmt(:,block(i_blk)%elmt)=bulkmod_blk(i_blk)
       shearmod_elmt(:,block(i_blk)%elmt)=shearmod_blk(i_blk)
+      if(mat_domain(i_blk)==VISCOELASTIC_DOMAIN)then
+        do i_gll=1,ngll
+          do i_maxwell=1,nmaxwell
+            muratio_elmt(i_maxwell,i_gll,block(i_blk)%elmt)=muratio_blk(i_maxwell,i_blk)
+            viscosity_elmt(i_maxwell,i_gll,block(i_blk)%elmt)=viscosity_blk(i_maxwell,i_blk)
+          enddo
+        enddo
+      endif
     endif
 
     ! Mass density if using gravity 
@@ -591,161 +602,191 @@ end subroutine set_model_properties
 !===============================================================================
 
 subroutine read_tomographic_model(i_blk, errcode, errtag)
-  ! WE created this subroutine that was originally part of set_model_properties
-  ! May not be functional - may need some edits for input/output variables
+! WE created this subroutine that was originally part of set_model_properties
+! May not be functional - may need some edits for input/output variables
 
-  ! USES: 
-  use global
-  use math_constants
-  use shape_library,only:shape_function_hex8p
+! USES: 
+use global
+use math_constants
+use shape_library,only:shape_function_hex8p
 
-  ! IO variables
-  integer :: i_blk
-  integer :: errcode
-  character(len=250) :: errtag
+! IO variables
+integer :: i_blk
+integer :: errcode
+character(len=250) :: errtag
 
-  ! Local variables
-  integer :: i_elmt,i_grid,i_gll,ios
-  integer :: ic(8),num(ngll)
-  integer :: ix1(3),ix2(3)
-  integer :: grid_l1,grid_l2,grid_m1,grid_m2,grid_n1,grid_n2
-  integer :: grid_n,grid_nx,grid_ny,grid_nz,grid_nxy
-  real(kind=kreal) :: grid_x0(3),grid_x(3),grid_x1(3),grid_dx(3)
-  real(kind=kreal) :: xp(3),midx(3)
-  real(kind=kreal) :: grid_vpmin,grid_vsmin,grid_rhomin,grid_qpmin,grid_qsmin
-  real(kind=kreal) :: grid_vpmax,grid_vsmax,grid_rhomax,grid_qpmax,grid_qsmax
-  real(kind=kreal),allocatable :: grid_vp(:),grid_vs(:),grid_rho(:)
-  real(kind=kreal) :: vp,vs,rho
-  real(kind=kreal) :: shape_hex8(8)
- 
-  ! CODE: 
-    ! Read file 
-  write(logunit, *)'Reading tomo. model and interpolating to GLL points...'
+! Local variables
+integer :: i_elmt,i_grid,i_gll,ios
+integer :: ic(8),num(ngll)
+integer :: ix1(3),ix2(3)
+integer :: grid_l1,grid_l2,grid_m1,grid_m2,grid_n1,grid_n2
+integer :: grid_n,grid_nx,grid_ny,grid_nz,grid_nxy
+real(kind=kreal) :: grid_x0(3),grid_x(3),grid_x1(3),grid_dx(3)
+real(kind=kreal) :: xp(3),midx(3)
+real(kind=kreal) :: grid_vpmin,grid_vsmin,grid_rhomin,grid_qpmin,grid_qsmin
+real(kind=kreal) :: grid_vpmax,grid_vsmax,grid_rhomax,grid_qpmax,grid_qsmax
+real(kind=kreal) :: grid_muratiomin,grid_viscositymin
+real(kind=kreal) :: grid_muratiomax,grid_viscositymax
+real(kind=kreal),allocatable :: grid_vp(:),grid_vs(:),grid_rho(:)
+real(kind=kreal),allocatable :: grid_muratio(:),grid_viscosity(:)
+real(kind=kreal) :: vp,vs,rho
+real(kind=kreal) :: muratio,viscosity
+real(kind=kreal) :: shape_hex8(8)
 
-    open(unit=11,file=trim(inp_path)//trim(mfile_blk(i_blk)),status='old',     &
-      action='read',iostat = ios)
+! CODE: 
+  ! Read file 
+write(logunit, *)'Reading tomo. model and interpolating to GLL points...'
 
-      ! Err if cant read
-      if( ios /= 0 ) then
-        write(errtag,'(a)')'ERROR: file "'//trim(mfile_blk(i_blk))//'" cannot be opened!'
-        return
-      endif
+open(unit=11,file=trim(inp_path)//trim(mfile_blk(i_blk)),status='old',     &
+action='read',iostat = ios)
 
-      ! Read tomographic data
-      read(11,*)grid_x0,grid_x1
-      read(11,*)grid_dx
-      read(11,*)grid_nx,grid_ny,grid_nz
-      !if(myrank==0)print*,'grid_x0:',grid_x0
-      !if(myrank==0)print*,'grid_x1:',grid_x1
-      !if(myrank==0)print*,'grid_dx:',grid_dx
-      !if(myrank==0)print*,'grid_nx:',grid_nx,grid_ny,grid_nz
-      grid_l1=1
-      grid_m1=1
-      grid_n1=1
+! Err if cant read
+if( ios /= 0 ) then
+  write(errtag,'(a)')'ERROR: file "'//trim(mfile_blk(i_blk))//'" cannot be opened!'
+  return
+endif
 
-      grid_l2=grid_nx
-      grid_m2=grid_ny
-      grid_n2=grid_nz
+! Read tomographic data
+read(11,*)grid_x0,grid_x1
+read(11,*)grid_dx
+read(11,*)grid_nx,grid_ny,grid_nz
+!if(myrank==0)print*,'grid_x0:',grid_x0
+!if(myrank==0)print*,'grid_x1:',grid_x1
+!if(myrank==0)print*,'grid_dx:',grid_dx
+!if(myrank==0)print*,'grid_nx:',grid_nx,grid_ny,grid_nz
+grid_l1=1
+grid_m1=1
+grid_n1=1
 
-      grid_n=grid_nx*grid_ny*grid_nz
-      grid_nxy=grid_nx*grid_ny
-      allocate(grid_vp(grid_n),grid_vs(grid_n),grid_rho(grid_n))
-      grid_vp=-inftol
-      grid_vs=-inftol
-      grid_rho=-inftol
+grid_l2=grid_nx
+grid_m2=grid_ny
+grid_n2=grid_nz
 
-      grid_vpmax=-inftol
-      grid_vpmin=-inftol
-      grid_vsmax=-inftol
-      grid_vsmin=-inftol
-      grid_rhomax=-inftol
-      grid_rhomin=-inftol
-      grid_qpmax=-inftol
-      grid_qpmin=-inftol
-      grid_qsmax=-inftol
-      grid_qsmin=-inftol
+grid_n=grid_nx*grid_ny*grid_nz
+grid_nxy=grid_nx*grid_ny
+allocate(grid_vp(grid_n),grid_vs(grid_n),grid_rho(grid_n))
+grid_vp=-inftol
+grid_vs=-inftol
+grid_rho=-inftol
 
-      read(11,*,iostat=ios)grid_vpmin,grid_vpmax,grid_vsmin,grid_vsmax,          &
-      grid_rhomin,grid_rhomax,grid_qpmin,grid_qpmax,grid_qsmin,grid_qsmax
-      do i_grid=1,grid_n
-        read(11,*,iostat=ios)grid_x,grid_vp(i_grid),grid_vs(i_grid),grid_rho(i_grid)
-      enddo
-      close(11)
+grid_vpmax=-inftol
+grid_vpmin=-inftol
+grid_vsmax=-inftol
+grid_vsmin=-inftol
+grid_rhomax=-inftol
+grid_rhomin=-inftol
+grid_qpmax=-inftol
+grid_qpmin=-inftol
+grid_qsmax=-inftol
+grid_qsmin=-inftol
 
-      ! check the properties read
-      if(minval(grid_vp).lt.grid_vpmin .or. maxval(grid_vp).gt.grid_vpmax)then
-        print*,'ERROR: read grid vp is beyond the given range!'
-        stop
-      endif
-      if(minval(grid_vs).lt.grid_vsmin .or. maxval(grid_vs).gt.grid_vsmax)then
-        print*,'ERROR: read grid vs is beyond the given range!'
-        stop
-      endif
-      if(minval(grid_rho).lt.grid_rhomin .or. maxval(grid_rho).gt.grid_rhomax)then
-        print*,'ERROR: read grid rho is beyond the given range!'
-        stop
-      endif
+if(mat_domain(i_blk)==VISCOELASTIC_DOMAIN)then
+  allocate(grid_muratio(grid_n),grid_viscosity(grid_n))
+  grid_muratio=0.0
+  grid_viscosity=1.0e+29
+  read(11,*,iostat=ios)grid_vpmin,grid_vpmax,grid_vsmin,grid_vsmax,          &
+  grid_rhomin,grid_rhomax,grid_qpmin,grid_qpmax,grid_qsmin,grid_qsmax,       &
+  grid_muratiomin,grid_muratiomax,grid_viscositymin,grid_viscositymax
+  do i_grid=1,grid_n
+    read(11,*,iostat=ios)grid_x,grid_vp(i_grid),grid_vs(i_grid),             &
+    grid_rho(i_grid),grid_muratio(i_grid),grid_viscosity(i_grid)
+  enddo
+else
+  read(11,*,iostat=ios)grid_vpmin,grid_vpmax,grid_vsmin,grid_vsmax,          &
+  grid_rhomin,grid_rhomax,grid_qpmin,grid_qpmax,grid_qsmin,grid_qsmax
+  do i_grid=1,grid_n
+    read(11,*,iostat=ios)grid_x,grid_vp(i_grid),grid_vs(i_grid),grid_rho(i_grid)
+  enddo
+endif
+close(11)
 
-      ! interpolate the model
-      do i_elmt=1,nelmt
-        num=g_num(:,i_elmt)
-        do i_gll=1,ngll
-          xp=g_coord(:,num(i_gll))
+! check the properties read
+if(minval(grid_vp).lt.grid_vpmin .or. maxval(grid_vp).gt.grid_vpmax)then
+  print*,'ERROR: read grid vp is beyond the given range!'
+  stop
+endif
+if(minval(grid_vs).lt.grid_vsmin .or. maxval(grid_vs).gt.grid_vsmax)then
+  print*,'ERROR: read grid vs is beyond the given range!'
+  stop
+endif
+if(minval(grid_rho).lt.grid_rhomin .or. maxval(grid_rho).gt.grid_rhomax)then
+  print*,'ERROR: read grid rho is beyond the given range!'
+  stop
+endif
+if(minval(grid_muratio).lt.grid_muratiomin .or. maxval(grid_muratio).gt.grid_muratiomax)then
+  print*,'ERROR: read grid muratio is beyond the given range!'
+  stop
+endif
+if(minval(grid_viscosity).lt.grid_viscositymin .or. maxval(grid_viscosity).gt.grid_viscositymax)then
+  print*,'ERROR: read grid viscosity is beyond the given range!'
+  stop
+endif
 
-          ix1=floor((xp-grid_x0)/grid_dx)+1
+! interpolate the model
+do i_elmt=1,nelmt
+  num=g_num(:,i_elmt)
+  do i_gll=1,ngll
+    xp=g_coord(:,num(i_gll))
 
-          if(ix1(1).le.grid_l1)ix1(1)=grid_l1
-          if(ix1(2).le.grid_m1)ix1(2)=grid_m1
-          if(ix1(3).le.grid_n1)ix1(3)=grid_n1
+    ix1=floor((xp-grid_x0)/grid_dx)+1
 
-          if(ix1(1).ge.grid_l2)ix1(1)=grid_l2-1
-          if(ix1(2).ge.grid_m2)ix1(2)=grid_m2-1
-          if(ix1(3).ge.grid_n2)ix1(3)=grid_n2-1
+    if(ix1(1).le.grid_l1)ix1(1)=grid_l1
+    if(ix1(2).le.grid_m1)ix1(2)=grid_m1
+    if(ix1(3).le.grid_n1)ix1(3)=grid_n1
 
-          ix2=ix1+1
+    if(ix1(1).ge.grid_l2)ix1(1)=grid_l2-1
+    if(ix1(2).ge.grid_m2)ix1(2)=grid_m2-1
+    if(ix1(3).ge.grid_n2)ix1(3)=grid_n2-1
 
-          ic(1)=(ix1(3)-1)*grid_nxy+(ix1(2)-1)*grid_nx+ix1(1)
-          ic(2)=(ix1(3)-1)*grid_nxy+(ix1(2)-1)*grid_nx+ix2(1)
-          ic(3)=(ix1(3)-1)*grid_nxy+(ix2(2)-1)*grid_nx+ix2(1)
-          ic(4)=(ix1(3)-1)*grid_nxy+(ix2(2)-1)*grid_nx+ix1(1)
-          ic(5)=(ix2(3)-1)*grid_nxy+(ix1(2)-1)*grid_nx+ix1(1)
-          ic(6)=(ix2(3)-1)*grid_nxy+(ix1(2)-1)*grid_nx+ix2(1)
-          ic(7)=(ix2(3)-1)*grid_nxy+(ix2(2)-1)*grid_nx+ix2(1)
-          ic(8)=(ix2(3)-1)*grid_nxy+(ix2(2)-1)*grid_nx+ix1(1)
-          if(maxval(ic).gt.grid_n .or. minval(ic).lt.1)then
-            print*,'impossible!'
-            print*,'grid nx:',grid_nx,grid_ny,grid_nz
-            print*,'ix1:',ix1
-            print*,'ix2:',ix2
-            print*,'ic:',ic
-            print*,'n',grid_n
-            stop
-          endif
+    ix2=ix1+1
 
-          ! normalize point coordinates to natural coordinates
-          midx=grid_x0+(ix1-1)*grid_dx+half*grid_dx
+    ic(1)=(ix1(3)-1)*grid_nxy+(ix1(2)-1)*grid_nx+ix1(1)
+    ic(2)=(ix1(3)-1)*grid_nxy+(ix1(2)-1)*grid_nx+ix2(1)
+    ic(3)=(ix1(3)-1)*grid_nxy+(ix2(2)-1)*grid_nx+ix2(1)
+    ic(4)=(ix1(3)-1)*grid_nxy+(ix2(2)-1)*grid_nx+ix1(1)
+    ic(5)=(ix2(3)-1)*grid_nxy+(ix1(2)-1)*grid_nx+ix1(1)
+    ic(6)=(ix2(3)-1)*grid_nxy+(ix1(2)-1)*grid_nx+ix2(1)
+    ic(7)=(ix2(3)-1)*grid_nxy+(ix2(2)-1)*grid_nx+ix2(1)
+    ic(8)=(ix2(3)-1)*grid_nxy+(ix2(2)-1)*grid_nx+ix1(1)
+    if(maxval(ic).gt.grid_n .or. minval(ic).lt.1)then
+      print*,'impossible!'
+      print*,'grid nx:',grid_nx,grid_ny,grid_nz
+      print*,'ix1:',ix1
+      print*,'ix2:',ix2
+      print*,'ic:',ic
+      print*,'n',grid_n
+      stop
+    endif
 
-          ! shift origin to the cell center
-          xp=xp-midx
+    ! normalize point coordinates to natural coordinates
+    midx=grid_x0+(ix1-1)*grid_dx+half*grid_dx
 
-          ! normalize to [-1, 1] range
-          xp=TWO*xp/grid_dx
-          where(xp.lt.-ONE)xp=-ONE
-          where(xp.gt.ONE)xp=ONE
-          ! compute shape function in natural coordinates
-          call shape_function_hex8p(8,xp(1),xp(2),xp(3),shape_hex8)
+    ! shift origin to the cell center
+    xp=xp-midx
 
-          vp=dot_product(shape_hex8,grid_vp(ic))
-          vs=dot_product(shape_hex8,grid_vs(ic))
-          rho=dot_product(shape_hex8,grid_rho(ic))
+    ! normalize to [-1, 1] range
+    xp=TWO*xp/grid_dx
+    where(xp.lt.-ONE)xp=-ONE
+    where(xp.gt.ONE)xp=ONE
+    ! compute shape function in natural coordinates
+    call shape_function_hex8p(8,xp(1),xp(2),xp(3),shape_hex8)
 
-          bulkmod_elmt(i_gll,i_elmt)=rho*(vp*vp-FOUR_THIRD*vs*vs)
-          shearmod_elmt(i_gll,i_elmt)=rho*vs*vs
-          massdens_elmt(i_gll,i_elmt)=rho
-        enddo
+    vp=dot_product(shape_hex8,grid_vp(ic))
+    vs=dot_product(shape_hex8,grid_vs(ic))
+    rho=dot_product(shape_hex8,grid_rho(ic))
 
-      enddo
-      deallocate(grid_vp,grid_vs,grid_rho)
+    bulkmod_elmt(i_gll,i_elmt)=rho*(vp*vp-FOUR_THIRD*vs*vs)
+    shearmod_elmt(i_gll,i_elmt)=rho*vs*vs
+    massdens_elmt(i_gll,i_elmt)=rho
+    if(mat_domain(i_blk)==VISCOELASTIC_DOMAIN)then
+      muratio_elmt(:,i_gll,i_elmt)=dot_product(shape_hex8,grid_muratio(ic))
+      viscosity_elmt(:,i_gll,i_elmt)=dot_product(shape_hex8,grid_viscosity(ic))
+    endif
+  enddo
+
+enddo
+deallocate(grid_vp,grid_vs,grid_rho)
+deallocate(grid_muratio,grid_viscosity)
 print*,'inside',minval(shearmod_elmt),maxval(shearmod_elmt)
 end subroutine read_tomographic_model
 !-------------------------------------------------------------------------------
