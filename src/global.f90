@@ -147,7 +147,6 @@ real(kind=kreal), allocatable:: weJAC(:,:,:,:)    ! NDIM x NDIM jacobian for NGL
 real(kind=kreal), allocatable:: weJACINV(:,:,:,:) ! NDIM x NDIM inverse jac for NGLL at N ELEMENTS 
 real(kind=kreal), allocatable:: weDETJAC(:,:)     ! Determinant of jacobian at GLL for each element 
 
-
 ! UTM projection zone (Optional input)
 integer :: UTM_ZONE
 character(len=20) :: proc_str,ptail,ptail_inp
@@ -189,7 +188,6 @@ integer :: ngllx,nglly,ngllz,ngll
 ! total number of GLL points on XY, YZ, and ZX planes
 integer :: ngllxy,ngllyz,ngllzx,maxngll2d
 integer,parameter :: ng=8 ! number of gauss points for FEM
-
 
 logical :: ismpi !.true. : MPI, .false. : serial
 integer :: myrank,nproc !myrank is indexed from 0
@@ -332,7 +330,8 @@ logical,allocatable :: ismagnet_blk(:)
 
 integer :: nmatblk_electric
 integer,allocatable :: econtype_blk(:)
-real(kind=kreal),allocatable :: econductivity1_blk(:),econductivity2_blk(:),econductivity3_blk(:)
+real(kind=kreal),allocatable :: econductivity1_blk(:),econductivity2_blk(:),   &
+econductivity3_blk(:)
 real(kind=kreal),allocatable :: econalpha_blk(:),econbeta_blk(:),econgamma_blk(:)
 logical,allocatable :: iselectric_blk(:)
 logical :: econductivity_aniso
@@ -577,7 +576,8 @@ character(len=1),parameter :: CR=achar(13) ! carriage return to overwrite
 ! format string for time step
 character(len=20) :: tstep_sformat
 ! Log file all information
-character(len=250) :: log_file,out_file, SL_log_file, ICE_log_file, kmat_log_file, debug_file
+character(len=250) :: log_file,out_file,SL_log_file,ICE_log_file,kmat_log_file,&
+debug_file
 ! file unit ID for log file
 integer :: logunit=7
 integer :: outunit=8
@@ -585,7 +585,7 @@ integer :: stdout=6
 
 character(len=250) :: log_msg
 
-! _________________________ ICE PARAMETERS _________________________
+! __________________________ ICE PARAMETERS ____________________________________
 character(len=250) :: icefile,iceratefile                ! Input file name 
 logical :: is_ICE
 real(kind=kreal), allocatable  :: iceobjs(:,:) !  list of ice objects read in, 
@@ -596,7 +596,6 @@ real(kind=kreal),parameter :: rho_ice_dim = 917.00_kreal !kg/m^3
 !for 0 Centrigrade https://www.cs.mcgill.ca/~rwest/wikispeedia/wpcd/wp/i/Ice.htm
 real(kind=kreal)::  rho_ice                              !may be nondimensionalised
 
-
 ! _________________________ SEA LEVEL STUFF ___________________________
 
 ! Flag for cartesian or global simulation 
@@ -605,11 +604,9 @@ character(len=250) :: slfile                ! Input file name
 integer ::  nsl_obj            !num of ice objs.
 real(kind=kreal), allocatable  :: slobjs(:,:) !  list of ice objects read in, 
 
-
 ! Constants: 
 real(kind=kreal),parameter :: rho_water_dim = 999.87_kreal !kg/m^3 for 0 Centrigrade
 real(kind=kreal)::  rho_water 
-
 
 ! Sea Level variables
 ! Ocean function - 1 or 0 (see Crawford et al 2018 or Milne et al etc)
@@ -664,7 +661,6 @@ integer :: ncloop_MAX = 10000
 real(kind=kreal) :: CLOOP_CONV_THRESH = 1.0e-14_kreal
 logical :: cloop_converged
 
-
 ! developement variables
 ! By default model is nondimensionalized unless the "devel_nondim" is .false. 
 logical :: devel_nondim
@@ -675,9 +671,6 @@ real(kind=kreal) :: devel_gaminf
 real(kind=kreal) :: devel_rtfac
 ! example: axial_rod
 character(len=20) :: devel_example
-
-
-
 
 end module global
 !===============================================================================

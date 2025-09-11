@@ -37,7 +37,6 @@ character(len=250),intent(out) :: errtag
 errtag="ERROR: unknown!"
 errcode=-1
 
-
 isbulkmod=.false.
 isshearmod=.false.
 ismassdens=.false.
@@ -531,7 +530,7 @@ if(savedata%model)then
   do i_elmt=1,nelmt
     ! Skip transition and infinite elements
     imat=mat_id(i_elmt)
-    ! The statement below makes some navalncy 0 causing the 
+    ! The statement below makes some nvalncy 0 causing the 
     ! "Floating-point exception - erroneous arithmetic operation" when divided by nvalency!
     ! if(mat_domain(imat).ge.ELASTIC_TRINFDOMAIN)cycle
 
@@ -593,7 +592,6 @@ if(savedata%model)then
   endif
   deallocate(bulkmod_node,shearmod_node,rho_node)
 endif
-
 
 if(myrank.eq.0)write(logunit, *)'Completed set_model_properties...'
 

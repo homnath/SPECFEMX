@@ -190,7 +190,9 @@ errtag=""; errcode=-1
 ! ______________________________________________________________________
 ! ______________________________________________________________________
 ! Calculate relaxation time for viscoelastic/plastic models
-call calc_relaxation_time(tunitfac)
+if(nmatblk_viscoelas>0)then
+  call calc_relaxation_time(tunitfac)
+endif
 
 !Count number of viscoelastic and elastic elements 
 call count_elmts(errcode)
