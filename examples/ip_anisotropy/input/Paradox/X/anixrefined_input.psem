@@ -1,0 +1,39 @@
+#pre information
+preinfo: nproc=40, method='sem', ngllx=3, nglly=3, ngllz=3, nenode=8, ngnode=8, &
+inp_path='./input', part_path='./partition', out_path='./output', disp_dof=0, pot_dof=1, pot_type='electric'
+
+#mesh information
+mesh: xfile='anixrefined_coord_x', yfile='anixrefined_coord_y', zfile='anixrefined_coord_z', &
+confile='anixrefined_connectivity', idfile='anixrefined_material_id', gfile='anixrefined_ghost', fsfile='anixrefined_infinite_surface'
+
+#boundary conditions
+bc: ubc=0, &
+    uxfile='anixrefined_ssbcux', &
+    uyfile='anixrefined_ssbcuy', &
+    uzfile='anixrefined_ssbcuz', &
+    phifile='anixrefined_ssbcphi', &
+    infbc=1, &
+      add_infmesh=1, &
+      infrfile='anixrefined_infinite_surface', &
+      mat_type='define', &
+      imat_inf=3, &
+      pole0='user', &
+      coord0=0.0000 0.0000 0.0000, &
+      pole_type='point', &
+      rinf=5000.0, &
+      valinf=0, &
+
+# electrical current
+ecurrent: ecfile='anixrefined_electrical_current'
+
+#material list
+material: matfile='anixrefined_material_list',density=1
+
+#control parameters
+control: ksp_tol=1e-7, ksp_maxiter=20000
+
+#save data
+save: cell=1, epot=1
+
+#devel
+devel: nondim=0

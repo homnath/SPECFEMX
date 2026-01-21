@@ -1,0 +1,5 @@
+#Number of points
+2
+#x, y, z, Current (I)
+0.0 -510 0.0 1.0
+0.0 510 0.0 -1.0
