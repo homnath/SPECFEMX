@@ -711,15 +711,16 @@ if(minval(grid_rho).lt.grid_rhomin .or. maxval(grid_rho).gt.grid_rhomax)then
   print*,'ERROR: read grid rho is beyond the given range!'
   stop
 endif
-if(minval(grid_muratio).lt.grid_muratiomin .or. maxval(grid_muratio).gt.grid_muratiomax)then
-  print*,'ERROR: read grid muratio is beyond the given range!'
-  stop
+if(mat_domain(i_blk)==VISCOELASTIC_DOMAIN)then
+  if(minval(grid_muratio).lt.grid_muratiomin .or. maxval(grid_muratio).gt.grid_muratiomax)then
+    print*,'ERROR: read grid muratio is beyond the given range!'
+    stop
+  endif
+  if(minval(grid_viscosity).lt.grid_viscositymin .or. maxval(grid_viscosity).gt.grid_viscositymax)then
+    print*,'ERROR: read grid viscosity is beyond the given range!'
+    stop
+  endif
 endif
-if(minval(grid_viscosity).lt.grid_viscositymin .or. maxval(grid_viscosity).gt.grid_viscositymax)then
-  print*,'ERROR: read grid viscosity is beyond the given range!'
-  stop
-endif
-
 ! interpolate the model
 do i_elmt=1,nelmt
   num=g_num(:,i_elmt)
@@ -784,7 +785,9 @@ do i_elmt=1,nelmt
 
 enddo
 deallocate(grid_vp,grid_vs,grid_rho)
-deallocate(grid_muratio,grid_viscosity)
+if(mat_domain(i_blk)==VISCOELASTIC_DOMAIN)then
+  deallocate(grid_muratio,grid_viscosity)
+endif
 print*,'inside',minval(shearmod_elmt),maxval(shearmod_elmt)
 end subroutine read_tomographic_model
 !-------------------------------------------------------------------------------

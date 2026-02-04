@@ -9,6 +9,10 @@ module parsolver_petsc
 !                    Include files
 !-------------------------------------------------------------------------------
 #include "petsc/finclude/petscksp.h"
+#include "petsc/finclude/petscmat.h"
+use petscmat
+use petscksp  
+
 use ksp_constants                                                                
 use global                                                                       
 use math_library_mpi,only:maxscal,minscal                                          
@@ -16,7 +20,6 @@ use shared,only:check_allocate
 use mpi_library,only:sync_process                                 
 use ghost_library_mpi,only:ngpart,gpart                                          
                                                                                  
-use petscksp  
 implicit none
 
 PetscBool      flg,flg_ch,flg_lu,flg_ilu,mat_symmetry

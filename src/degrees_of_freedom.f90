@@ -101,9 +101,8 @@ implicit none
 integer :: i,iu(NNDOFU),iphi,j,nu, isl
 integer :: iu0, iphi0, isl0
 
-
 ! order ux,uy,uz,\phi
-edofu=-9999
+if(ISDISP_DOF)edofu=-9999
 if(ISPOT_DOF)edofphi=-9999
 if(ISSL_DOF)edofsl=-9999
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -N 1   # node count
-#SBATCH --ntasks-per-node=80
+#SBATCH --ntasks-per-node=192
 #SBATCH -t 00:30:00
 
 # load appropriate compiler
