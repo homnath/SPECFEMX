@@ -1,0 +1,1 @@
+Anisotropy paradox example
