@@ -603,6 +603,7 @@ elseif(eqsource_type==1)then
     flush(logunit)
   endif
   allocate(source_coord(3,ncmt_source),M_cmt(6,ncmt_source))
+  print*,'hello0:'
   ! Store 6 unique moment-tensor components in the order
   ! 1: Mxx
   ! 2: Myy
@@ -612,6 +613,7 @@ elseif(eqsource_type==1)then
   ! 6: Mzx
   ! read CMT sources
   call read_cmtsolution(source_coord,M_cmt,errcode,errtag)
+  print*,'hello:',errcode
   if(errcode.ne.0)return
   ! NOTE: all quantities are nondimensionalized within read_cmtsolution routine
 
