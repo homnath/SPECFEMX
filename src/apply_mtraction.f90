@@ -35,7 +35,7 @@ real(kind=kreal),allocatable :: ftracload(:) ! face mtraction load
 ! Magnetization
 ! magnetization properties type for the traction surface
 ! 'inherit': inherit the magnetization form the parent element
-! 'define': defien the magnetization
+! 'define': define the magnetization
 character(len=10) :: mag_type
 ! Inclination (0) or latitude (1). If latitude, the inclination is obtained
 ! using the relation: inclination = ATAN(2*TAN(latitude))

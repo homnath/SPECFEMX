@@ -22,7 +22,7 @@ POT_TYPE,PGRAVITY,PMAGNETIC,    &
 element_is_infinite,storederiv,storejw,storeinterpf_infinite,devel_nondim, &
 isdxval,isdyval,isdzval,devel_gaminf,infquad, &
 edofu,edofphi,grav0_nodal,dgrav0_elmt,ISGRAV0,&
-imat_to_imatmag,magnetization_blk,ismagnet_blk
+imat_to_imatmag,magnetization_blk,ismagnet_blk,nelmt_infinite
 use element,only:hex8_gnode,map2exodus_hex8
 use math_constants,only:HALF,ONE,ZERO,FOUR,GRAV_CONS,PI
 use math_library,only:determinant,invert,issymmetric
@@ -535,11 +535,8 @@ do i_elmt=1,nelmt
     call shape_function_infiniteGLHEX8ZW(infquad,ngllx,nglly,ngllz,    &
     ngll,nip,isfaces,shape_infinite,dshape_infinite,lagrange_gl,       &
     dlagrange_gl,GLw)
-
     storeinterpf_infinite(:,:,ielmt_infinite)=lagrange_gl
     
-    storeinterpf_infinite(:,:,ielmt_infinite)=lagrange_gl
-
   endif
 
   egdof=gdof_elmt(:,i_elmt)

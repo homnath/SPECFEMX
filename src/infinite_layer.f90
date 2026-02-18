@@ -106,6 +106,7 @@ allocate(ismat(nmatblk),ismat_vis(nmatblk))
 ismat=.false.
 ismat_vis=.false.
 n1=1; n2=4
+
 do i_elpart=1,nelpart
   ! This will read a line and proceed to next line
   read(11,*)ielmt,iface
@@ -221,7 +222,7 @@ if(trim(matinf_type).eq.'inherit')then
       elseif(mdomain.eq.ELASTIC_TRINFDOMAIN)then
         mdomain=mdomain*10
       else
-        write(stdout,*)'ERROR: wrong material ID for inhertance!'
+        write(stdout,*)'ERROR: wrong material ID for inheritance!'
         stop
       endif
       ! inherit properties
@@ -402,11 +403,12 @@ do i=1,nelmtINF
   ! assign material ID
   if(trim(matinf_type).eq.'inherit')then
   ! inherit material block ID/s from the parent elements
-    imat=imat_INFS(i)
-    mat_id(ielmt)=imat_inherit(imat)
-  else
-  ! set specified material block ID/s
-    if(mat_domainINFS(i).eq.ELASTIC_TRINFDOMAIN)then
+    if(mat_domainINFS(i).eq.ELASTIC_DOMAIN .or. &
+       mat_domainINFS(i).eq.VISCOELASTIC_DOMAIN)then
+      imat=imat_INFS(i)
+      mat_id(ielmt)=imat_inherit(imat)
+    elseif(mat_domainINFS(i).eq.ELASTIC_TRINFDOMAIN .or. &
+           mat_domainINFS(i).eq.VISCOELASTIC_TRINFDOMAIN)then
       ! adjacent element is the transition element
       if(imat_trinf.lt.1)then
         write(*,'(a,i0)')'ERROR: invalid material ID for transition infinite elements! ',imat_trinf
@@ -418,8 +420,15 @@ do i=1,nelmtINF
       mat_id(ielmt)=imat_trinf
       nelmtTRINF=nelmtTRINF+1
     else
-      mat_id(ielmt)=imat_inf
+      write(*,'(a)')'ERROR: invalid "mat_domainINFS"!'
+      stop
     endif
+  elseif(trim(matinf_type).eq.'define')then
+  ! set specified material block ID/s
+    mat_id(ielmt)=imat_inf
+  else
+   write(*,'(a)')'ERROR: invalid "matinf_type"! It must be either "inherit" or "define"!'
+   stop
   endif
   n1=n2+1; n2=n1+3
 enddo
@@ -428,7 +437,6 @@ mat_domainINFS,imat_INFS)
 if(allocated(imat_inherit))deallocate(imat_inherit)
 write(logunit,*)'Number of transition infinite elements:',nelmtTRINF
 flush(logunit)
-
 ielmtINF1=nelmtOLD+1; ielmtINF2=nelmt
 ifaceINF=6
 

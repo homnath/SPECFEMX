@@ -467,6 +467,7 @@ src:do i_src=1,ncmt_source
 
   source_tshift(i_src) = tshift
   source_hdur(i_src) = hdur
+    call sync_process
 
   if(trim(cmt_mapto).eq.'GLOBE')then
     ! convert geographic latitude lat (degrees) to geocentric colatitude theta (radians)

@@ -129,8 +129,9 @@ end subroutine prepare_free_surface
 
 ! Determine the elevation on the free surface for a given point.
 subroutine free_surface_elevation(xp,elevation,ilocated)
+use global,only:myrank
 use math_constants,only:ZERO
-use math_library,only:IsPointInPolygon
+use math_library,only:point_in_polygon
 use shape_library,only:shape_function_quad4p
 use map_location,only:map_point2naturalquad4
 use global,only:g_coord
@@ -156,7 +157,7 @@ do i_face=1,nelmt_fs
   coord(1,:)=vx
   coord(2,:)=vy
   vz=g_coord(3,gnum4_fs(:,i_face))
-  isinside=IsPointInPolygon(vx,vy,xp(1),xp(2))
+  isinside=point_in_polygon(xp(1),xp(2),vx,vy,1d-12,.TRUE.)
   if(isinside)then
     iface=iface+1
     call  map_point2naturalquad4(coord,xp,xip,located_x,niter,errx)
@@ -181,8 +182,6 @@ if(allocated(gnode_fs))deallocate(gnode_fs)
 if(allocated(rgnum_fs))deallocate(rgnum_fs)
 end subroutine cleanup_free_surface
 !===============================================================================
-
-
 
 subroutine check_surface_normals()
   use global
