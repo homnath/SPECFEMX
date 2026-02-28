@@ -68,6 +68,15 @@ character(len=150) :: data_path
 
 errtag="ERROR: unknown!"
 errcode=-1
+
+! Check if the infinite element material type is correctly defined.
+if(trim(matinf_type).eq.'define')then
+  if(mat_domain(imat_inf).ne.ELASTIC_INFDOMAIN .and. &
+    mat_domain(imat_inf).ne.VISCOELASTIC_INFDOMAIN)then
+    write(errtag,*)'ERROR: "mat_domain" for "imat_inf" isn''t infinite!'
+    return
+  endif
+endif
 ! set data path
 if(ismpi .and. nproc.gt.1)then
   data_path=trim(part_path)

@@ -232,8 +232,12 @@ call initialise_local_arrays()
 ! Use BCs to determine global DOF index etc
 call sort_gdofs_and_bc()
 call initialise_equation_arrays()
+
+! computes and stores elemental derivative and integration information
+call precompute_derivative_integration(errcode,errtag)
+
 ! Calculate any prestress 
-call calculate_prestress(errcode, errtag, ksp_iter)
+if(isstress0)call calculate_prestress(errcode, errtag, ksp_iter)
    
 ! compute node valency and assemble all node_valency across processors
 call calculate_valency()

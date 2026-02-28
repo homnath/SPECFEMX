@@ -107,6 +107,13 @@ character(len=500) :: errsrc
 
 errsrc='initialise_equation_arrays'
 
+! allocate variables to store elemental derivative and intergration factors.
+allocate(element_is_infinite(nelmt),stat=istat)
+if(nelmt_infinite.gt.0)then
+  allocate(storeinterpf_infinite(ngll,ngll,nelmt_infinite),stat=istat)
+endif
+allocate(storederiv(ndim,ngll,ngll,nelmt),storejw(ngll,nelmt))
+
 ! HERE IS ALLOCATION OF U VECTOR 
 allocate(storekmat(nedof,nedof,nelmt),storemmat(nedof,nelmt),stat=istat)
 allocate(load(0:neq),bodyload(0:neq),selfload(0:neq),viscoload(0:neq), &

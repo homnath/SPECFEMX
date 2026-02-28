@@ -476,7 +476,6 @@ matblock: do i_blk=1,nmatblk
   ! read from the tomographic structured grid model
   elseif(type_blk(i_blk).eq.-1)then
     call read_tomographic_model(i_blk, errcode, errtag)
-    print*,'outside',minval(shearmod_elmt),maxval(shearmod_elmt)
   else
     print*,'ERROR: unsupported type_blk:',type_blk(i_blk)
   endif
@@ -648,10 +647,12 @@ endif
 read(11,*)grid_x0,grid_x1
 read(11,*)grid_dx
 read(11,*)grid_nx,grid_ny,grid_nz
-!if(myrank==0)print*,'grid_x0:',grid_x0
-!if(myrank==0)print*,'grid_x1:',grid_x1
-!if(myrank==0)print*,'grid_dx:',grid_dx
-!if(myrank==0)print*,'grid_nx:',grid_nx,grid_ny,grid_nz
+if(myrank==0)then
+  print*,'grid_x0:',grid_x0
+  print*,'grid_x1:',grid_x1
+  print*,'grid_dx:',grid_dx
+  print*,'grid_nx:',grid_nx,grid_ny,grid_nz
+endif
 grid_l1=1
 grid_m1=1
 grid_n1=1
@@ -701,6 +702,7 @@ close(11)
 ! check the properties read
 if(minval(grid_vp).lt.grid_vpmin .or. maxval(grid_vp).gt.grid_vpmax)then
   print*,'ERROR: read grid vp is beyond the given range!'
+  print*,minval(grid_vp),grid_vpmin,maxval(grid_vp),grid_vpmax
   stop
 endif
 if(minval(grid_vs).lt.grid_vsmin .or. maxval(grid_vs).gt.grid_vsmax)then
@@ -788,7 +790,6 @@ deallocate(grid_vp,grid_vs,grid_rho)
 if(mat_domain(i_blk)==VISCOELASTIC_DOMAIN)then
   deallocate(grid_muratio,grid_viscosity)
 endif
-print*,'inside',minval(shearmod_elmt),maxval(shearmod_elmt)
 end subroutine read_tomographic_model
 !-------------------------------------------------------------------------------
 
