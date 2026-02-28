@@ -19,7 +19,6 @@ use math_library_mpi,only:maxscal,minscal
 use shared,only:check_allocate
 use mpi_library,only:sync_process                                 
 use ghost_library_mpi,only:ngpart,gpart                                          
-                                                                                 
 implicit none
 
 PetscBool      flg,flg_ch,flg_lu,flg_ilu,mat_symmetry
