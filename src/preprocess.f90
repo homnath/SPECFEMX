@@ -77,10 +77,9 @@ allocate(shape_infinite(nipinf,nginf),dshape_infinite(NDIM,nipinf,nginf))
 allocate(lagrange_gl(nipinf,ngll),dlagrange_gl(NDIM,nipinf,ngll))
 
 allocate(GLw(nipinf))
-
 element_is_infinite=.false.
 storederiv=zero
-storeinterpf_infinite=zero
+if(allocated(storeinterpf_infinite))storeinterpf_infinite=zero
 ! Purely elastic elements
 ! Viscoelastic elements are elastic at time = 0
 ! Following loops through nelmt_elas+nelmt_viscoelas

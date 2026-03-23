@@ -54,9 +54,7 @@ integer :: ios
 integer :: gnum_hex8(8),node_hex8(8)
 integer :: gnum_quad4(4),node_quad4(4)
 
-character(len=250) :: arg1,arg2,inp_fname,prog
-character(len=150) :: path
-character(len=20) :: ext,format_str
+character(len=20) :: format_str
 character(len=250) :: case_file,geo_file
 character(len=250) :: infcase_file,infgeo_file,trinfcase_file,trinfgeo_file
 ! switch to check if the geometry file changes with time steps, for example,
@@ -77,11 +75,6 @@ real(kind=kreal) :: cpu_tstart,cpu_tend,telap,max_telap,mean_telap
 
 integer :: tot_nelmt,max_nelmt,min_nelmt,tot_nnode,max_nnode,min_nnode
 
-character(len=250) :: cmd ! command line
-character(len=8) :: tdate ! date
-character(len=10) :: ttime ! time
-character(len=5) :: tzone ! time zone
-
 character(len=250) :: errtag ! error message
 integer :: errcode
 
@@ -100,10 +93,8 @@ call start_process()
 ismesh_only = .false.
 
 ! Read cmd line/process input file etc ... 
-call process_user_input(cmd, tdate, ttime, tzone, path, &
-                        ext, format_str, errcode, errtag, &
-                        ismesh_only,arg1,arg2,inp_fname,prog, &
-                        cpu_tstart)
+call process_user_input(format_str, errcode, errtag, &
+                        ismesh_only,cpu_tstart)
 
 ! Print info from read input for SL/Ice 
 if(is_SL)then 

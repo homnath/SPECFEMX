@@ -3,10 +3,8 @@ module user_input
 contains
 !_______________________________________________________________________________
 
-subroutine process_user_input(cmd, tdate, ttime, tzone, path, &
-                              ext, format_str, errcode, errtag, &
-                              ismesh_only,arg1,arg2,inp_fname,prog, &
-                              cpu_tstart)
+subroutine process_user_input(format_str,errcode, errtag, &
+                              ismesh_only,cpu_tstart)
 
 ! USES
 use global
