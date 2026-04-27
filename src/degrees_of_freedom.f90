@@ -221,10 +221,12 @@ if(ISDISP_DOF)then
     mdomain=mat_domain(imat)
     ! elastic domain
     if(mdomain==ELASTIC_DOMAIN)then
-      gdof(idofu,inodes)=1
-    ! viselastic domain
+      ! skip empty (zero-property) blocks - they have no stiffness contribution
+      ! and would leave zero rows in the matrix causing PETSc KSP FPE
+      if(.not.isempty_blk(imat))gdof(idofu,inodes)=1                  !! Fix
+    ! viscoelastic domain
     elseif(mdomain==VISCOELASTIC_DOMAIN)then
-      gdof(idofu,inodes)=1
+      if(.not.isempty_blk(imat))gdof(idofu,inodes)=1                  !! Fix
     ! acoustic domain
     elseif(mdomain==ACOUSTIC_DOMAIN)then
       write(errtag,'(a)')'ERROR: acoustic domain not supported!'

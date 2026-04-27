@@ -26,7 +26,7 @@ implicit none
 ! In/Out variables: 
 
 ! Local variables: 
-integer          :: iviscoelas,imat,i_elmt,i_gll,i_maxwell,i_mat
+integer          :: i_elmt,i_gll,i_maxwell,imat,mdomain
 real(kind=kreal) :: tunitfac,ym
 real(kind=kreal) :: min_relaxtime,max_relaxtime
 
@@ -65,7 +65,7 @@ endif
 
 
 ! compute relax time
-iviscoelas=0
+!iviscoelas=0
 !do i_mat=1,nmatblk_viscoelas
 !!  if(mat_domain(i_mat)==VISCOELASTIC_DOMAIN .or. &
 !!    mat_domain(i_mat)==VISCOELASTIC_TRINFDOMAIN .or. &
@@ -114,7 +114,16 @@ do i_elmt=1,nelmt
     !print*,imat,shearmod_blk(imat)
     !relaxtime(:,i_mat)=devel_rtfac*tunitfac*viscosity_blk(:,i_mat)/shearmod_blk(imat)
     !endif
-    do i_gll=1,ngll
+    imat = mat_id(i_elmt)                                              !! fix
+    mdomain = mat_domain(imat)                                         !! fix
+      ! Skip non-viscoelastic and empty (zero-property) elements       !! fix
+      if (mdomain /= VISCOELASTIC_DOMAIN .and. &                       !! fix
+          mdomain /= VISCOELASTIC_TRINFDOMAIN .and. &                  !! fix
+          mdomain /= VISCOELASTIC_INFDOMAIN) cycle                     !! fix
+      if (isempty_blk(imat)) cycle                                     !! fix
+  
+  
+      do i_gll=1,ngll
       do i_maxwell=1,nmaxwell
         relaxtime_elmt(i_maxwell,i_gll,i_elmt)=devel_rtfac*tunitfac* &
         viscosity_elmt(i_maxwell,i_gll,i_elmt)/shearmod_elmt(i_gll,i_elmt)
