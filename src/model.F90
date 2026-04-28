@@ -53,6 +53,8 @@ if(ISDISP_DOF)then
   if(nmatblk_viscoelas>0)then
     allocate(muratio_elmt(nmaxwell,ngll,nelmt))
     allocate(viscosity_elmt(nmaxwell,ngll,nelmt))
+    muratio_elmt=ZERO                                                   !! Fix
+    viscosity_elmt=ZERO                                                 !! Fix
   endif
 endif
 
@@ -310,7 +312,7 @@ implicit none
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 
-integer :: i,i_blk,i_dim,i_elmt,i_gll, ios
+integer :: i,i_blk,i_dim,i_elmt,i_gll,iblkve,ios                   !! Fix
 integer :: iblk,ielmt
 integer :: imat,imatmag
 integer,allocatable :: ielmts(:),block_nelmt(:)
@@ -392,11 +394,14 @@ matblock: do i_blk=1,nmatblk
     if(ISDISP_DOF)then
       bulkmod_elmt(:,block(i_blk)%elmt)=bulkmod_blk(i_blk)
       shearmod_elmt(:,block(i_blk)%elmt)=shearmod_blk(i_blk)
-      if(mat_domain(i_blk)==VISCOELASTIC_DOMAIN)then
+      if(mat_domain(i_blk)==VISCOELASTIC_DOMAIN .or. &                  !! Fix
+         mat_domain(i_blk)==VISCOELASTIC_TRINFDOMAIN .or. &             !! Fix
+         mat_domain(i_blk)==VISCOELASTIC_INFDOMAIN)then                 !! Fix
+        iblkve=imat_to_imatve(i_blk)                                    !! Fix
         do i_gll=1,ngll
           do i_maxwell=1,nmaxwell
-            muratio_elmt(i_maxwell,i_gll,block(i_blk)%elmt)=muratio_blk(i_maxwell,i_blk)
-            viscosity_elmt(i_maxwell,i_gll,block(i_blk)%elmt)=viscosity_blk(i_maxwell,i_blk)
+            muratio_elmt(i_maxwell,i_gll,block(i_blk)%elmt)=muratio_blk(i_maxwell,iblkve)  !! Fix
+            viscosity_elmt(i_maxwell,i_gll,block(i_blk)%elmt)=viscosity_blk(i_maxwell,iblkve) !! Fix
           enddo
         enddo
       endif
