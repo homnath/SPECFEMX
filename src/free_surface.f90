@@ -5,7 +5,7 @@ character(len=250),private :: myfname=' => free_surface.f90'
 character(len=500),private :: errsrc
 
 integer :: nelmt_fs,nnode_fs
-integer,allocatable :: iface_fs(:)
+integer,allocatable :: iface_fs(:), id_elem_fs(:), fs_elem_id(:) !stores faces, element IDs of fs elems
 ! We can store only gnum_fs and gnum4_fs can be later extracted from it.
 integer,allocatable :: gnum4_fs(:,:)
 integer,allocatable :: gnum_fs(:,:)
@@ -21,7 +21,7 @@ contains
 !   HNG, Oct 08, 2018
 subroutine prepare_free_surface(errcode,errtag)
 use global,only:ismpi,nproc,nenode,maxngll2d,g_num, &
-fsfile,inp_path,part_path,ptail_inp,savedata
+fsfile,inp_path,part_path,ptail_inp,savedata, nelmt
 use element,only:hexface
 use math_library,only:i_uniinv
 
@@ -39,6 +39,8 @@ logical,allocatable :: isnode(:)
 character(len=80) :: fname
 character(len=80) :: data_path
 
+
+
 errtag=""
 errcode=0
 ! Set data path
@@ -49,9 +51,11 @@ else
 endif
 
 fname=trim(data_path)//trim(fsfile)//trim(ptail_inp)
+
+
 open(unit=11,file=trim(fname),status='old',action='read',iostat=ios)
 if (ios /= 0)then
-  write(errtag,'(a)')'ERROR: input file "',trim(fname),'" cannot be opened!'
+  write(errtag,'(a)')'ERROR: input file "'//trim(fname)//'" cannot be opened!'
   errcode=-1
   return
 endif
@@ -64,18 +68,26 @@ if(ios/=0.or.nelmt_fs.eq.0)then
   savedata%fsplot_plane=.false.
   return
 endif
-allocate(iface_fs(nelmt_fs))
+
+allocate(iface_fs(nelmt_fs), id_elem_fs(nelmt_fs), fs_elem_id(nelmt) )
 allocate(gnum4_fs(4,nelmt_fs),gnum_fs(maxngll2d,nelmt_fs))
 nsnode_all=nelmt_fs*maxngll2d
 allocate(nodelist(nsnode_all),inode_order(nsnode_all))
+
+
+fs_elem_id = 0 
+
 n1=1; n2=maxngll2d
 do i_face=1,nelmt_fs
   read(11,*)ielmt,iface
+
   iface_fs(i_face)=iface
   num=g_num(:,ielmt)
   gnum4_fs(:,i_face)=num(hexface(iface)%gnode)
   gnum_fs(:,i_face)=num(hexface(iface)%node)
   
+  id_elem_fs(i_face) = ielmt  ! Input ielmt_fs --> returns global elemnt ID
+  fs_elem_id(ielmt) = i_face  ! Input global element ID --> returns ielmt_fs
   nodelist(n1:n2)=num(hexface(iface)%node)
   n1=n2+1; n2=n1+maxngll2d-1
 enddo
@@ -117,8 +129,9 @@ end subroutine prepare_free_surface
 
 ! Determine the elevation on the free surface for a given point.
 subroutine free_surface_elevation(xp,elevation,ilocated)
+use global,only:myrank
 use math_constants,only:ZERO
-use math_library,only:IsPointInPolygon
+use math_library,only:point_in_polygon
 use shape_library,only:shape_function_quad4p
 use map_location,only:map_point2naturalquad4
 use global,only:g_coord
@@ -144,7 +157,7 @@ do i_face=1,nelmt_fs
   coord(1,:)=vx
   coord(2,:)=vy
   vz=g_coord(3,gnum4_fs(:,i_face))
-  isinside=IsPointInPolygon(vx,vy,xp(1),xp(2))
+  isinside=point_in_polygon(xp(1),xp(2),vx,vy,1d-12,.TRUE.)
   if(isinside)then
     iface=iface+1
     call  map_point2naturalquad4(coord,xp,xip,located_x,niter,errx)
@@ -169,6 +182,120 @@ if(allocated(gnode_fs))deallocate(gnode_fs)
 if(allocated(rgnum_fs))deallocate(rgnum_fs)
 end subroutine cleanup_free_surface
 !===============================================================================
+
+subroutine check_surface_normals()
+  use global
+  use set_precision
+  use integration 
+  use math_constants
+  use element,only:hexface,hexface_sign,hex8_gnode
+
+  implicit none 
+
+  integer                        :: i_elmtfs, i_gll ! loops
+  real(kind=kreal)               :: detjac 
+  integer                        :: iface           ! face ID for elmt 
+  integer                        :: i_elmt, errcode          ! face ID for elmt 
+  integer                        :: nfgll           ! ngll on 2D face
+  real(kind=kreal), allocatable  :: gw(:), nodalsl(:) ! GLL weights 2D
+  real(kind=kreal), allocatable  :: dshape4(:,:,:)
+  real(kind=kreal)               :: coord(ndim,4), face_normal(3),dx_dxi(NDIM), dx_deta(NDIM), vertical(3), dot_w_vert
+        
+  integer :: num4(4), counter
+
+
+  ! Code
+  allocate(gw(maxngll2d))
+  allocate(dshape4(2,4,maxngll2d))
+
+
+  if(myrank.eq.0)then
+    write(*,*)'* checking surface normal'
+  endif 
+
+  vertical    = zero
+  vertical(3) = one
+
+  counter = 0 
+
+  do i_elmtfs = 1, nelmt_fs
+    ! Face number (ie between 1 and 6) and get related properties
+    iface = iface_fs(i_elmtfs)    
+    if(iface==1 .or. iface==3)then
+        nfgll             = ngllzx
+        gw(1:nfgll)       = gll_weights_zx
+        dshape4(:,:,1:nfgll) = dshape_quad4_zx
+
+      elseif(iface==2 .or. iface==4)then
+        nfgll             = ngllyz
+        gw(1:nfgll)       = gll_weights_yz
+        dshape4(:,:,1:nfgll) = dshape_quad4_yz
+
+      elseif(iface==5 .or. iface==6)then
+        nfgll             = ngllzx
+        gw(1:nfgll)       = gll_weights_xy
+        dshape4(:,:,1:nfgll) = dshape_quad4_xy
+      else
+        return
+    endif
+    
+    num4  = gnum4_fs(:, i_elmtfs)
+    coord = g_coord(:,num4)
+
+    do i_gll = 1, nfgll 
+        ! Calculate the magnitude of the 2D jacobian 
+        dx_dxi  = matmul(coord,dshape4(1,:,i_gll))
+        dx_deta = matmul(coord,dshape4(2,:,i_gll))
+
+        ! Calc normal and therefore jac dec (2D) on the fly
+        face_normal(1)=dx_dxi(2)*dx_deta(3)-dx_deta(2)*dx_dxi(3) 
+        face_normal(2)=dx_deta(1)*dx_dxi(3)-dx_dxi(1)*dx_deta(3)
+        face_normal(3)=dx_dxi(1)*dx_deta(2)-dx_deta(1)*dx_dxi(2)
+
+
+        detjac=sqrt(dot_product(face_normal,face_normal))
+
+        if (detjac.eq.zero)then 
+          write(*,*)'ERROR! 2D jacobian magnitude is 0'
+          write(*,*)'ielmtfs     = ', i_elmtfs
+          write(*,*)'iface       = ', iface
+          write(*,*)'i_gll       = ', i_gll
+          write(*,*)'nfgll       = ', nfgll
+          write(*,*)'dshape4 1   = ', coord,dshape4(1,:,i_gll)
+          write(*,*)'dshape4 2   = ', coord,dshape4(2,:,i_gll)
+          write(*,*)'num4        = ', num4
+          write(*,*)'coord       = ', coord
+          write(*,*)'dxi         = ', dx_dxi
+          write(*,*)'dx_deta     = ', dx_deta
+          write(*,*)'face_normal = ', face_normal
+          write(*,*)'--------------------- '
+          stop
+        endif 
+
+        face_normal=hexface_sign(iface)*face_normal/detjac
+        dot_w_vert = dot_product(face_normal, vertical)
+
+        ! Check dot with vertical is positive (or zero if orthogonal)
+        if (dot_w_vert.lt.zero)then 
+          write(*,*)'Error: negative normals on the free surface (pointing into mesh)' 
+          write(*,*)'STOPPING...' 
+          stop
+        endif 
+
+    enddo 
+  enddo 
+
+
+  if(myrank.eq.0)then
+    write(*,*)' ✓ Done'
+  endif
+
+  deallocate(gw)
+  deallocate(dshape4)
+end subroutine check_surface_normals
+
+
+
 
 end module free_surface
 !===============================================================================

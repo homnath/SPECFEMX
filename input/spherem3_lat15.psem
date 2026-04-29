@@ -8,7 +8,8 @@ mesh: xfile='spherem3_coord_x', &
       zfile='spherem3_coord_z', &
       confile='spherem3_connectivity', &
       idfile='spherem3_material_id', &
-      gfile='spherem3_lat15_ghost'
+      gfile='spherem3_lat15_ghost', &
+      fsfile='spherem3_lat15_infinite'
 
 #boundary conditions
 bc: ubc=0, &

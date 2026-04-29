@@ -9,6 +9,7 @@
 module math_library
 use set_precision
 use math_constants
+private :: point_on_segment
 contains
 !-------------------------------------------------------------------------------
 
@@ -245,6 +246,211 @@ return
 end function dnorm
 !===============================================================================
 
+pure logical function point_on_segment(px, py, ax, ay, bx, by, eps) result(onseg)
+real(kind=kreal), intent(in) :: px, py, ax, ay, bx, by, eps
+real(kind=kreal) :: cross, dotp, abx, aby, apx, apy, bbx, bby
+
+abx = bx - ax
+aby = by - ay
+apx = px - ax
+apy = py - ay
+
+! Cross product (AB x AP) magnitude in 2D (z-component)
+cross = abx*apy - aby*apx
+if (abs(cross) > eps) then
+  onseg = .false.
+  return
+end if
+
+! Check projection lies within segment bounds using dot products
+dotp = apx*abx + apy*aby
+if (dotp < -eps) then
+  onseg = .false.
+  return
+end if
+
+bbx = px - bx
+bby = py - by
+dotp = bbx*abx + bby*aby
+if (dotp > eps) then
+  onseg = .false.
+  return
+end if
+
+onseg = .true.
+end function point_on_segment
+!===============================================================================
+
+pure logical function point_in_polygon(px,py,x,y,eps,include_boundary) result(inside)
+! Even–odd rule: cast a ray to +infinity in x-direction.
+! Count edge crossings; odd => inside, even => outside.
+!
+! Arguments:
+!   px, py : point to test
+!   x, y   : polygon vertex arrays of length n (closed or unclosed)
+!   eps    : numerical tolerance (e.g., 1d-12). If absent => 0.
+!   include_boundary : if true, points on edges count as inside. Default true.
+
+real(kind=kreal), intent(in) :: px, py
+real(kind=kreal), intent(in) :: x(:), y(:)
+real(kind=kreal), intent(in), optional :: eps
+logical, intent(in), optional :: include_boundary
+
+integer :: n
+real(kind=kreal) :: tol
+logical :: incb
+integer :: i, j
+logical :: intersect
+real(kind=kreal) :: xi, yi, xj, yj
+
+n=ubound(x,1)
+
+if (n < 3) then
+  inside = .false.
+  return
+end if
+if (size(x) < n .or. size(y) < n) then
+  inside = .false.
+  return
+end if
+
+tol  = 0d0
+if (present(eps)) tol = eps
+
+incb = .true.
+if (present(include_boundary)) incb = include_boundary
+
+inside = .false.
+j = n
+
+do i = 1, n
+  xi = x(i); yi = y(i)
+  xj = x(j); yj = y(j)
+
+  if (incb) then
+    if (point_on_segment(px, py, xi, yi, xj, yj, tol)) then
+      inside = .true.
+      return
+    end if
+  end if
+
+  ! Check if edge (j->i) straddles the horizontal line at py
+  ! Use a half-open interval rule to avoid double counting at vertices.
+  intersect = ((yi > py) .neqv. (yj > py))
+  if (intersect) then
+    ! Compute x-coordinate of intersection of edge with y=py
+    if (px < (xj - xi) * (py - yi) / (yj - yi) + xi) then
+      inside = .not. inside
+    end if
+  end if
+
+  j = i
+end do
+end function point_in_polygon
+!===============================================================================
+
+pure logical function dpoint_on_segment(px, py, ax, ay, bx, by, eps) result(onseg)
+double precision, intent(in) :: px, py, ax, ay, bx, by, eps
+double precision :: cross, dotp, abx, aby, apx, apy, bbx, bby
+
+abx = bx - ax
+aby = by - ay
+apx = px - ax
+apy = py - ay
+
+! Cross product (AB x AP) magnitude in 2D (z-component)
+cross = abx*apy - aby*apx
+if (abs(cross) > eps) then
+  onseg = .false.
+  return
+end if
+
+! Check projection lies within segment bounds using dot products
+dotp = apx*abx + apy*aby
+if (dotp < -eps) then
+  onseg = .false.
+  return
+end if
+
+bbx = px - bx
+bby = py - by
+dotp = bbx*abx + bby*aby
+if (dotp > eps) then
+  onseg = .false.
+  return
+end if
+
+onseg = .true.
+end function dpoint_on_segment
+!===============================================================================
+
+pure logical function dpoint_in_polygon(px, py, x, y, eps, include_boundary) result(inside)
+! Even–odd rule: cast a ray to +infinity in x-direction.
+! Count edge crossings; odd => inside, even => outside.
+!
+! Arguments:
+!   px, py : point to test
+!   x, y   : polygon vertex arrays of length n (closed or unclosed)
+!   eps    : numerical tolerance (e.g., 1d-12). If absent => 0.
+!   include_boundary : if true, points on edges count as inside. Default true.
+
+double precision, intent(in) :: px, py
+double precision, intent(in) :: x(:), y(:)
+double precision, intent(in), optional :: eps
+logical, intent(in), optional :: include_boundary
+
+integer :: n
+double precision :: tol
+logical :: incb
+integer :: i, j
+logical :: intersect
+double precision :: xi, yi, xj, yj
+
+n=ubound(x,1)
+
+if (n < 3) then
+  inside = .false.
+  return
+end if
+if (size(x) < n .or. size(y) < n) then
+  inside = .false.
+  return
+end if
+
+tol  = 0d0
+if (present(eps)) tol = eps
+
+incb = .true.
+if (present(include_boundary)) incb = include_boundary
+
+inside = .false.
+j = n
+
+do i = 1, n
+  xi = x(i); yi = y(i)
+  xj = x(j); yj = y(j)
+
+  if (incb) then
+    if (point_on_segment(px, py, xi, yi, xj, yj, tol)) then
+      inside = .true.
+      return
+    end if
+  end if
+
+  ! Check if edge (j->i) straddles the horizontal line at py
+  ! Use a half-open interval rule to avoid double counting at vertices.
+  intersect = ((yi > py) .neqv. (yj > py))
+  if (intersect) then
+    ! Compute x-coordinate of intersection of edge with y=py
+    if (px < (xj - xi) * (py - yi) / (yj - yi) + xi) then
+      inside = .not. inside
+    end if
+  end if
+
+  j = i
+end do
+end function dpoint_in_polygon
+!===============================================================================
 
 ! This function below determines whether the given point (px,py) is inside
 ! the polygon defined by its corner points (vx(nv), vy(nv)).
@@ -276,10 +482,12 @@ if(px < minx .or. px > maxx .or. py < miny .or. py > maxy)then
   isinside=.false.
   return
 endif
-!print*,'at least!'
-!print*,px,py
-!print*,'vx:',vx
-!print*,'vy:',vy
+print*,'---------------------------Start--------------'
+print*,'at least!'
+print*,px,py
+print*,'vx:',vx
+print*,'vy:',vy
+print*,'---------------------------Finish--------------'
 nv=ubound(vx,1)
 j=nv
 do i=1,nv
@@ -346,9 +554,6 @@ if(xp(1).lt.minval(xcorner(1,:)) .or. xp(1).gt.maxval(xcorner(1,:)) .or.     &
   !print*,'outrange!'
   return
 endif
-!print*,'at least!'
-!print*,xp
-!print*,xcorner
 ! check through all the faces
 do i_face=1,6
   x0=xcorner(:,fnode3(1,i_face))
@@ -568,7 +773,8 @@ case(6)
   sigm=(s1+s2+s3)/three
   d2=((s1-s2)**2+(s2-s3)**2+(s3-s1)**2)/six+s4*s4+s5*s5+s6*s6
 
-  if(d2<small)d2=small ! special case of hydrostatic pressure or just at the tip
+  !! WARNING: Need to check this
+  !if(d2<small)d2=small ! special case of hydrostatic pressure or just at the tip
 
   ds1=s1-sigm
   ds2=s2-sigm
@@ -654,7 +860,7 @@ end subroutine insertion_sort
 ! Author: Michel Olagnon
 ! orderpack 2.0
 ! source: http://www.fortran-2000.com/rank/
-Subroutine i8_uniinv (XDONT, IGOEST)
+subroutine i8_uniinv (XDONT, IGOEST)
 ! UNIINV = Merge-sort inverse ranking of an array, with removal of
 ! duplicate entries.
 ! this routine is similar to pure merge-sort ranking, but on
@@ -668,10 +874,16 @@ integer(kind=kint8),intent(in)  :: XDONT(:)
 integer(kind=kint8),intent(out) :: IGOEST(:)
 
 integer(kind=kint8) :: XTST, XDONA, XDONB
-integer(kind=kint8), dimension (SIZE(IGOEST)) :: JWRKT, IRNGT
+! This gives segmentation faults in some cases!
+!integer(kind=kint8), dimension (SIZE(IGOEST)) :: JWRKT, IRNGT
+! Therefore, I changed to allocatable arrays.
+integer(kind=kint8),dimension(:),allocatable :: JWRKT, IRNGT
 integer(kind=kint8) :: LMTNA, LMTNC, IRNG, IRNG1, IRNG2, NUNI
-integer(kind=kint8) :: NVAL, IIND, IWRKD, IWRK, IWRKF, JINDA, IINDA, IINDB
+integer(kind=kint8) :: N, NVAL, IIND, IWRKD, IWRK, IWRKF, JINDA, IINDA, IINDB
 
+N = size(IGOEST)
+allocate(JWRKT(N),IRNGT(N))
+NVAL = Min (SIZE(XDONT), SIZE(IGOEST))
 NVAL = Min (SIZE(XDONT), SIZE(IGOEST))
 select case (NVAL)
 case (:0)
@@ -858,6 +1070,7 @@ do IWRK = 1, NVAL
   endif
   IGOEST (IRNG) = NUNI
 enddo
+deallocate(JWRKT,IRNGT)
 return
 end subroutine i8_uniinv
 !===============================================================================
@@ -886,10 +1099,15 @@ integer,intent(in)  :: XDONT(:)
 integer,intent(out) :: IGOEST(:)
 
 integer :: XTST, XDONA, XDONB
-integer, dimension (SIZE(IGOEST)) :: JWRKT, IRNGT
+! This gives segmentation faults in some cases!
+!integer, dimension (SIZE(IGOEST)) :: JWRKT, IRNGT
+! Therefore, I changed to allocatable arrays.
+integer,dimension(:),allocatable :: JWRKT, IRNGT
 integer :: LMTNA, LMTNC, IRNG, IRNG1, IRNG2, NUNI
-integer :: NVAL, IIND, IWRKD, IWRK, IWRKF, JINDA, IINDA, IINDB
+integer :: N, NVAL, IIND, IWRKD, IWRK, IWRKF, JINDA, IINDA, IINDB
 
+N = size(IGOEST)
+allocate(JWRKT(N),IRNGT(N))
 NVAL = Min (SIZE(XDONT), SIZE(IGOEST))
 select case (NVAL)
 case (:0)
@@ -1076,6 +1294,7 @@ do IWRK = 1, NVAL
   endif
   IGOEST (IRNG) = NUNI
 enddo
+deallocate(JWRKT,IRNGT)
 return
 end subroutine i_uniinv
 !===============================================================================

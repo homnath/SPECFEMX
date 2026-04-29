@@ -43,9 +43,9 @@ character(len=*),intent(in) :: inp_fname
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 logical,optional,intent(in) :: ispartmesh
-
+integer :: read_stat
 logical :: isfrom_partmesh
-character(len=250) :: line
+character(len=250) :: line !="Line initialized"
 character(len=60) :: lineword(9)
 character(len=800) ::tag
 character(len=80) :: strval,token
@@ -53,9 +53,10 @@ character(len=1) :: tmp_char
 character(len=80),dimension(50) :: args
 integer :: id,ind,ios,narg,slen
 
-integer :: bc_stat,preinfo_stat,mesh_stat,material_stat,control_stat,          &
-eqload_stat,stress0_stat,traction_stat,mtraction_stat,water_stat,save_stat,    &
-eqsource_stat,benchmark_stat,station_stat,devel_stat,mag_stat
+integer :: bc_stat,preinfo_stat,mesh_stat,material_stat,step_stat,control_stat,&
+bodyload_stat,stress0_stat,traction_stat,mtraction_stat,water_stat,&
+save_stat,eqsource_stat,ecurrent_stat,benchmark_stat,station_stat,devel_stat,  &
+mag_stat,electric_stat,charge_stat,sl_stat
 integer :: mat_count
 integer :: ielmt,i_node,inode,imat,tmp_nelmt,tmp_nnode !,mat_domain
 
@@ -71,6 +72,14 @@ real(kind=kreal),allocatable :: rvect(:)
 
 logical,allocatable :: ismat(:)
 
+
+! Sea level variables: 
+integer :: sl_read_ctr, nline
+! Ice variables: 
+integer :: ice_read_ctr, ice_stat, t1, t2 ,t3 , k, kold
+real(kind=kreal)icerateval_tmp
+integer :: icerate_ind, n_iceratevals, iirate, iceratetype
+
 ! Magnetization
 ! Inclination (0) or latitude (1). If latitude, the inclination is obtained
 ! using the relation: inclination = ATAN(2*TAN(latitude))
@@ -78,6 +87,10 @@ integer :: incORlat
 ! magnitude of the magnetization
 real(kind=kreal) :: M0
 real(kind=kreal) :: inc,dec,azim
+! magnitude of the electrical conductivity
+!real(kind=kreal) :: econductivity
+! magnitude of the charge density
+real(kind=kreal) :: charge_density
 
 errtag="ERROR: unknown!"
 errcode=-1
@@ -102,24 +115,30 @@ preinfo_stat=-1
 bc_stat=-1
 traction_stat=0
 mtraction_stat=0
-eqload_stat=0
+bodyload_stat=0
 water_stat=0
 mesh_stat=-1
 material_stat=-1
 stress0_stat=-1
+step_stat=-1
 control_stat=-1
 eqsource_stat=0
+ecurrent_stat=0
 station_stat=0
 save_stat=0
 benchmark_stat=0
 devel_stat=0
 mag_stat=0
+electric_stat=0
+charge_stat=0
 
 ISDISP_DOF=.true.
 ISPOT_DOF=.false.
 POT_TYPE=PGRAVITY
 POT_STRING='gravity'
 ISGRAV0=.false.
+
+
 
 iselastic=0
 allelastic=.false.
@@ -128,8 +147,11 @@ isfstraction=.false.
 isfstraction0=.false.
 trcase=TRACTION_EXTERNAL
 ismtraction=.false.
-iseqload=.false.
+isbodyload=.false.
+isselfweight=.false.
+ispseudoeq=.false.
 iseqsource=.false.
+isecurrent=.false.
 iswater=.false.
 isstress0=.false.
 usek0=.false.
@@ -142,26 +164,51 @@ benchmark_okada=.false.
 benchmark_error=.false.
 isstation=.false.
 
+
+! Sea level defaults
+sl_stat          = 0 
+ISSL_DOF         = .false.
+IS_CART_SIM      = .false.
+IS_GLOB_SIM      = .false.
+is_SL            = .false.
+savedata%sl      = .false. 
+savedata%sl0     = .false. 
+savedata%oceanf  = .false. 
+savedata%oceanf0 = .false. 
+
+
+! Ice defaults: 
+ice_stat          = 0 
+IS_ICE            = .false.
+savedata%ice      = .false. 
+savedata%icerate  = .false. 
+savedata%iceload  = .false. 
+savedata%ice0     = .false. 
+
+
+
 ! Default savedata options
-savedata%model=.false.
-savedata%model_cell=.false.
-savedata%disp=.false.
-savedata%stress=.false.
-savedata%strain=.false.
-savedata%porep=.false.
-savedata%psigma=.false.
-savedata%maxtau=.false.
-savedata%nsigma=.false.
-savedata%scf=.false.
+savedata%model        = .false.
+savedata%model_cell   = .false.
+savedata%disp         = .false.
+savedata%stress       = .false.
+savedata%strain       = .false.
+savedata%porep        = .false.
+savedata%psigma       = .false.
+savedata%maxtau       = .false.
+savedata%nsigma       = .false.
+savedata%scf          = .false.
 ! gravity potential
-savedata%gpot=.false.
-savedata%agrav=.false.
+savedata%gpot         = .false.
+savedata%agrav        = .false.
 ! magnetic potential
-savedata%mpot=.false.
-savedata%magb=.false.
-savedata%infinite=.false.
-savedata%fsplot=.false.
-savedata%fsplot_plane=.false.
+savedata%mpot         = .false.
+savedata%magb         = .false.
+! electric potential
+savedata%epot         = .false.
+savedata%infinite     = .false.
+savedata%fsplot       = .false.
+savedata%fsplot_plane = .false.
 
 ! Default development variables
 devel_nondim=.true.
@@ -173,6 +220,7 @@ devel_rtfac=ONE
 ! by default 4th column of the material list is assumed to be unit weight
 ! if .true., density is assumed
 isdensity=.false.
+isplastic=.false.
 
 s0_type=0 ! by default compute initial stress using SEM
 
@@ -186,6 +234,8 @@ if(ismpi.and.nproc.gt.1)then
 else
   inp_path='./input/'
 endif
+
+
 ! output path
 out_path='./output/'
 ! partititon path
@@ -199,18 +249,26 @@ eqkz=0.0_kreal
 ! default NL parameters
 nl_tol=zerotol; nl_maxiter=1
 
+! Stepping
+steptype=0 ! time
+nstep=1
+step0=ZERO
+step1=ZERO
+dstep=zero ! time/frequency step interval
+
 nexcav=0
 nsrf=1 ! number of strength reduction factors
 ninc=1 ! number of load increments
-ntstep=1 ! number of time steps
-dtstep=zero ! time step interval
 tunit='sec'
+funit='hz'
 isdxval=.false.
 isdyval=.false.
 isdzval=.false.
 
 isubc=.true.
 isfsubc=.false.
+fix_center=.false.
+fix_radius=ZERO
 
 ! BC value for the infinite-element layer surface, 
 ! which is generally zero
@@ -319,10 +377,20 @@ do
         POT_TYPE=PGRAVITY
         POT_STRING='gravity'
       elseif(trim(strval).eq.'magnetic' .or. &
-             trim(strval).eq.'Magnetic' .or. &
-             trim(strval).eq.'MAGNETIC')then
+        trim(strval).eq.'Magnetic' .or. &
+        trim(strval).eq.'MAGNETIC')then
         POT_TYPE=PMAGNETIC
         POT_STRING='magnetic'
+      elseif(trim(strval).eq.'electric' .or. &
+        trim(strval).eq.'Electric' .or. &
+        trim(strval).eq.'ELECTRIC')then
+        POT_TYPE=PELECTRIC
+        POT_STRING='electric'
+      elseif(trim(strval).eq.'charge' .or. &
+        trim(strval).eq.'Charge' .or. &
+        trim(strval).eq.'CHARGE')then
+        POT_TYPE=PCHARGE
+        POT_STRING='charge'
       else
         write(errtag,*)'ERROR: unsupported "pot_type": ',trim(strval)
         return
@@ -364,10 +432,12 @@ do
       write(errtag,*)'ERROR: wrong value for method!'
       return
     endif
+    
     call seek_string('inp_path',strval,args,narg)
     if (.not. isblank(strval))inp_path=trim(strval)
     slen=len_trim(inp_path)
     if(inp_path(slen:slen)/='/')inp_path=trim(inp_path)//'/'
+
     if(ismpi .or. isfrom_partmesh)then
       call seek_string('part_path',strval,args,narg)
       if (.not. isblank(strval))part_path=trim(strval)
@@ -383,6 +453,7 @@ do
     preinfo_stat=1
     cycle
   endif
+
   ! read mesh information
   if (trim(token)=='mesh:')then
     if(mesh_stat==1)then
@@ -420,6 +491,21 @@ do
         write(errtag,*)'ERROR: ubc must be 0 or 1!',ival
         return
       endif
+    endif
+    call seek_integer('fix_center',ival,args,narg,istat)
+    if(istat==0)then
+      if(ival.eq.0)then
+        fix_center=.false.
+      elseif(ival.eq.1)then
+        fix_center=.true.
+      else
+        write(errtag,*)'ERROR: fix_center must be 0 or 1!',ival
+        return
+      endif
+    endif
+    if(fix_center)then
+      call seek_real('fix_radius',rval,args,narg,istat)
+      if(istat==0 .and. rval.ne.zero)fix_radius=rval
     endif
     uxfile=get_string('uxfile',args,narg)
     uyfile=get_string('uyfile',args,narg)
@@ -590,6 +676,12 @@ do
 
   ! read traction information
   if (trim(token)=='traction:')then
+    
+    if(myrank==0)then 
+      write(*,*)'* Detected traction flag'
+      write(*,*)
+    endif 
+
     if(traction_stat==1)then
       write(errtag,*)'ERROR: copy of line type traction: not permitted!'
       return
@@ -626,6 +718,7 @@ do
         return
       endif
     endif
+    savedata%traction = .true.
     traction_stat=1
     !istraction=.true.
     !print*,trfile
@@ -666,6 +759,8 @@ do
     if(istat==0 .and. iselastic==1)allelastic=.true.
     call seek_integer('density',ival,args,narg,istat)
     if(istat==0 .and. ival==1)isdensity=.true.
+    call seek_integer('plastic',ival,args,narg,istat)
+    if(istat==0 .and. ival==1)isplastic=.true.
     call seek_string('model',strval,args,narg)
     if (.not. isblank(strval))cmodel=trim(strval)
     if(trim(cmodel)=='chakravarthi')then
@@ -678,18 +773,24 @@ do
     cycle
   endif
 
-  ! read earthquake loading information
-  if (trim(token)=='eqload:')then
-    if(eqload_stat==1)then
-      write(errtag,*)'ERROR: copy of line type eqload: not permitted!'
+  ! read body loading information
+  if (trim(token)=='bodyload:')then
+    if(bodyload_stat==1)then
+      write(errtag,*)'ERROR: copy of line type bodyload: not permitted!'
       return
     endif
     call split_string(tag,',',args,narg)
-    eqkx=get_real('eqkx',args,narg)
-    eqky=get_real('eqky',args,narg)
-    eqkz=get_real('eqkz',args,narg)
-    eqload_stat=1
-    iseqload=.true.
+    call seek_integer('selfweight',ival,args,narg,istat)
+    if(istat==0 .and. ival==1)isselfweight=.true.
+    call seek_integer('pseudoeq',ival,args,narg,istat)
+    if(istat==0 .and. ival==1)ispseudoeq=.true.
+    if (ispseudoeq)then
+      eqkx=get_real('eqkx',args,narg)
+      eqky=get_real('eqky',args,narg)
+      eqkz=get_real('eqkz',args,narg)
+    endif
+    bodyload_stat=1
+    isbodyload=.true.
     cycle
   endif
 
@@ -704,7 +805,17 @@ do
     if(eqsource_type==0)then
       slipfile=get_string('slipfile',args,narg)
     elseif(eqsource_type==1)then
+      cmt_mapto='none' ! Default is NONE.
       cmtfile=get_string('cmtfile',args,narg)
+      call seek_string('mapto',strval,args,narg)
+      if (.not. isblank(strval))cmt_mapto=upcase(trim(strval))
+      if(cmt_mapto.ne.'GLOBE' .and. &
+         cmt_mapto.ne.'UTM' .and.   &
+         cmt_mapto.ne.'NONE')then
+         write(errtag,*)'ERROR: invalid option for cmt_mapto!'
+         return
+      endif 
+      !cmt_mapto=get_string('mapto',args,narg)
     elseif(eqsource_type==2)then
       faultfile=get_string('faultfile',args,narg)
       faultmetafile=get_string('faultmetafile',args,narg)
@@ -737,6 +848,20 @@ do
     cycle
   endif
 
+  ! read electrical current information
+  if (trim(token)=='ecurrent:')then
+    if(ecurrent_stat==1)then
+      write(errtag,*)'ERROR: copy of line type ecurrent: not permitted!'
+      return
+    endif
+    call split_string(tag,',',args,narg)
+    ecfile=get_string('ecfile',args,narg)
+
+    ecurrent_stat=1
+    isecurrent=.true.
+    cycle
+  endif
+  
   !read benchmark information.
   !For now (9/16) only okada benchmarking is supported
   if (trim(token)=='benchmark:')then
@@ -766,6 +891,36 @@ do
     cycle
   endif
 
+  ! read stepping information
+  if (trim(token)=='step:')then
+    if(step_stat==1)then
+      write(errtag,*)'ERROR: copy of line type step: not permitted!'
+      return
+    endif
+    call split_string(tag,',',args,narg)
+    steptype=get_integer('type',args,narg)
+    ! time/frequency step variables dt/df
+    dstep=get_real('step',args,narg)
+    if(steptype.eq.FREQSTEP)then
+      step0=get_real('start',args,narg)
+      step1=get_real('end',args,narg)
+      call seek_string('funit',strval,args,narg)
+      if (.not. isblank(strval))funit=trim(strval)
+      nstep=1+nint((step1-step0)/dstep)
+    elseif(steptype.eq.TIMESTEP)then
+      nstep=get_integer('nstep',args,narg)
+      call seek_string('tunit',strval,args,narg)
+      if (.not. isblank(strval))tunit=trim(strval)
+    else
+      write(errtag,'(a,i0)')'ERROR: unknown step type: ',steptype
+      return
+    endif
+    !---------------------------
+                                                                                 
+    step_stat=1
+    cycle
+  endif
+
   ! read control information
   if (trim(token)=='control:')then
     if(control_stat==1)then
@@ -781,13 +936,6 @@ do
     if(istat==0)nl_tol=rval
     call seek_integer('nl_maxiter',ival,args,narg,istat)
     if(istat==0)nl_maxiter=ival
-    ! time step variables
-    call seek_real('dt',rval,args,narg,istat)
-    if(istat==0)dtstep=rval
-    call seek_string('tunit',strval,args,narg)
-    if (.not. isblank(strval))tunit=trim(strval)
-    call seek_integer('ntstep',ival,args,narg,istat)
-    if(istat==0)ntstep=ival
     ! strength reduction variables
     call seek_integer('nsrf',ival,args,narg,istat)
     if(istat==0)nsrf=ival
@@ -891,6 +1039,14 @@ do
         call seek_integer('magb',issave,args,narg,istat)
         if(istat==0 .and. issave==1)savedata%magb=.true.
       endif
+      if(POT_TYPE==PELECTRIC)then
+        call seek_integer('epot',issave,args,narg,istat)
+        if(istat==0 .and. issave==1)savedata%epot=.true.
+      endif
+      if(POT_TYPE==PCHARGE)then
+        call seek_integer('epot',issave,args,narg,istat)
+        if(istat==0 .and. issave==1)savedata%epot=.true.
+      endif
     endif
     if(infbc)then
       call seek_integer('inf',issave,args,narg,istat)
@@ -905,8 +1061,140 @@ do
     cycle
   endif
 
+
+! read ice part: 
+  if (trim(token)=='ice:')then
+
+    if(myrank==0)then
+      write(*,*)'* Detected ice flag'
+    endif 
+
+
+    if(ice_stat==1)then
+      write(errtag,*)'ERROR: copy of line type ice: not permitted!'
+      return
+    endif
+
+    ! Means ICE is involved
+    call split_string(tag,',',args,narg)
+    icefile       = get_string('icefile',args,narg)
+    iceratefile   = get_string('iceratefile',args,narg)
+
+    ice_stat  = 1
+    is_ICE    = .true.
+
+    if(myrank.eq.0)then 
+      write(*,*)'  --> Fetching information from file: ', trim(icefile)
+    endif 
+
+    ! Save ice0 
+    call seek_integer('saveice0',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%ice0    = .true.
+      savedata%fsplot  = .true.
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving initial ice distribution'
+      endif 
+    endif 
+
+    call seek_integer('saveicerate',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%icerate    = .true.
+
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving ice rate'
+      endif 
+    endif 
+
+
+    call seek_integer('saveiceload',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%iceload    = .true.
+
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving ice load'
+      endif 
+    endif 
+
+    if(myrank.eq.0)then 
+      write(*,*)'  --> See ', trim(file_head), 'ICE.log for details '
+      write(*,*)
+    endif 
+
+    cycle
+  endif 
+
+! read sea level part
+  if (trim(token)=='sealevel:')then
+    if(myrank.eq.0)then 
+      write(*,*)'* Detected sea level flag'
+    endif 
+    if(sl_stat==1)then
+      write(errtag,*)'ERROR: copy of line type sealevel: not permitted!'
+      return
+    endif
+
+    ! Means SL is involved
+    call split_string(tag,',',args,narg)
+    slfile   = get_string('slfile',args,narg)
+    sl_stat  = 1
+    is_SL    = .true.
+    if(myrank.eq.0)then 
+      write(*,*)'  --> Fetching information from file: ', trim(slfile)
+    endif 
+    ! Save sl0 
+    call seek_integer('savesl0',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%sl0    = .true.
+      savedata%fsplot = .true.
+      
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving initial Sea Level'
+      endif 
+
+    endif 
+
+      ! Save ocean function 
+    call seek_integer('saveOF',issave,args,narg,istat)
+    if(istat==0 .and. issave==1)then 
+      savedata%oceanf   = .true.
+      savedata%oceanf0  = .true.
+      savedata%fsplot  = .true.
+
+      if(myrank.eq.0)then 
+        write(*,*)'        + Saving ocean functions'
+      endif 
+
+    endif 
+
+   
+    ! In this case will actually solve for SL 
+    call seek_integer('solvesl',ival,args,narg,istat)
+    if(istat==0.and.ival.eq.1)then 
+      ISSL_DOF = .true.
+      savedata%sl    = .true.
+      savedata%ice    = .true.
+    else 
+      if(myrank.eq.0)then 
+        write(*,*)' WARNING: SL FILE PARSED BUT NOT SOLVING FOR SEA LEVEL'
+      endif 
+    endif 
+    if(myrank.eq.0)then 
+      write(*,*)'  --> See ', trim(file_head), 'SL.log for details '
+      write(*,*)
+    endif 
+
+    cycle
+  endif
+  
   ! read development vaiables if any
   if (trim(token)=='devel:')then
+
+    if(myrank.eq.0)then 
+      write(*,*)'* Detected devel flag'
+      write(*,*)
+    endif
+
     if(devel_stat==1)then
       write(errtag,*)'ERROR: copy of line type eqsource: not permitted!'
       return
@@ -958,8 +1246,8 @@ do
   endif
   write(errtag,'(a)')'ERROR: invalid line type: "'//trim(token)//'"!'
   return
-
 enddo ! do
+
 
 if(.not.iswater)savedata%porep=.false.
 
@@ -1007,6 +1295,10 @@ if(myrank==0)then
   flush(logunit)
 endif
 !--------------------------------------------------------
+
+! SL files are not partitioned
+SL_path = inp_path
+
 ! set data path
 if(ismpi.and.nproc.gt.1)then
   data_path=trim(part_path)
@@ -1046,6 +1338,7 @@ do i=1,ndim
   endif
 enddo
 close(11)
+
 ! Read connectivity
 fname=trim(data_path)//trim(confile)//trim(ptail_inp)
 open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
@@ -1072,6 +1365,197 @@ if(iseqsource.and.eqsource_type.eq.3)then
     call recreate_faultslip_file(faultslipfile_plus)
     call recreate_faultslip_file(faultslipfile_minus)
   endif
+endif
+
+! Make sure the Okada benchmark is currently implemented only for slip source.
+if(benchmark_okada)then
+  if(.not.(iseqsource.and.eqsource_type==0))then
+   write(*,*)'WARNING: Okada benchmark is currently implemented ONLY for slip &
+   &source (eqsource: type=0)!'
+   benchmark_okada=.false.
+  endif
+endif
+
+! Read Sea Level file: 
+sl_read_ctr = 0 
+if(is_SL)then 
+
+  fname= trim(SL_path)//trim(slfile)
+  open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
+  if( ios /= 0 ) then
+    write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
+    return
+  endif
+
+  do 
+    read(11,*,IOSTAT=read_stat) line 
+    if (read_stat==0)then 
+      ! Line read and needs processing 
+      if (isblank(line) .or. iscomment(line,'#'))then
+        cycle 
+      else ! not blank 
+        
+        if(sl_read_ctr.eq.0)then 
+          ! Get cartesian/global simulation
+          if (str2int(trim(line)).eq.0) then 
+            write(*,*)'ERROR: GLOBAL SL NOT IMPLIMENTED'
+            stop 
+          elseif (str2int(trim(line)).eq.1)then 
+            IS_CART_SIM = .true.
+          else 
+            write(*,*)'ERROR: SL SIM_TYPE must be GLOBAL (0) or CARTESIAN (1)'
+            stop 
+          endif 
+          sl_read_ctr = sl_read_ctr + 1 
+        else
+          ! PROCESS MAIN DATA IN FILE
+          ! Line isnt a comment so process it: 
+          ! First line must be the number of ice objects 
+          nsl_obj = str2int(trim(line))
+          sl_read_ctr = sl_read_ctr + 1 
+
+          ! Allocate the iceobj array - stores details read in
+          ! max params to describe object is currently 5....
+          allocate(slobjs(nsl_obj, 5))
+          slobjs = -1.0
+
+          ! Reading an object: 
+          do nline = 1, nsl_obj
+            read(11,'(A)',IOSTAT=read_stat)line   
+            ! progress string line delimited by space: 
+            
+            kold = 0
+            k    = 250
+            i    = 1
+            do 
+              k = INDEX(trim(line(kold+1:250)), ' ')
+              if (k.eq.0) then
+                ! Either empty or no spaces left.
+                slobjs(nline, i) = str2real(trim(line(kold+1:)))
+                exit 
+              endif 
+              slobjs(nline, i) = str2real(line(kold+1:kold+ k-1))
+              kold = k + kold
+              i = i + 1
+            enddo 
+          enddo 
+
+        endif ! sl_read_ctr
+      endif ! is/isnt blank/comment
+
+    elseif(read_stat==-1)then 
+      ! End of File: 
+      exit 
+    else
+      ! Error reading line  
+      write(*,*)'ERROR READING LINE OF SEA LEVEL FILE '    
+    endif 
+  enddo 
+endif 
+
+! Read ICE file: 
+ice_read_ctr = 0 
+if(is_ICE)then 
+
+  ! Open the file
+  fname= trim(SL_path)//trim(icefile)
+  open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
+  if( ios /= 0 ) then
+    write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
+    return
+  endif
+
+  ! Read first line - number of different ice objects (deltas, cylinders...)
+  do 
+    read(11,*,IOSTAT=read_stat)line 
+
+    if (read_stat==0)then 
+      ! Line read and needs processing 
+      if (isblank(line) .or. iscomment(line,'#'))then
+        cycle 
+      else 
+        ! Line isnt a comment so process it: 
+        ! First line must be the number of ice objects 
+        nice_obj = str2int(trim(line))
+        ice_read_ctr = ice_read_ctr + 1 
+
+        ! Allocate the iceobj array - stores details read in
+        ! max params to describe object is currently 5....
+        allocate(iceobjs(nice_obj, 5))
+        iceobjs = -1.0
+        ! Reading an object: 
+
+
+        do nline = 1, nice_obj
+          read(11,'(A)',IOSTAT=read_stat)line   
+           ! progress string line delimited by space: 
+          
+          kold = 0
+          k    = 250
+          i    = 1
+          do 
+            k = INDEX(trim(line(kold+1:250)), ' ')
+            if (k.eq.0) then
+              ! Either empty or no spaces left.
+              iceobjs(nline, i) = str2real(trim(line(kold+1:)))
+              exit 
+            endif 
+            iceobjs(nline, i) = str2real(line(kold+1:kold+ k-1))
+            kold = k + kold
+            i = i + 1
+            
+          enddo 
+        enddo 
+      endif 
+
+    elseif(read_stat==-1)then 
+      ! End of File: 
+      exit 
+    else
+      ! Error reading line  
+      write(*,*)'ERROR READING LINE OF SEA LEVEL FILE '    
+    endif 
+  enddo 
+
+
+  ! Open the iceratefile file
+  fname= trim(SL_path)//trim(iceratefile)
+  open(unit=11,file=trim(fname),status='old',action='read',iostat = ios)
+  if( ios /= 0 ) then
+    write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
+    return
+  endif
+
+  ! Read in icerate values: 
+  if(myrank.eq.0)then
+    write(*,*)'Reading the icerate values...'
+  endif
+
+  allocate(icerate(nstep))
+  icerate = zero 
+
+
+  ! Get user-specified type of input: 
+  ! 0 is equal for all timesteps
+  read(11,*)iceratetype
+  if(iceratetype.eq.0)then ! specify each timestep 
+      ! Get total number of entries in iceratefile
+      read(11,*)n_iceratevals
+
+      ! Load each one and store in element of array that 
+      ! corresponds to timestep e.g. 5th timestep in 5th element
+      do iirate = 1, n_iceratevals
+        read(11,*)icerate_ind, icerateval_tmp
+        icerate(icerate_ind) = icerateval_tmp
+      enddo
+  elseif(iceratetype.eq.1)then! uniform across timesteps
+    read(11,*)icerateval_tmp
+    icerate = icerateval_tmp
+  else 
+    write(*,*)'ERROR: Icerate first line must specify type of input - currently 0 or 1'
+    stop
+  endif
+
 endif
 
 ! Read material id
@@ -1126,6 +1610,7 @@ read(11,*)nmatblk
 allocate(isempty_blk(nmatblk),mat_domain(nmatblk),type_blk(nmatblk), &
 gam_blk(nmatblk),rho_blk(nmatblk),ym_blk(nmatblk),coh_blk(nmatblk),  &
 nu_blk(nmatblk),phi_blk(nmatblk),psi_blk(nmatblk),water(nmatblk))
+allocate(isplastic_blk(nmatblk))
 allocate(mfile_blk(nmatblk))
 ! initilize
 isempty_blk=.false.
@@ -1138,26 +1623,45 @@ nu_blk=-inftol
 coh_blk=-inftol
 phi_blk=-inftol
 psi_blk=-inftol
+isplastic_blk=.false.
 allocate(ismat(nmatblk))
 ismat=.false.
+
 do i=1,nmatblk
   ! This will read a line and proceed to next line
   ! if the input line is long enough only the part of the lineword will be
   ! filled
+
   lineword=""
+  line=''
   read(11,'(a)',iostat=ios)line
   read(line,*,iostat=ios)lineword
+
   imat=str2int(lineword(1))
+
   mat_domain(imat)=str2int(lineword(2))
+
+
   type_blk(imat)=str2int(lineword(3))
+
   if(type_blk(imat).eq.0)then
     ! block material properties
+   
+
     if(isdensity)then
+      
       rho_blk(imat)=str2real(lineword(4))
+      
+
       gam_blk(imat)=agrav*rho_blk(imat)
+
     else
+
       gam_blk(imat)=str2real(lineword(4))
+
       rho_blk(imat)=gam_blk(imat)/agrav
+
+
     endif
 
     ym_blk(imat)=str2real(lineword(5))
@@ -1166,6 +1670,19 @@ do i=1,nmatblk
     coh_blk(imat)=str2real(lineword(8))
     psi_blk(imat)=str2real(lineword(9))
 
+    ! Check phi_blk value
+    if(phi_blk(imat).gt.90.0_kreal)then
+      write(*,*)'ERROR: invalid internal friction angle:',phi_blk
+      stop
+    endif
+    if(psi_blk(imat).gt.90.0_kreal)then
+      write(*,*)'ERROR: invalid dilation angle:',psi_blk
+      stop
+    endif
+    if(phi_blk(imat).gt.ZERO .or. coh_blk(imat).gt.ZERO)then
+      !print*,'blk is platic:',imat
+      isplastic_blk(imat)=.true.
+    endif
     if(rho_blk(imat).eq.ZERO .and. ym_blk(imat).eq.ZERO)then
       isempty_blk(imat)=.true.
     endif
@@ -1180,6 +1697,14 @@ do i=1,nmatblk
     stop
   endif
 enddo
+!close(11)
+!! Nondimensionalization is NOT fully implemented for plasticity
+!if(isplastic.and.devel_nondim)then
+!  write(*,'(a,a)')'WARNING: nondim=1 is NOT valid for plastic case!', &
+!                         'Changing to nondim=0!'
+!  devel_nondim=.false.
+!endif
+
 if(count(.not.ismat).gt.0)then
   write(errtag,'(a,a)')'ERROR: some material blocks are undefined!'//new_line('a'), &
                          'HINT: please check material list file!'
@@ -1309,6 +1834,99 @@ if(POT_TYPE==PMAGNETIC)then
     return
   endif
 endif
+
+! read electrical conductivity information
+if(POT_TYPE==PELECTRIC)then
+  do i_line=1,NMAXLINE
+    read(11,'(a)',iostat=ios)line
+    ! This will read a line and proceed to next line
+    if (ios/=0)exit
+    ! check for blank and comment line
+    if (isblank(line) .or. iscomment(line,'#'))cycle
+
+    call first_token(line,token)
+    if (trim(token)=='electrical_conductivity:')then
+      if(electric_stat==1)then
+        write(errtag,*)'ERROR: copy of line type "electrical_conductivity:" not permitted!'
+        return
+      endif
+      read(11,*)nmatblk_electric
+      allocate(econtype_blk(nmatblk_electric))
+      allocate(econductivity1_blk(nmatblk_electric), &
+               econductivity2_blk(nmatblk_electric), &
+               econductivity3_blk(nmatblk_electric))
+      allocate(econalpha_blk(nmatblk_electric), &
+               econbeta_blk(nmatblk_electric), &
+               econgamma_blk(nmatblk_electric))
+      allocate(iselectric_blk(nmatblk))
+      econductivity1_blk=ZERO
+      econductivity2_blk=ZERO
+      econductivity3_blk=ZERO
+      econalpha_blk=ZERO
+      econbeta_blk=ZERO
+      econgamma_blk=ZERO
+      iselectric_blk=.false.
+      do i=1,nmatblk_electric
+        read(11,*)imat,econtype_blk(imat),econductivity1_blk(imat), &
+                econductivity2_blk(imat),econductivity3_blk(imat), &
+                econalpha_blk(imat),econbeta_blk(imat),econgamma_blk(imat)
+        iselectric_blk(imat)=.true.
+      enddo
+      econalpha_blk=DEG2RAD*econalpha_blk 
+      econbeta_blk=DEG2RAD*econbeta_blk 
+      econgamma_blk=DEG2RAD*econgamma_blk
+      econductivity_aniso=any(econtype_blk.eq.1)
+      electric_stat=1
+      cycle
+    endif
+
+  enddo
+  ! check electric status
+  if (electric_stat /= 1)then
+    write(errtag,'(a)')'ERROR: cannot read electrical conductivity information! make sure &
+    &the "electrical_conductivity:" information is added in the material list file.'
+    return
+  endif
+endif
+! read electrical charge information
+if(POT_TYPE==PCHARGE)then
+  do i_line=1,NMAXLINE
+    read(11,'(a)',iostat=ios)line
+    ! This will read a line and proceed to next line
+    if (ios/=0)exit
+    ! check for blank and comment line
+    if (isblank(line) .or. iscomment(line,'#'))cycle
+
+    call first_token(line,token)
+    if (trim(token)=='charge_density:')then
+      if(charge_stat==1)then
+        write(errtag,*)'ERROR: copy of line type "charge_density:" not permitted!'
+        return
+      endif
+      read(11,*)nmatblk_charge
+      allocate(charge_density_blk(nmatblk_charge))
+      allocate(ischarge_blk(nmatblk))
+      charge_density_blk=ZERO
+      ischarge_blk=.false.
+      do i=1,nmatblk_charge
+        read(11,*)imat,charge_density
+        charge_density_blk(i)=charge_density
+        ischarge_blk(imat)=.true.
+      enddo
+      !print*,'charge density:',maxval(abs(charge_density_blk)) 
+      charge_stat=1
+      cycle
+    endif
+
+  enddo
+  ! check charge status
+  if (charge_stat /= 1)then
+    write(errtag,'(a)')'ERROR: cannot read charge density information! make sure &
+    &the "charge_density:" information is added in the material list file.'
+    return
+  endif
+endif
+close(11)
 
 ! infinite elements 
 if(infbc)then

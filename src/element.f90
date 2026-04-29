@@ -36,6 +36,7 @@ integer :: hex8_gnode(8)
 real(kind=kreal) :: hexface_sign(6)
 ! face sign or normal orientation (outward +, inward -)
 
+! Face of a Hex element
 type hex_face
   integer,allocatable :: node(:)
   integer :: gnode(4) ! geometric (corner) nodes only
@@ -43,10 +44,14 @@ type hex_face
 end type hex_face
 type (hex_face) :: hexface(6)
 
+! Edge of a face of a hex element
 type hex_face_edge
-  ! node index in ngllx * nglly * ngllz
+  ! node index in 3D indexing: ngllx * nglly * ngllz
+  ! stores all edge node indices in 3D indexing: ngllx*nglly*ngllz mapping. 
   integer,allocatable :: node(:)
-  ! node index in ngllx * nglly or nglly * ngllz, etc.
+  ! node index in 2D indexing ngllx * nglly or nglly * ngllz, etc.
+  ! stores all edge node index in 2D indexing
+  ! ngllx*nglly or nglly*ngllz mapping
   integer,allocatable :: fnode(:)
 end type hex_face_edge
 type (hex_face_edge) :: hexface_edge(6,4) ! each of 6 HEX faces has 4 edges 
@@ -54,7 +59,7 @@ contains
 
 !-------------------------------------------------------------------------------
 subroutine prepare_hex(errcode,errtag)
-use global,only:ngllx,ngllz,ngll,ngllxy
+use global,only:ngllx,ngllz,ngll,ngllxy, logunit
 implicit none
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
@@ -64,6 +69,7 @@ errcode=-1
 
 ! geometrical nodes (corner nodes) in EXODUS/CUBIT order
 ! bottom nodes
+
 hex8_gnode(1)=1;
 hex8_gnode(2)=ngllx
 hex8_gnode(3)=ngllxy;
@@ -74,6 +80,7 @@ hex8_gnode(6)=hex8_gnode(5)+ngllx-1
 hex8_gnode(7)=ngll;
 hex8_gnode(8)=hex8_gnode(7)-ngllx+1
 
+
 errcode=0
 return
 
@@ -81,7 +88,7 @@ end subroutine prepare_hex
 !===============================================================================
 
 subroutine prepare_hexface(errcode,errtag)
-use global,only:ngllx,nglly,ngllz,ngllxy,ngllyz,ngllzx,nndof
+use global,only:ngllx,nglly,ngllz,ngllxy,ngllyz,ngllzx,nndof, logunit, myrank
 use math_constants,only:ONE
 implicit none
 integer,intent(out) :: errcode
@@ -98,51 +105,65 @@ integer,allocatable :: indx(:),indy(:),indz(:)
 errtag="ERROR: unknown!"
 errcode=-1
 
+
 allocate(hexface(1)%node(ngllzx),hexface(3)%node(ngllzx))
 allocate(hexface(2)%node(ngllyz),hexface(4)%node(ngllyz))
 allocate(hexface(5)%node(ngllxy),hexface(6)%node(ngllxy))
+
 
 ! local node numbers for the faces (faces are numbered in exodus/CUBIT
 ! convention)
 inode=0
 i1=0; i2=0; i3=0; i4=0; i5=0; i6=0
 do k=1,ngllz
+  
   do j=1,nglly
+
     do i=1,ngllx
       inode=inode+1
+      
+
       if (i==1)then
-        ! face 4
         i4=i4+1
         hexface(4)%node(i4)=inode
+
       endif
+
       if (i==ngllx)then
-        ! face 2
         i2=i2+1
         hexface(2)%node(i2)=inode
+
       endif
+
       if (j==1)then
-        ! face 1
         i1=i1+1
         hexface(1)%node(i1)=inode
+
       endif
+
       if (j==nglly)then
-        ! face 3
         i3=i3+1
         hexface(3)%node(i3)=inode
+
       endif
+
       if (k==1)then
-        ! face 5
         i5=i5+1
         hexface(5)%node(i5)=inode
+
+        !write(logunit,*)'hexface(5).node(',i5,') = ', inode
       endif
+
       if (k==ngllz)then
-        ! face 6
         i6=i6+1
         hexface(6)%node(i6)=inode
       endif
     enddo
+
   enddo
 enddo
+
+
 
 ! find geometric corners nodes
 do i_face=1,6 ! there are 6 faces in a hexahedron
@@ -166,6 +187,9 @@ do i_face=1,6 ! there are 6 faces in a hexahedron
     return
   endif
 enddo
+
+
+
 
 ! orientation of the normals
 hexface_sign(1)=one
@@ -199,6 +223,10 @@ do i_face=1,6
   enddo
 enddo
 
+
+
+
+
 ! face_edge_nodes
 allocate(indx(ngllx),indy(nglly),indz(ngllz))
 
@@ -215,23 +243,36 @@ ny=ngllz
 iedge=1
 do j=1,1
   jm1=j-1
+
   do i=1,nx
     indx(i)=jm1*nx+i
+
   enddo
 enddo
+
+
 hexface_edge(iface,iedge)%fnode=indx
 hexface_edge(iface,iedge)%node=hexface(iface)%node(indx)
 
+
+
 ! edge 2 => [2,6]
 iedge=2
+
 do j=1,ny
+
   jm1=j-1
+
+
   do i=nx,nx
+
     indy(j)=jm1*nx+i
+
   enddo
 enddo
 hexface_edge(iface,iedge)%fnode=indy
 hexface_edge(iface,iedge)%node=hexface(iface)%node(indy)
+
 
 ! edge 3 => [6,5]
 iedge=3
@@ -521,8 +562,16 @@ hexface_edge(iface,iedge)%fnode=indy
 hexface_edge(iface,iedge)%node=hexface(iface)%node(indy)
 !-------------------------------------------------------------------------------
 
+
 deallocate(indx,indy,indz)
+
+if(myrank.eq.0)then
+  write(logunit, *)'✓ Finished preparing hexahedra faces'
+  write(logunit, *)
+endif 
 errcode=0
+
+
 return
 
 end subroutine prepare_hexface
@@ -620,7 +669,6 @@ function isort2(v2) result(s2)
 implicit none
 integer,dimension(2),intent(in) :: v2
 integer,dimension(2) :: s2
-integer :: i,id
 
 if(v2(1).gt.v2(2))then
   s2(1)=v2(2)

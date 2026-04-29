@@ -8,6 +8,7 @@ mesh: xfile='socalg_coord_x', &
       yfile='socalg_coord_y', &
       zfile='socalg_coord_z', &
       confile='socalg_connectivity', &
+      fsfile='socalg_free_surface', &
       idfile='socalg_material_id', &
       gfile='socalg_ghost'
 
@@ -16,7 +17,6 @@ bc: ubc=0, &
     uxfile='socalg_ssbcux', &
     uyfile='socalg_ssbcuy', &
     uzfile='socalg_ssbcuz', &
-    fsfile='socalg_free_surface', &
     infbc=1, &
       add_infmesh=1, &
       infrfile='socalg_infinite_surface', &
@@ -38,7 +38,7 @@ bc: ubc=0, &
 #traction: trfile='socalg_free_surface',case='internal'
 
 #earthquake slip or CMT file. 0 = slip,1 = CMT, 2 = Finite fault, 3 = Slip with split node
-eqsource: type=1, cmtfile='CMTSOLUTION_NorthRidge'
+eqsource: type=1, cmtfile='CMTSOLUTION_NorthRidge', mapto='UTM'
 
 #material list
 material: matfile='socalg_material_list',density=1

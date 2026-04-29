@@ -27,6 +27,7 @@ subroutine prepare_ghost()
 use element
 use global,only:ndim,nnode,nndof,ngllx,nglly,ngllz,g_num0,g_num,g_coord,gfile, &
 part_path,proc_str,file_head,stdout
+use shared
 use math_library, only : iquick_sort,sort_array_coord
 use math_library_mpi, only : maxscal
 
@@ -107,14 +108,14 @@ open(unit=11,file=trim(fname),access='stream',form='unformatted',    &
 status='old',action='read',iostat=istat)
 if (istat /= 0)then
   write(errtag,'(a)')'ERROR: file "'//trim(fname)//'" cannot be opened!'
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
 endif
 read(11)sline
 read(11)mrank ! master partition ID
 
 if(mrank/=myrank)then
   write(errtag,*)'ERROR: wrong gpart file partition ',mrank,' !'
-  call control_error(errcode,errtag,stdout,myrank)
+  call control_error(errcode,errtag,stdout)
 endif
 
 read(11)sline
@@ -128,7 +129,7 @@ ofname='tmp/'//trim(file_head)//'_partitioninfo'//trim(adjustl(proc_str))
 open(unit=22,file=trim(ofname),access='stream',form='unformatted',             &
 status='replace',action='write',iostat=istat)
 if (istat /= 0)then
-  write(*,'(a)')'ERROR: output file "'//trim(fname)//'" cannot be opened!'
+  write(*,'(a)')'ERROR: output file "'//trim(ofname)//'" cannot be opened!'
   stop
 endif
 write(22)nnode
@@ -163,7 +164,7 @@ do i_gpart=1,ngpart ! ghost partitions loop
       eid=get_faceidHEX8(inode4,gnode8)
     else
       write(errtag,*)'ERROR: wrong etype:',etype,' for ghost partition ',mrank,'!'
-      call control_error(errcode,errtag,stdout,myrank)
+      call control_error(errcode,errtag,stdout)
     endif
 
     ! initialize
@@ -185,7 +186,7 @@ do i_gpart=1,ngpart ! ghost partitions loop
       kg0=minval(kgn(node_face(:,eid))); kg1=maxval(kgn(node_face(:,eid)))
     else
       write(errtag,*)'ERROR: wrong etype:',etype,' for ghost partition ',mrank,'!'
-      call control_error(errcode,errtag,stdout,myrank)
+      call control_error(errcode,errtag,stdout)
     endif
 
     do k_g=kg0,kg1
@@ -230,7 +231,7 @@ do i_gpart=1,ngpart ! ghost partitions loop
   deallocate(xp,yp,zp)
   if(ncount/=new_ncount)then
     write(errtag,*)'ERROR: number of ghost nodes mismatched after sorting!'
-    call control_error(errcode,errtag,stdout,myrank)
+    call control_error(errcode,errtag,stdout)
   endif
 
   ! find ghost gdof
@@ -287,6 +288,47 @@ do i_gpart=1,ngpart
 enddo ! do i_gpart
 return
 end subroutine modify_ghost
+
+!===============================================================================
+
+! This subroutine assembles the contributions of all ghost partitions
+! at gdof locations
+subroutine send_ghosts_for_gpu_mode(nndof,neq,send_array,recv_array)
+!use math_library, only : maxscal_par
+use mpi
+implicit none
+integer,intent(in) :: nndof,neq
+real(kind=kreal),dimension(nndof*maxngnode,ngpart), intent(in) :: send_array
+real(kind=kreal),dimension(nndof*maxngnode,ngpart), intent(out) :: recv_array
+integer,parameter :: tag=0
+integer, dimension(MPI_STATUS_SIZE) :: mpistatus
+integer,dimension(ngpart) :: send_req,recv_req
+real(kind=kreal),parameter :: zero=0.0_kreal
+integer :: ierr,i_gpart,ncount
+
+do i_gpart=1,ngpart
+  ncount=gpart(i_gpart)%nnode*nndof
+  ! send
+  call MPI_ISSEND(send_array(:,i_gpart),ncount,MPI_KREAL,gpart(i_gpart)%rank,  &
+  tag,MPI_COMM_WORLD,send_req(i_gpart),ierr)
+  ! receive
+  call MPI_IRECV(recv_array(:,i_gpart),ncount,MPI_KREAL,gpart(i_gpart)%rank,   &
+  tag,MPI_COMM_WORLD,recv_req(i_gpart),ierr)
+enddo
+! wait for receive-communications completion (recv)
+do i_gpart=1,ngpart
+  call MPI_WAIT(recv_req(i_gpart),mpistatus,ierr)
+enddo
+
+! wait for send communications completion (send)
+do i_gpart=1,ngpart
+  call MPI_WAIT(send_req(i_gpart),mpistatus,ierr)
+enddo
+call sync_process()
+return
+end subroutine send_ghosts_for_GPU_mode
+
+
 !===============================================================================
 
 ! This subroutine assembles the contributions of all ghost partitions

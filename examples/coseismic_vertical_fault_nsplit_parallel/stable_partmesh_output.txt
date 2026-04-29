@@ -1,0 +1,37 @@
+reading main input file...
+ infinite elements: NO
+ * Detected devel flag
+ 
+ relaxation time factor: 1.00000
+complete!
+reading mesh & material IDs...
+ element valency of fault node MIN MAX:           1           4
+ element valency of fault node MIN MAX:           1           4
+complete!
+reading material properties...
+ Number of empty blocks: 0
+ Number of viscoelastic blocks: 0
+complete!
+ partition directory: ./partition/
+ matfile: vfault_material_list
+ nodes valence: 
+   min =            1 max =            8
+   nsize =            8 sup_neighbour =           38
+ mesh2dual: 
+   max_neighbour =           26
+   sup_neighbour =           38
+ mat id:           1           1
+ domains: T T F
+ domains: F F F
+ domains: F F F
+ domains: F F F
+ num_material:           1           1
+writing bc files... ./input/vfault_ssbcux
+nbc=  1... ./input/vfault_ssbcuy
+nbc=  1... ./input/vfault_ssbcuz
+nbc=  1... ./input/vfault_free_surface
+complete!
+writing fault slip files...nfs=  1...nfs=  1...complete!
+ number of partitions:           40
+ mesh partitioning finished successfully!
+ -----------------------------------------

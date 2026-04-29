@@ -1,29 +1,50 @@
-# cmake file for the cross-platform configure of the
+# CMake file for the cross-platform configure of the
 # software package SPECFEMX
 # REVISION:
 #   HNG, Mar 24,2017; HNG, Sep 06,2011;
 
-# required cmake version
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.4 FATAL_ERROR)
-
-# define project
-PROJECT(semgeotech Fortran C)
+# Required cmake version
+CMAKE_MINIMUM_REQUIRED(VERSION 3.16 FATAL_ERROR)
+SET(CMAKE_DEPENDS_USE_COMPILER FALSE)
+SET(ENABLE_CUDA OFF CACHE BOOL "Build specfem-x with CUDA support")
+IF(ENABLE_CUDA)
+  PROJECT(specfem-x Fortran C CUDA)
+ELSE(ENABLE_CUDA)
+  PROJECT(specfem-x Fortran C)
+ENDIF(ENABLE_CUDA)
+# Define project
 
 #SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake-modules")
 
 # Disallow in-source build
-IF("${semgeotech_SOURCE_DIR}"  STREQUAL "${semgeotech_BINARY_DIR}")
-  MESSAGE(FATAL_ERROR "SPECFEMX requires an out-of-source build. Please create a separate build directory and run CMake there.")
-ENDIF("${semgeotech_SOURCE_DIR}"  STREQUAL "${semgeotech_BINARY_DIR}")
+IF("${specfem-x_SOURCE_DIR}"  STREQUAL "${specfem-x_BINARY_DIR}")
+  MESSAGE(FATAL_ERROR "Specfem_X requires an out-of-source build. Please create a separate build directory and run CMake there.")
+ENDIF("${specfem-x_SOURCE_DIR}"  STREQUAL "${specfem-x_BINARY_DIR}")
 
-# Set a default build type if none was specified                                
-IF(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)                      
-  MESSAGE(STATUS "Setting build type to 'Debug' as none was specified.")        
-  SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)    
-  # Set the possible values of build type for cmake-gui                         
-  SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"        
-  "MinSizeRel" "RelWithDebInfo")                                              
+# Set a default build type if none was specified
+IF(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  MESSAGE(STATUS "Setting build type to 'Debug' as none was specified.")
+  SET(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 ENDIF()
+
+#  ADD compiler specific flags
+if(CMAKE_Fortran_COMPILER_ID MATCHES Intel)
+    set(CMAKE_Fortran_FLAGS         "${CMAKE_Fortran_FLAGS} -xHOST -fpe0 -ftz -assume buffered_io -assume byterecl -align sequence -std08 -diag-disable 6477 -implicitnone -gen-interfaces -warn all -Wall")
+    set(CMAKE_Fortran_FLAGS_DEBUG   "${CMAKE_Fortran_FLAGS_DEBUG} -check all -check uninit -debug -g -O0 -fp-stack-check -traceback -ftrapuv -fsanitize=memory")
+    set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O3 -ip")
+endif()
+
+if(CMAKE_Fortran_COMPILER_ID MATCHES GNU)
+    set(CMAKE_Fortran_FLAGS         "${CMAKE_Fortran_FLAGS} -std=f2008 -fimplicit-none -fmax-errors=10 -pedantic -pedantic-errors -ffree-line-length-none -Waliasing -Wampersand -Wsurprising -Wno-tabs -Wunderflow -ffpe-trap=invalid,zero,overflow")
+    set(CMAKE_Fortran_FLAGS_DEBUG   "-g -O0 -fbacktrace -fbounds-check -frange-check")
+    set(CMAKE_Fortran_FLAGS_RELEASE "-O3 -finline-functions")
+endif()
+## Optionally, print flags to check if they are being applied correctly
+#message(STATUS "CMAKE_Fortran_FLAGS: ${CMAKE_Fortran_FLAGS}")
+#message(STATUS "CMAKE_Fortran_FLAGS_DEBUG: ${CMAKE_Fortran_FLAGS_DEBUG}")
+#message(STATUS "CMAKE_Fortran_FLAGS_RELEASE: ${CMAKE_Fortran_FLAGS_RELEASE}")
 
 # Test Fortran compiler
 TRY_COMPILE(TEST_F90 ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src/testf90.f90)
@@ -31,38 +52,39 @@ IF(NOT TEST_F90)
   MESSAGE(FATAL_ERROR "Fortran compiler: ${CMAKE_Fortran_COMPILER} doesn't work! Please set working CMAKE_Fortran_COMPILER!")
 ENDIF(NOT TEST_F90)
 
-# build directories
+# Build directories
 SET(BDIR ${CMAKE_BINARY_DIR}/bin)
 SET(DDIR ${CMAKE_BINARY_DIR}/doc)
 SET(IDIR ${CMAKE_BINARY_DIR}/input)
 SET(LDIR ${CMAKE_BINARY_DIR}/lib)
 SET(ODIR ${CMAKE_BINARY_DIR}/output)
 SET(PDIR ${CMAKE_BINARY_DIR}/partition)
-SET(PDIR ${CMAKE_BINARY_DIR}/tmp)
+SET(TDIR ${CMAKE_BINARY_DIR}/tmp)
 SET(SDIR ${CMAKE_SOURCE_DIR})
 FILE(MAKE_DIRECTORY ${BDIR})
 #FILE(MAKE_DIRECTORY ${DDIR})
-FILE(MAKE_DIRECTORY ${IDIR}) 
-FILE(MAKE_DIRECTORY ${ODIR}) 
-FILE(MAKE_DIRECTORY ${PDIR}) 
+FILE(MAKE_DIRECTORY ${IDIR})
+FILE(MAKE_DIRECTORY ${ODIR})
+FILE(MAKE_DIRECTORY ${PDIR})
 
-# set paths to executable and libraries
+# Set paths to executable and libraries
 SET(EXECUTABLE_OUTPUT_PATH ${BDIR})
 SET(LIBRARY_OUTPUT_PATH ${LDIR})
 
-# set internal default logical variables
+# Set internal default logical variables
 SET(ISDOCUMENTATION OFF)
 SET(ISPARTMESH OFF)
 SET(ISPARALLEL OFF)
+SET(ISCOMPLEX OFF)
 
-# build documentation option
+# Build documentation option
 SET(BUILD_DOCUMENTATION OFF CACHE BOOL "Build documentation for
-SPECFEM3D_GEOTECH")
+SPECFEM-X")
 IF(BUILD_DOCUMENTATION)
   SET(ISDOCUMENTATION ON)
   FIND_PACKAGE(LATEX REQUIRED)
   IF(NOT PDFLATEX_COMPILER OR NOT BIBTEX_COMPILER)
-    MESSAGE(WARNING "LaTeX compiler/s not found! DOCUMENTATION cannot be built!"    )
+    MESSAGE(WARNING "LaTeX compiler/s not found! DOCUMENTATION cannot be built!" )
   SET(ISDOCUMENTATION OFF)
   ENDIF(NOT PDFLATEX_COMPILER OR NOT BIBTEX_COMPILER)
 ENDIF(BUILD_DOCUMENTATION)
@@ -70,7 +92,7 @@ ENDIF(BUILD_DOCUMENTATION)
 #SET(BUILD_SLOPE ON CACHE BOOL "Build slope stability program")
 #SET(BUILD_EXCAVATION ON CACHE BOOL "Build excavation program")
 
-# build partmesh option
+# Build partmesh option
 SET(BUILD_PARTMESH OFF CACHE BOOL "Build mesh partitioning program")
 IF(BUILD_PARTMESH)
   SET(ISPARTMESH ON)
@@ -94,15 +116,15 @@ SET(BUILD_UTIL_EXODUSOLD2SEM OFF CACHE BOOL "Build exodusold2sem program")
 SET(BUILD_UTIL_WRITE_SOS OFF CACHE BOOL "Build write_sos program")
 
 # MPI for parallel processing
-SET(ENABLE_MPI ON CACHE BOOL "Build semgeotech with MPI support")
+SET(ENABLE_MPI OFF CACHE BOOL "Build specfem-x with MPI support")
 IF(ENABLE_MPI)
   SET(ISPARALLEL ON)
   FIND_PACKAGE(MPI COMPONENTS Fortran REQUIRED)
   IF(NOT MPI_FOUND)
-    MESSAGE(WARNING "MPI Fortran compiler not found! Parallel semgeotech cannot be built!")
+    MESSAGE(WARNING "MPI Fortran compiler not found! Parallel specfem-x cannot be built!")
     SET(ISPARALLEL OFF)
   ENDIF(NOT MPI_FOUND)
-  
+
   # Test MPI Fortran compiler
   TRY_COMPILE(TEST_MPI ${CMAKE_BINARY_DIR}/CMakeTmp ${CMAKE_SOURCE_DIR}/src/testmpi.f90
   #COMPILE_DEFINITIONS USE_MPI
@@ -110,40 +132,45 @@ IF(ENABLE_MPI)
   LINK_LIBRARIES ${MPI_Fortran_LIBRARIES}
   OUTPUT_VARIABLE test)
   IF(NOT TEST_MPI)
-    MESSAGE(WARNING "MPI Fortran compiler: ${MPI_Fortran_COMPILER} doesn't work! Parallel semgeotech cannot be built! ${test}")
+    MESSAGE(WARNING "MPI Fortran compiler: ${MPI_Fortran_COMPILER} doesn't work! Parallel specfem-x cannot be built! ${test}")
     SET(ISPARALLEL OFF)
-  ENDIF(NOT TEST_MPI) 
+  ENDIF(NOT TEST_MPI)
 ENDIF(ENABLE_MPI)
 
-# to be used with cmake-modules
+# To be used with cmake-modules
 #FIND_PACKAGE(PETSc COMPONENTS Fortran REQUIRED)
 #IF(NOT MPI_FOUND)
-#  MESSAGE(WARNING "MPI Fortran compiler not found! Parallel semgeotech cannot be built!")
+#  MESSAGE(WARNING "MPI Fortran compiler not found! Parallel specfem-x cannot be built!")
 #  SET(ISPARALLEL OFF)
 #ENDIF(NOT MPI_FOUND)
 # PETSC library for solver
-SET(ENABLE_PETSC ON CACHE BOOL "Build with PETSC support")
+SET(ENABLE_PETSC OFF CACHE BOOL "Build with PETSC support")
 IF(ENABLE_PETSC)
-  SET(ISPETSC ON)
+  SET(USE_PETSC ON)
   IF(EXISTS $ENV{PETSC_DIR})
     SET(PETSC_DIR $ENV{PETSC_DIR} CACHE PATH "PETSc directory.")
   ELSE()
-    MESSAGE(WARNING "Please set correct PETSC_DIR environement variable to use PETSc!")
-    SET(ISPETSC OFF)
+    MESSAGE(WARNING "Please set correct PETSC_DIR environment variable to use PETSc!")
+    SET(USE_PETSC OFF)
   ENDIF()
   IF(EXISTS $ENV{PETSC_DIR}/$ENV{PETSC_ARCH})
     SET(PETSC_ARCH $ENV{PETSC_DIR}/$ENV{PETSC_ARCH} CACHE PATH "PETSC_ARCH directory.")
   ELSE()
-    MESSAGE(WARNING "Please set correct PETSC_ARCH environement variable to use PETSc!")
-    SET(ISPETSC OFF)
+    MESSAGE(WARNING "Please set correct PETSC_ARCH environment variable to use PETSc!")
+    SET(USE_PETSC OFF)
   ENDIF()
 ENDIF(ENABLE_PETSC)
 
-# process CMakeLists.txt in other subdirectories
+# Complex number solver
+SET(ENABLE_COMPLEX_SOLVER OFF CACHE BOOL "Enable complex number solver")
+IF(ENABLE_COMPLEX_SOLVER)
+  SET(ISCOMPLEX ON)
+ENDIF(ENABLE_COMPLEX_SOLVER)
+
+# Process CMakeLists.txt in other subdirectories
 ADD_SUBDIRECTORY(doc)
 ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(util)
 
-# notes
+# Notes
 #SET_SOURCE_FILES_PROPERTIES(${SRC} PROPERTIES LANGUAGE "C")
-

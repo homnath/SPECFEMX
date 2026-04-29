@@ -57,9 +57,6 @@ if(ipass==0)then
     else
       i_inf=i_inf+1
       elmt_infinite(i_inf)=i_elmt
-      if(myrank==0)then
-        if(i_elmt==9134)print*,i_elmt,i_inf
-      endif
     endif
   enddo
   if(myrank==0)then
@@ -699,7 +696,7 @@ call zwgljd(gllpz,gllwz,ngllz,jacobi_alpha,jacobi_beta)
 ! gauss-jacobi or gauss-legendre points and weights
 call zwgjd(igllpx,igllwx,nipx,jacobi_alpha,jacobi_beta)
 if(nip.ne.8.and.nip.ne.27.and.nip.ne.64)then
-  print*,'ERROR: illegal number of Gauss points:',nip,'!'
+  print*,'ERROR: invalid number of Gauss points:',nip,'!'
   stop
 endif
 igllpy=igllpx; igllpz=igllpx;
@@ -943,7 +940,7 @@ call zwgljd(gllpz,gllwz,ngllz,jacobi_alpha,jacobi_beta)
 ! gauss-jacobi or gauss-legendre points and weights
 call zwgjd(igllpx,igllwx,nipx,jacobi_alpha,jacobi_beta)
 if(nip.ne.8.and.nip.ne.27.and.nip.ne.64)then
-  print*,'ERROR: illegal number of Gauss points:',nip,'!'
+  print*,'ERROR: invalid number of Gauss points:',nip,'!'
   stop
 endif
 igllpy=igllpx; igllpz=igllpx;
@@ -1064,7 +1061,7 @@ call zwgjd(gllpx,gllwx,nipx,jacobi_alpha,jacobi_beta)
 !  gllwx(1)=five/9.0_kreal; gllwx(2)=8.0_kreal/9.0_kreal; gllwx(3)=gllwx(1);
 !else
 if(nip.ne.8.and.nip.ne.27.and.nip.ne.64)then
-  print*,'ERROR: illegal number of Gauss points:',nip,'!'
+  print*,'ERROR: invalid number of Gauss points:',nip,'!'
   stop
 endif
 gllpy=gllpx; gllpz=gllpx;
@@ -1226,7 +1223,7 @@ real(kind=kreal) :: ddir
 real(kind=kreal),parameter :: one=1.0_kreal
 
 if(iface.lt.1.or.iface.gt.6)then
-  write(*,*)'ERROR: illegal outer face ID:',iface
+  write(*,*)'ERROR: invalid outer face ID:',iface
   stop
 endif
 
@@ -1296,7 +1293,7 @@ real(kind=kreal),dimension(ndim,ngllx) :: lagrangeINF_x,lagrangeINF_dx
 integer :: inc(ndim),ngllxINF0(ndim),ngllxINF(ndim),iINF,ind0(3),ind1(3)
 
 if(nip.ne.8.and.nip.ne.27.and.nip.ne.64)then
-  print*,'ERROR: illegal number of Gauss points:',nip,'!'
+  print*,'ERROR: invalid number of Gauss points:',nip,'!'
   stop
 endif
 
@@ -1434,7 +1431,7 @@ real(kind=kreal),dimension(ndim,ngllx) :: lagrange_x,lagrange_dx
 real(kind=kreal),dimension(ndim,ngllx) :: lagrangeINF_x,lagrangeINF_dx
 integer :: inc(ndim),ngllxINF0(ndim),ngllxINF(ndim),iINF,ind0(3),ind1(3)
 if(nip.ne.8.and.nip.ne.27.and.nip.ne.64)then
-  print*,'ERROR: illegal number of Gauss points:',nip,'!'
+  print*,'ERROR: invalid number of Gauss points:',nip,'!'
   stop
 endif
 
@@ -1559,7 +1556,7 @@ real(kind=kreal) :: ddir
 real(kind=kreal),parameter :: one=1.0_kreal
 
 if(iface.lt.1.or.iface.gt.6)then
-  write(*,*)'ERROR: illegal outer face ID:',iface
+  write(*,*)'ERROR: invalid outer face ID:',iface
   stop
 endif
 
@@ -1662,7 +1659,7 @@ elseif(nip==27)then
   gllpx(1)=-sqrt(3.0_kreal/five); gllpx(2)=0.0_kreal; gllpx(3)=-gllpx(1)
   gllwx(1)=five/9.0_kreal; gllwx(2)=8.0_kreal/9.0_kreal; gllwx(3)=gllwx(1);
 else
-  print*,'ERROR: illegal number of Gauss points:',nip,'!'
+  print*,'ERROR: invalid number of Gauss points:',nip,'!'
   stop
 endif
 gllpy=gllpx; gllpz=gllpx;
@@ -1766,7 +1763,7 @@ else
 endif
 
 if(iface.lt.1.or.iface.gt.6)then
-  write(*,*)'ERROR: illegal outer face ID:',iface
+  write(*,*)'ERROR: invalid outer face ID:',iface
   stop
 endif
 
@@ -1820,7 +1817,7 @@ elseif(nip==27)then
   gllpx(1)=-sqrt(3.0_kreal/five); gllpx(2)=0.0_kreal; gllpx(3)=-gllpx(1)
   gllwx(1)=five/9.0_kreal; gllwx(2)=8.0_kreal/9.0_kreal; gllwx(3)=gllwx(1);
 else
-  print*,'ERROR: illegal number of Gauss points:',nip,'!'
+  print*,'ERROR: invalid number of Gauss points:',nip,'!'
   stop
 endif
 gllpy=gllpx; gllpz=gllpx;
@@ -1921,7 +1918,7 @@ elseif(nip==27)then
   gllpx(1)=-sqrt(3.0_kreal/five); gllpx(2)=0.0_kreal; gllpx(3)=-gllpx(1)
   gllwx(1)=five/9.0_kreal; gllwx(2)=8.0_kreal/9.0_kreal; gllwx(3)=gllwx(1);
 else
-  print*,'ERROR: illegal number of Gauss points:',nip,'!'
+  print*,'ERROR: invalid number of Gauss points:',nip,'!'
   stop
 endif
 gllpy=gllpx; gllpz=gllpx;
@@ -2192,7 +2189,6 @@ implicit none
 real(kind=kreal),intent(in) :: ddir,gam,nd,xi
 real(kind=kreal) :: recn,r
 real(kind=kreal),parameter :: two=2.0_kreal
-!print*,gam; stop
 recn=1.0_kreal/nd
 r=(two**recn)*gam/(xi*xi*(gam**nd-two)-ddir*xi*gam**nd+two)**recn
 end function decay_function
@@ -2223,7 +2219,7 @@ integer,intent(out) :: gnodinf(ngllinf),poleid(9)
 integer :: i,j,k,inum,ip
 
 if(iface.lt.1.or.iface.gt.6)then
-  write(*,*)'ERROR: illegal outer face ID:',iface
+  write(*,*)'ERROR: invalid outer face ID:',iface
   stop
 endif
 inum=0; ip=0
@@ -2307,8 +2303,8 @@ elseif(iface==6)then
   enddo
 endif
 if(inum.ne.ngllinf)then
-  !print*,iface,inum,ngllinf
-  !stop
+  print*,iface,inum,ngllinf
+  stop
 endif
 return
 end subroutine get_gnodinf1

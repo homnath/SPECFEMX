@@ -1,0 +1,10 @@
+
+
+R_EARTH = 6371000 m
+R_CMB = 3480000 m
+R_ICB = 1221000 m
+
+Scaled:
+R_EARTH = 1.0
+R_CMB = 0.5462
+R_ICB = 0.1916

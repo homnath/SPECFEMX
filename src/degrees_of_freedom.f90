@@ -16,79 +16,123 @@ contains
 
 ! This subroutine sets number of degrees of freedom and IDs of nodal dof  
 subroutine initialize_dof()
-use global,only:edofu,edofphi,idofu,nenode,idofphi,nndofu,nndofphi,nndof,      &
-                nedofu,nedofphi,nedof,ISDISP_DOF,ISPOT_DOF
+use global
 implicit none
-integer :: i_dof,idof
-! total number of degrees of freedom per node
-nndof=0
-nedofu=0
-nedofphi=0
-nedof=0
+integer :: i_dof,idof, nelmt_fs, ios
+character(len=80) :: data_path
+character(len=80) :: fname
+integer :: errcode
+character(len=250) :: errtag
 
-! dof IDs
-idof=0
-idofu=0
-idofphi=0
+! total number of degrees of freedom per node
+nndof    = 0
+nedofu   = 0  
+nedofphi = 0 
+nedof    = 0
+
+! initialise dof IDs
+idof    = 0
+idofu   = 0
+idofphi = 0
+
 
 ! displacement
 if(ISDISP_DOF)then
-  nndof=nndof+nndofu
-  nedofu=NNDOFU*nenode
+  nndof=nndof+nndofu 
+  nedofu=NNDOFU*nenode 
   nedof=nedof+nedofu
+
   do i_dof=1,nndofu
+    
     idof=idof+1
     idofu(i_dof)=idof
+
   enddo
+
   allocate(edofu(nedofu))
 endif
+
+
 ! gravity
+
 idof=idofu(nndofu)
+
 if(ISPOT_DOF)then
   nndof=nndof+nndofphi
   nedofphi=NNDOFPHI*nenode
   nedof=nedof+nedofphi
+
   do i_dof=1,nndofphi
     idof=idof+1
+
     idofphi(i_dof)=idof
+
   enddo
   allocate(edofphi(nedofphi))
 endif
+
+if(ISSL_DOF)then 
+  nndof = nndof + 1 
+
+  ! Assert that all DOFs are on: 
+  if (nndof/=5)then 
+    write(*,*)'ERROR: Trying to calculate SL but not 5 DOFs switched on'
+    stop 
+  endif
+
+  ! Note here we are setting a possible DOF for theta on every GLL in an 
+  ! element...of course it can only actually be on the surface but 
+  ! for now it is convenient ... may be a memory issue if mesh is huge
+  ! For things like kmat 
+  nedof = nedof + nenode  
+endif 
+
 end subroutine initialize_dof
 !===============================================================================
 
+
+
 ! This subroutine sets IDs for the elemental degrees of freedom for
 ! u and \phi which may be used to map the elemental matrices
-subroutine set_element_dof()
-use global,only:ISDISP_DOF,ISPOT_DOF,nedofu,nedofphi,ngll,nndofu, &
-                edofu,edofphi
+subroutine set_element_dof_uphi()
+use global,only:ISDISP_DOF,ISPOT_DOF,ISSL_DOF, nedofu,nedofphi,ngll,nndofu, &
+                edofu,edofphi,edofsl
 implicit none
-integer :: i,iu(NNDOFU),iphi,j,nu
-integer :: iu0,iphi0
+integer :: i,iu(NNDOFU),iphi,j,nu, isl
+integer :: iu0, iphi0, isl0
 
 ! order ux,uy,uz,\phi
-edofu=-9999
-edofphi=-9999
+if(ISDISP_DOF)edofu=-9999
+if(ISPOT_DOF)edofphi=-9999
+if(ISSL_DOF)edofsl=-9999
 
 iu0=0
 iphi0=0
+isl0=0
 
 iphi=0
+isl=0
 nu=0
 iu=0
 do i=1,NGLL
+
   if(ISDISP_DOF)then
     iu(1)=iu0+1
     nu=nu+1
     edofu(nu)=iu(1)
+
     do j=2,NNDOFU
       nu=nu+1
       iu(j)=iu(j-1)+1
       edofu(nu)=iu(j)
+
     enddo
+
     iu0=iu(NNDOFU) ! this will be overwritten if POT_DOF is present
     iphi0=iu(NNDOFU)
   endif
+
+
   if(ISPOT_DOF)then
     iphi=iphi0+1
     edofphi(i)=iphi
@@ -96,11 +140,11 @@ do i=1,NGLL
     iu0=iphi ! this will be overwritten if DISP_DOF is present
     iphi0=iphi
   endif
+
 enddo
-!print*,edofu
-!print*,edofphi; stop
+
 return
-end subroutine set_element_dof
+end subroutine set_element_dof_uphi
 !===============================================================================
 
 ! compute mapping of u  to face elemental matrices
@@ -147,17 +191,23 @@ end subroutine set_face_scaldof
 ! This subroutine activates degrees of freedoms.
 subroutine activate_dof(errcode,errtag)
 use global
+use free_surface
 use math_constants,only:ZERO
 implicit none
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 
-integer :: ios
-integer :: i_elmt,imat,mdomain
+integer :: ios, ctr 
+integer :: i_elmt,imat,mdomain, i_face
 integer :: inodes(ngll)
-
+integer :: numf(maxngll2d)
+integer :: overwrite_ctr, iover 
 errtag="ERROR: unknown!"
 errcode=-1
+
+if(myrank.eq.0)then
+  write(logunit,*)'    Activating DOF'
+endif
 
 ! Initialize all DOFs to OFF
 gdof=0
@@ -171,10 +221,12 @@ if(ISDISP_DOF)then
     mdomain=mat_domain(imat)
     ! elastic domain
     if(mdomain==ELASTIC_DOMAIN)then
-      gdof(idofu,inodes)=1
-    ! viselastic domain
+      ! skip empty (zero-property) blocks - they have no stiffness contribution
+      ! and would leave zero rows in the matrix causing PETSc KSP FPE
+      if(.not.isempty_blk(imat))gdof(idofu,inodes)=1                  !! Fix
+    ! viscoelastic domain
     elseif(mdomain==VISCOELASTIC_DOMAIN)then
-      gdof(idofu,inodes)=1
+      if(.not.isempty_blk(imat))gdof(idofu,inodes)=1                  !! Fix
     ! acoustic domain
     elseif(mdomain==ACOUSTIC_DOMAIN)then
       write(errtag,'(a)')'ERROR: acoustic domain not supported!'
@@ -204,33 +256,105 @@ if(ISPOT_DOF)then
   gdof(idofphi,:)=1
 endif
 
+
+overwrite_ctr = 0
+! Sea Level
+if(ISSL_DOF)then
+  ! only for nodes on the free surface
+  ! Loops over each FACE on the free surface
+  do i_face = 1, nelmt_fs  
+    ! Get g_num values of this face 
+    numf  = gnum_fs(:,i_face)
+    ! Set these nodes for the index idofsl to 1 (activate them) 
+    ! Note here that for SL to be solved we need displacement and 
+    ! phi to be solved so theta will always be the 5th dof slot 
+
+    gdof(5, numf) = 1
+  enddo 
+  
+  if(myrank.eq.0)then 
+    write(logunit,*)'    Total unique FS nodes:' , nnode_fs
+    write(logunit,*)'    Total FS faces       : ', nelmt_fs
+    write(logunit,*)'    Total U   DOF        : ', INT(SUM(gdof(1, :))) + INT(SUM(gdof(2, :))) + INT(SUM(gdof(3, :)))  
+    write(logunit,*)'    Total PHI DOF        : ', INT(SUM(gdof(4, :))) 
+    write(logunit,*)'    Total SL  DOF        : ', INT(SUM(gdof(5, :))) 
+  endif
+
+endif
+
+if(myrank.eq.0)then
+  write(logunit,*)' ✓  Activated DOF'
+  write(logunit,*)
+endif
+
 errcode=0
+
+
 
 end subroutine activate_dof
 !===============================================================================
 
 ! This subroutine finalizes the global degrees of freedom IDs.
 subroutine finalize_gdof(errcode,errtag)
-use global,only:gdof,neq,nndof,nnode,g_num,part_path,proc_str,file_head
-use global,only:myrank,nedof
+use global, only:gdof,neq,nndof,nnode,g_num,part_path,proc_str,file_head, logunit
+use global, only:myrank,nedof, ISSL_DOF
+use free_surface
 implicit none
 integer,intent(out) :: errcode
 character(len=250) :: ofname
 character(len=250),intent(out) :: errtag
-integer :: i,istat,j
+integer :: i,istat,j, neqsl
 
 errtag="ERROR: unknown!"
 errcode=-1
 ! Compute modified gdof
 neq=0
-do j=1,ubound(gdof,2)
-  do i=1,ubound(gdof,1)
-    if(gdof(i,j)/=0)then
-      neq=neq+1
-      gdof(i,j)=neq
-    endif
+neqsl = 0
+
+if(myrank.eq.0)then
+  write(logunit,*)
+  write(logunit,*)'Finalising DOF global IDs: '
+endif
+
+if (ISSL_DOF)then 
+  ! If SL then we want to run it as original version first by ignoring 
+  ! the theta, and then tag on the theta DOF after 
+
+  do j=1,ubound(gdof,2)
+    do i=1,ubound(gdof,1)-1 ! -1 so that not including theta
+      if(gdof(i,j)/=0)then
+        neq=neq+1
+        gdof(i,j)=neq
+      endif
+    enddo
   enddo
-enddo
+
+  write(logunit,*)'    Number of eq. for U, Phi: ', neq
+
+  ! Now index the SL ones 
+  do j=1,ubound(gdof,2)
+      if(gdof(5,j)/=0)then ! always 5th dof 
+        neq=neq+1
+        gdof(5,j)=neq
+        neqsl = neqsl + 1 
+      endif
+  enddo
+
+  write(logunit,*)'    Number of eq. for SL    : ', neqsl
+  write(logunit,*)'    Total number of eqns    : ', neq
+
+else
+  ! Original version 
+  do j=1,ubound(gdof,2)
+    do i=1,ubound(gdof,1)
+      if(gdof(i,j)/=0)then
+        neq=neq+1
+        gdof(i,j)=neq
+      endif
+    enddo
+  enddo
+
+endif 
 
 ofname='tmp/'//trim(file_head)//'_gdof'//trim(adjustl(proc_str))
 open(unit=22,file=trim(ofname),access='stream',form='unformatted', &
@@ -254,11 +378,50 @@ write(22)nnode
 write(22)g_num
 close(22)
 
+if(myrank.eq.0)then
+  write(logunit,*)' ✓ Finalised DOFs'
+  write(logunit,*)
+endif
 ! Compute nodal to global
 errcode=0
 return
 end subroutine finalize_gdof
 !===============================================================================
+
+subroutine sea_level_dof()
+  ! DOF setup for the sea level stuff - requires free surface to be run first.
+  ! Takes the last degree of freedom from the Phi variable and starts from +1 of this 
+  use global 
+  use free_surface 
+  implicit none 
+
+  integer :: ldof, i 
+
+  allocate(edofsl(ngll))
+
+
+  nedofsl = nenode
+
+  ! Get last degree of freedom from phi + 1: 
+  ldof = edofphi(nedofphi) + 1
+
+  ! DOFs for SL are sequence starting with ldof since after u and phi
+  do i = 1, ngll
+    edofsl(i) = ldof
+    ldof = ldof + 1 
+  enddo 
+
+end subroutine sea_level_dof
+
+
+
+
+
+
+
+
+
+
 
 end module dof
 !===============================================================================

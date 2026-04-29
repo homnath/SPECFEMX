@@ -5,6 +5,10 @@
 BIN = ../bin
 include ${PETSC_DIR}/lib/petsc/conf/variables
 
+FORTRAN_COMPILER = INTEL
+
+CUDA = no#yes
+
 ifeq ($(FORTRAN_COMPILER), INTEL)
 	FC = ifort
 	MPIFC = mpiifort #mpif90
@@ -19,6 +23,15 @@ else
 	CC = gcc
 	CFLAGS = -O3
 endif
+
+ifeq ($(CUDA), yes)
+NVCC = nvcc
+GENCODE_60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
+NVCC_FLAGS_BASE = $(CUDA_FLAGS) $(CUDA_INC) $(MPI_INCLUDES) $(COND_MPI_CPPFLAGS)
+NVCC_FLAGS = $(NVCC_FLAGS_BASE) -DCUDA $(GENCODE_60) -ftz=true  -L/usr/local/cuda-10.1/lib64
+CUDA_LINK =  -L/usr/local/cuda-10.1/lib64 -lcudart -lstdc++ -lcudadevrt -lcublas
+endif
+
 ## serial fortran compiler
 ##FC = gfortran
 ##FFLAGS = -g -std=f2003 -fbounds-check -fimplicit-none -O5 -pedantic -pedantic-errors -Wline-truncation -fno-trapping-math -fno-backslash
@@ -67,7 +80,8 @@ OBJ = $(BIN)/global.o            \
       $(BIN)/integration.o       \
       $(BIN)/infinite_element.o  \
       $(BIN)/utmgeo.o            \
-      $(BIN)/visual.o            \
+      $(BIN)/coordinate.o        \
+      $(BIN)/write_ensight.o     \
       $(BIN)/fault.o             \
       $(BIN)/weakform.o          \
       $(BIN)/prepare_gravity.o   \
@@ -79,10 +93,27 @@ OBJ = $(BIN)/global.o            \
       $(BIN)/apply_bc.o          \
       $(BIN)/apply_traction.o    \
       $(BIN)/apply_mtraction.o   \
+      $(BIN)/source_function.o   \
       $(BIN)/plastic_library.o   \
       $(BIN)/postprocess.o       \
       $(BIN)/okada_solution.o    \
-	    $(EMPTY_MACRO)
+      $(EMPTY_MACRO)
+
+ifeq ($(CUDA), yes)
+
+CUDA_OBJ = $(BIN)/GPU_broken_loop.cuda.o          \
+           $(BIN)/initialize_cuda.cuda.o  \
+           $(BIN)/helper_functions.cuda.o  \
+           $(BIN)/prepare_GPU.cuda.o  \
+           $(EMPTY_MACRO)
+
+else
+
+#OBJ +=  $(BIN)/GPU_stubs.c.o    \
+          $(EMPTY_MACRO)
+
+endif
+
 
 # object tree for SEM serial
 OBJ_SEM = $(BIN)/serial_library.o \
@@ -97,10 +128,10 @@ OBJ_SEMMPI = $(BIN)/set_precision_mpi.o \
              $(BIN)/mpi_library.o       \
              $(BIN)/math_library_mpi.o  \
              $(BIN)/ghost_library_mpi.o \
-	           $(BIN)/prepare_sparse.o	\
+	     $(BIN)/prepare_sparse.o	\
              $(BIN)/parsolver.o	\
-	    			 $(BIN)/parsolver_petsc.o \
-	           $(EMPTY_MACRO)
+	     $(BIN)/parsolver_petsc.o \
+	     $(EMPTY_MACRO)
 
 # object for both serial and MPI
 OBJ_BOTH_SERIAL = $(BIN)/model.serial.o           \
@@ -114,29 +145,29 @@ OBJ_BOTH_PARALLEL = $(BIN)/model.parallel.o            \
                     $(BIN)/earthquake_load.parallel.o \
                     $(BIN)/station.parallel.o \
                     $(BIN)/benchmark.parallel.o       \
-	                  $(EMPTY_MACRO)
+	            $(EMPTY_MACRO)
 
 # object tree for PARTMESH
 OBJ_PARTMESH = $(BIN)/global.o           \
                $(BIN)/string_library.o   \
-							 $(BIN)/serial_library.o   \
-							 $(BIN)/math_library.o     \
+	 $(BIN)/serial_library.o   \
+	 $(BIN)/math_library.o     \
                $(BIN)/element.o          \
-               $(BIN)/infinite_layer.o \
+               $(BIN)/infinite_layer.o 	 \
                $(BIN)/partmesh_library.o \
-							 $(BIN)/recreate_fault.o   \
-							 $(BIN)/read_input.o       \
-	             $(BIN)/partmesh_scotch.o  \
+	 $(BIN)/recreate_fault.o   \
+	 $(BIN)/read_input.o       \
+	       $(BIN)/partmesh_scotch.o  \
                $(BIN)/partmesh.o         \
-	             $(EMPTY_MACRO)
+	       $(EMPTY_MACRO)
 
-OBJ_specfem-x =  $(OBJ)               \
+OBJ_specfemx =  $(OBJ)               \
                 $(OBJ_SEM)           \
 							  $(OBJ_BOTH_SERIAL)   \
 							  $(BIN)/specfem3d.o  \
 							  $(BIN)/specfemx.o    \
 	              $(EMPTY_MACRO)
-OBJ_pspecfem-x = $(OBJ)               \
+OBJ_pspecfemx = $(OBJ)               \
                 $(OBJ_SEMMPI)        \
 								$(OBJ_BOTH_PARALLEL) \
 								$(BIN)/pspecfem3d.o \
@@ -144,28 +175,62 @@ OBJ_pspecfem-x = $(OBJ)               \
 	              $(EMPTY_MACRO)
 
 # main executable for spectral-element method
-specfem-x = $(BIN)/specfem-x
-pspecfem-x = $(BIN)/pspecfem-x
+specfemx = $(BIN)/specfemx
+pspecfemx = $(BIN)/pspecfemx
 PARTMESH = $(BIN)/partmesh
 
-default: specfem-x pspecfem-x
+default: specfemx pspecfemx
 
 clean:
 	rm -f *.mod $(BIN)/*.o core src/*.*.swp
 test:
 	echo ${PETSC_FC_INCLUDES}
-all: clean partmesh specfem-x pspecfem-x
+all: clean partmesh specfemx pspecfemx
 
-debug: clean partmesh specfem-x pspecfem-x 
+debug: clean partmesh specfemx pspecfemx 
 
-specfem-x: $(OBJ_specfem-x)
-	$(FC_COMPILE) -o $(specfem-x) $(OBJ_specfem-x) $(LIB)
 
-pspecfem-x: $(OBJ_pspecfem-x)
-	$(FC_COMPILE) -o $(pspecfem-x) $(OBJ_pspecfem-x) $(LIBMPI) ${PETSC_KSP_LIB}
+ifeq ($(CUDA),yes)
+
+specfemx: $(OBJ_specfemx)
+	@echo ""
+	@echo "building specfemx with CUDA support"
+	@echo ""
+	$(FC_COMPILE) -o $(specfemx) $(OBJ_specfemx) $(LIB) $(CUDA_OBJ) $(CUDA_LINK)
+	@echo ""
+
+pspecfemx: $(OBJ_pspecfemx)
+	@echo ""
+	@echo "building pspecfemx with CUDA support"
+	@echo ""
+	$(FC_COMPILE) -o $(pspecfemx) $(OBJ_pspecfemx) $(LIBMPI) ${PETSC_KSP_LIB} $(CUDA_OBJ) $(CUDA_LINK) 
+
+else
+
+specfemx: $(OBJ_specfemx)
+	@echo ""
+	@echo "building specfemx without CUDA support"
+	@echo ""
+	$(FC_COMPILE) -o $(specfemx) $(OBJ_specfemx) $(LIB) $(CUDA_STUBS)
+	@echo ""
+
+pspecfemx: $(OBJ_pspecfemx)
+	@echo ""
+	@echo "building pspecfemx without CUDA support"
+	@echo ""
+	$(FC_COMPILE) -o $(pspecfemx) $(OBJ_pspecfemx) $(LIBMPI) ${PETSC_KSP_LIB} $(CUDA_STUBS)
+
+endif
+
+
+
 
 partmesh: $(OBJ_PARTMESH)
 	$(FC_COMPILE) -o ${PARTMESH} $(OBJ_PARTMESH) $(LIBSCOTCH)
+
+
+
+
 
 # compile file which can be compiled as both serial and parllel versions
 # serial
@@ -227,6 +292,9 @@ $(BIN)/infinite_element.o: infinite_element.f90
 $(BIN)/utmgeo.o: utmgeo.f90
 	$(FC_COMPILE) -c -o $(BIN)/utmgeo.o utmgeo.f90
 
+$(BIN)/coordinate.o: coordinate.f90
+	$(FC_COMPILE) -c -o $(BIN)/coordinate.o coordinate.f90
+
 $(BIN)/shape_library.o: shape_library.f90
 	$(FC_COMPILE) -c -o $(BIN)/shape_library.o shape_library.f90
 
@@ -272,6 +340,9 @@ $(BIN)/apply_traction.o: apply_traction.f90
 $(BIN)/apply_mtraction.o: apply_mtraction.f90
 	$(FC_COMPILE) -c -o $(BIN)/apply_mtraction.o apply_mtraction.f90
 
+$(BIN)/source_function.o: source_function.f90
+	$(FC_COMPILE) -c -o $(BIN)/source_function.o source_function.f90
+
 $(BIN)/model.o: model.F90
 	$(FC_COMPILE) -DUSE_MPI -c -o $(BIN)/model.o model.F90
 
@@ -302,8 +373,8 @@ $(BIN)/plastic_library.o: plastic_library.f90
 $(BIN)/okada_solution.o: okada_solution.f90
 	$(FC_COMPILE) -c -o $(BIN)/okada_solution.o okada_solution.f90
 
-$(BIN)/visual.o: visual.f90
-	$(FC_COMPILE) -c -o $(BIN)/visual.o visual.f90
+$(BIN)/write_ensight.o: write_ensight.f90
+	$(FC_COMPILE) -c -o $(BIN)/write_ensight.o write_ensight.f90
 
 $(BIN)/postprocess.o: postprocess.f90
 	$(FC_COMPILE) -c -o $(BIN)/postprocess.o postprocess.f90
@@ -342,7 +413,7 @@ $(BIN)/specfem3d.o: specfem3d.F90
 $(BIN)/pspecfem3d.o: specfem3d.F90
 	$(FC_COMPILE) ${INCPETSC} -DUSE_MPI -c -o $(BIN)/pspecfem3d.o specfem3d.F90
 
-# following objective files are compiled from the same file but with
+# The following objective files are compiled from the same file but with
 # different compiler preprocessing directives options.
 $(BIN)/specfemx.o: specfemx.F90
 	$(FC_COMPILE) -c -o $(BIN)/specfemx.o specfemx.F90
@@ -359,4 +430,12 @@ $(BIN)/partmesh_scotch.o: partmesh_scotch.f90 partmesh_library.f90
 
 $(BIN)/partmesh.o: partmesh.f90
 	$(FC_COMPILE) -c -o $(BIN)/partmesh.o partmesh.f90
+
+CC =gcc
+
+$(BIN)/GPU_stubs.c.o: GPU_stubs.c GPU.h
+	${CC} -c -o $(BIN)/GPU_stubs.c.o GPU_stubs.c 
+
+$(BIN)/%.cuda.o: %.cu GPU.h
+	${NVCC} -c $< -o $@ $(NVCC_FLAGS)
 

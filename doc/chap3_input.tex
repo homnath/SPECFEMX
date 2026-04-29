@@ -1,3 +1,4 @@
+% !TEX root = ./manual_SPECFEMX.tex
 \chapter{Input}
 \label{chap:input}
 \section{Main input file}
@@ -23,7 +24,7 @@ Only the following line types are permitted.
 \item[mesh:]      mesh information
 \item[bc:]        boundary conditions information
 \item[traction:]  traction information [optional]
-\item[mraction:]  magnetic traction information [optional]
+\item[mtraction:]  magnetic traction information [optional]
 \item[eqsource:]  earthquake source information [optional]
 \item[stress0:]   initial stress information [optional]. It is generally necessary for multistage excavation.
 \item[benchmark:] benchmark information [Optional]. This is necessary to compute benchmark results. Benchmark results are not avaible for all cases.
@@ -31,7 +32,10 @@ Only the following line types are permitted.
 \item[eqload:]    pseudo-static earthquake loading [optional]
 \item[water:]     water table information [optional]
 \item[control:]   control of the simulation
+\item[step:]      frequency/time step information
 \item[save:]      options to save data
+\item[sealevel:]  ocean information for sea-level simulation
+\item[ice:]       ice information for sea-level simulations
 \item[devel:]     development parameters for experimental features [optional]
 \end{adescription}
 
@@ -42,6 +46,7 @@ Only the following arguments under the specified line types are permitted.\\
 \texttt{\underline{preinfo:}}
 
 \begin{adescription}{nl\_maxiter}
+  \item[utm\_zone]  The UTM (Universal Transverse Mercator) zone [integer, optional, valid range (1, 60)]. This is required for regional simulations.
   \item[nproc] : number of processors to be used for the parallel processing [integer > 1]. Only required for parallel processing.
   \item[ngllx] : number of Gauss-Lobatto-Legendre (GLL) points along $x$-axis [integer > 1].
   \item[nglly] : number of GLL points along $y$-axis [integer > 1].
@@ -52,8 +57,8 @@ Only the following arguments under the specified line types are permitted.\\
   \item[out\_path]  : output path where the output data will be stored [string, optional, default $\Rightarrow$ \texttt{\sq{../output}}].
   \item[disp\_dof]  : switch to activate displacement degree of freedom [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 1].
   \item[pot\_dof]  : switch to activate potential (gravity or magnetic) degree of freedom [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
-  \item[pot\_type] : potential type [string, optional,\texttt{\sq{gravity}} = Gravity potential, \texttt{\sq{magnetic}} = Magnetic potential]. It must be provided if \texttt{pot\_dof = 1}.
-  \item[magnetic]  : switch gravity potential to magnetic potential degree of freedom [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
+  \item[pot\_type] : potential type [string, optional,\texttt{\sq{gravity}} = Gravity potential, \texttt{\sq{magnetic}} = Magnetic potential, \texttt{\sq{electric}} = Electrical potential due to a current, \texttt{\sq{charge}} = Electrical potential due to a charge density]. It must be provided if \texttt{pot\_dof = 1}.
+  \item[grav0]  : switch to activate background gravity (Cowling approximation) [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
   \\
 \end{adescription}
 
@@ -64,31 +69,33 @@ Only the following arguments under the specified line types are permitted.\\
   \item[yfile] : file name of $y$-coordinates [string].
   \item[zfile] : file name of $z$-coordinates [string].
   \item[confile]: file name of mesh connectivity [string].
+  \item[fsfile]: file name of free surface [string]. Use an empty file if there is no free surface or the free surface isn't necessary.
   \item[idfile]: file name of element IDs [string].
   \item[gfile]: file name of ghost interfaces, i.e., partition interfaces [string]. Only required for parallel processing.  \\
 \end{adescription}
 
 \texttt{\underline{bc:}}
-\begin{adescription}{add\_infmesh}
+\begin{adescription}{  add\_infmesh}
   \item[ubc]  : switch to apply primary/essential boundary condition [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 1].
   \item[uxfile]: file name of displacement boundary conditions along $x$-axis [string].
   \item[uyfile]: file name of displacement boundary conditions along $y$-axis [string].
   \item[uzfile]: file name of displacement boundary conditions along $z$-axis [string].
   \item[infbc]  : switch to apply infnite bounday condition condition [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
-  \item[add\_infmesh]  : switch to add infinite mesh layer [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
-  \item[infrfile]  : surface file on which the infinite elements are created [string].
-  \item[mat\_type]  : type of material block for infinite elements [string, \texttt{\sq{define}} = Define specific material block IDs for transition infinite and infinite regions, \texttt{\sq{inherit}} = Inherit material block IDs of the parent elements].
-  \item[imat\_trinf]  : material block ID for transition-infinite elements [integer, optional].
-  \item[imat\_inf]  : material block ID for infinite elements [integer, optional but must be defined if \texttt{mat\_type}=\texttt{\sq{define}}].
-  \item[pole0]  : initial pole for the infinite element layer [string, optional, \texttt{\sq{origin}} = Origin of the model, \texttt{\sq{center}} = Center of the model, \texttt{\sq{user}} = User-defined, default $\Rightarrow$ \texttt{\sq{origin}}].
-  \item[pole\_type]  : pole type for the infinite element layer [string, optional, \texttt{\sq{point}} = A point, \texttt{\sq{axis}} = Multipoles on the axis, \texttt{\sq{pointaxis}} = Single pole and multipoles on the axis, \texttt{\sq{plane}} = Multipoles on the plane, default $\Rightarrow$ \texttt{\sq{point}}].
-  \item[coord0]: user defined coordinates for the pole [real vector].
-  \item[coord1]: user defined coordinates for the end pole [real vector, optional]. It is necessary only if the \texttt{pole\_type}=\texttt{\sq{pointaxis}}.
-  \item[pole\_axis]  : pole axis [integer, 1 = X-axis, 2 = Y-axis, 3 = Z-axis]. This must be defined for \texttt{\sq{pole\_type}} = \texttt{\sq{axis}} or \texttt{\sq{pointaxis}}.
-  \item[axis\_range]: ragnge of the pole coordinates along the pole axis [real two-component vector, optional]. This must be defined for \texttt{\sq{pole\_type}} = \texttt{\sq{pointaxis}}.
-  \item[rinf]: reference radius for infinite elements [real]. rinf > largest corner distance from the pole.
-  \item[valinf]: value of the primary variable at the infinity [real, default $\Rightarrow$ 0.0].
-  \item[infquad]  : quadrature type in the infinite elements [string, optional, \texttt{\sq{radau}} = Radau quadrature, \texttt{\sq{gauss}} = Gauss quadrature, default $\Rightarrow$ \texttt{\sq{radau}}].
+  \item[if infbc = 1, i.e., infinite BC]
+  \item[  add\_infmesh]  : switch to add infinite mesh layer [integer, optional, 0 = OFF, 1 = ON, default $\Rightarrow$ 0].
+  \item[  infrfile]  : surface file on which the infinite elements are created [string].
+  \item[  mat\_type]  : type of material block for infinite elements [string, \texttt{\sq{define}} = Define specific material block IDs for transition infinite and infinite regions, \texttt{\sq{inherit}} = Inherit material block IDs of the parent elements].
+  \item[  imat\_trinf]  : material block ID for transition-infinite elements [integer, optional].
+  \item[  imat\_inf]  : material block ID for infinite elements [integer, optional but must be defined if \texttt{mat\_type}=\texttt{\sq{define}}].
+  \item[  pole0]  : initial pole for the infinite element layer [string, optional, \texttt{\sq{origin}} = Origin of the model, \texttt{\sq{center}} = Center of the model, \texttt{\sq{user}} = User-defined, default $\Rightarrow$ \texttt{\sq{origin}}].
+  \item[  pole\_type]  : pole type for the infinite element layer [string, optional, \texttt{\sq{point}} = A point, \texttt{\sq{axis}} = Multipoles on the axis, \texttt{\sq{pointaxis}} = Single pole and multipoles on the axis, \texttt{\sq{plane}} = Multipoles on the plane, default $\Rightarrow$ \texttt{\sq{point}}].
+  \item[  coord0]: user defined coordinates for the pole [real vector].
+  \item[  coord1]: user defined coordinates for the end pole [real vector, optional]. It is necessary only if the \texttt{pole\_type}=\texttt{\sq{pointaxis}}.
+  \item[  pole\_axis]  : pole axis [integer, 1 = X-axis, 2 = Y-axis, 3 = Z-axis]. This must be defined for \texttt{\sq{pole\_type}} = \texttt{\sq{axis}} or \texttt{\sq{pointaxis}}.
+  \item[  axis\_range]: ragnge of the pole coordinates along the pole axis [real two-component vector, optional]. This must be defined for \texttt{\sq{pole\_type}} = \texttt{\sq{pointaxis}}.
+  \item[  rinf]: reference radius for infinite elements [real]. rinf > largest corner distance from the pole.
+  \item[  valinf]: value of the primary variable at the infinity [real, default $\Rightarrow$ 0.0].
+  \item[  infquad]  : quadrature type in the infinite elements [string, optional, \texttt{\sq{radau}} = Radau quadrature, \texttt{\sq{gauss}} = Gauss quadrature, default $\Rightarrow$ \texttt{\sq{radau}}].
   \\
 \end{adescription}
 
@@ -98,15 +105,28 @@ Only the following arguments under the specified line types are permitted.\\
   \\
 \end{adescription}
 
+\texttt{\underline{mtraction:}}
+\begin{adescription}{nl\_maxiter}
+  \item[trfile]: file name of traction specification [string].
+  \\
+\end{adescription}
+
 \texttt{\underline{eqsource:}}
 \begin{adescription}{nl\_maxiter}
   \item[type]: type of earthquake source [integer, optional, 0 = slip source, 1 = CMT source, 2 = Finite fault, 3 = Slip with split node, default $\Rightarrow$ 0].
-  \item[slipfile]: file name of slip information [string].
-  \item[cmtfile]: file name of CMT information [string].
-  \item[faultslipfile\_plus]: file name of fault slip information for plus side [string].
-  \item[faultslipfile\_minus]: file name of fault slip information for minus side [string].
-  \item[shalf]: switch to use equal,.i.e., half of the slip on each side of the fault [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0]. Only required for slip with split node.
-  \item[taper]: switch to taper the slip on the fault edge [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 1]. Only required for slip with split node.
+  \item[if type = 0: Slip source]
+  \item[  slipfile]: file name of slip information [string].
+  \item[if type = 1: CMTSOLUTION]
+  \item[  cmtfile]: file name of CMT information [string].
+  \item[  mapto]: file name of CMT information [string, optional, \texttt{\sq{GLOBE}} = iGlobal spherical coordinates, \texttt{\sq{UTM}} = UTM coordinates, \texttt{\sq{none}} = None, default $\Rightarrow$ \texttt{\sq{none}}].
+  \item[if type = 2: Finite fault]
+  \item[  faultfile]: file name for the fault information [string].
+  \item[  faultmetafile]: file name for the fault meta file [string].
+  \item[if type = 1: Slip with split node]
+  \item[  faultslipfile\_plus]: file name of fault slip information for plus side [string].
+  \item[  faultslipfile\_minus]: file name of fault slip information for minus side [string].
+  \item[  shalf]: switch to use equal,.i.e., half of the slip on each side of the fault [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0]. Only required for slip with split node.
+  \item[  taper]: switch to taper the slip on the fault edge [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 1]. Only required for slip with split node.
   \\
 \end{adescription}
 
@@ -133,6 +153,7 @@ Only the following arguments under the specified line types are permitted.\\
   \item[matpath]: path to material file [string, optional, default $\Rightarrow$ \texttt{\sq{../input}} for serial or unpartitioned material file in parallel and \texttt{\sq{../partition}} for partitioned material file in parallel].
   \item[allelastic]: assume all entire domain as elastic [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
   \item[density]: flag to indicate that unit weight column is density [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[plastic]: flag to implement plasticity [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
   \\
 \end{adescription}
 
@@ -148,6 +169,20 @@ Only the following arguments under the specified line types are permitted.\\
 \texttt{\underline{water:}}
 \begin{adescription}{nl\_maxiter}
   \item[wsfile]: file name of water surface file.
+  \\
+\end{adescription}
+
+\texttt{\underline{step:}}
+\begin{adescription}{  start}
+  \item[type]: step type [integer, 0 = Time, 1 = Frequency, default $\Rightarrow$ 0].
+  \item[step]: step interval [real].
+  \item[if type = 1, i.e., frequency]
+  \item[  start]: start frequency [real].
+  \item[  end]: end frequency [real].
+  \item[  funit]: frequency unit [string, optional, `Hz'].
+  \item[if type = 0, i.e., time]
+  \item[  nstep]: number of time steps [integer > 0, default $\Rightarrow$ 1].
+  \item[  tunit]: time unit [string, optional, `sec', `hr',`day', `yr', default $\Rightarrow$ `sec'].
   \\
 \end{adescription}
 
@@ -170,15 +205,45 @@ Only the following arguments under the specified line types are permitted.\\
   {\emph{Note: Do not mix arguments for slope stability and excavation.}} \\
 \end{adescription}
 
-\texttt{\underline{save:}}
-\begin{adescription}{porep}
-  \item[disp]: displacement field [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
-  \item[model]: model properties [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
-  \item[porep]: pore water pressure [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
-  \item[gpot]: gravitational or magnetic potential [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
-  \item[agrav]: gradient of potential, e.g., acceleration due to gravity [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+\texttt{\underline{station:}}
+\begin{adescription}{sfile}
+  \item[sfile]: file name of stations.
   \\
 \end{adescription}
+
+\texttt{\underline{save:}}
+\begin{adescription}{pstress}
+  \item[disp]: displacement field [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[stress]: stress field [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[strain]: strain field [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[pstress]: principal stress field [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[model]: model properties [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[gpot]: gravitational potential [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[mpot]: magnetic potential [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[epot]: electric potential [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[agrav]: gradient of potential, e.g., acceleration due to gravity [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[magb]: magnetic field, B [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \\
+\end{adescription}
+
+
+\texttt{\underline{sealevel:}}
+\begin{adescription}{solvesl}
+  \item[slfile]: sea level file name  [string].
+  \item[savesl0]: saves initial sea level [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[saveOF]: saves the ocean function [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \item[solvesl]: solve for sea level? [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \\
+\end{adescription}
+
+
+\texttt{\underline{ice:}}
+\begin{adescription}{solvesl}
+  \item[icefile]: ice file name  [string].
+  \item[saveice0]: saves initial ice distribution [integer, optional, 0 = No, 1 = Yes, default $\Rightarrow$ 0].
+  \\
+\end{adescription}
+
 
 \texttt{\underline{devel:}}
 \begin{adescription}{example}
@@ -373,6 +438,32 @@ Example:\\\\
 ...\\
 ...\\}
 
+\subsection{Free surface file: \texttt{fsfile}}
+
+This file contains the free surface information on the model in the following format:\\
+
+\emph{number of entities} (faces)\\
+\emph{elementID entityID \\
+elementID entityID \\
+elementID entityID \\
+...\\
+...\\}
+
+Example:\\
+The following data specify the free surface file.\\\\
+
+\texttt{363\\
+56 1\\
+57 1\\
+58 1\\
+59 1\\
+60 1\\
+61 1\\
+62 1\\
+...\\
+...\\
+...}\\
+
 \subsection{Element IDs (or Material IDs) file: \texttt{idfile}}
 
 
@@ -409,8 +500,9 @@ This file will be generated automatically by a program \texttt{partmesh}.\\
 
 \subsection{Displacement boundary conditions files: \texttt{uxfile, uyfile, uzfile}}
 
-This file contains information on the displacement boundary conditions (currently only the zero-displacement is implemented), and has the following format:\\
-
+This file contains information on the displacement boundary conditions, and has the following format:\\
+\emph{BC\_type val}\\
+     $\Rightarrow$\emph{BC\_type} (integer, 0=nodal, 1=edge, 2=face)\\
 \emph{number of element faces}\\
 \emph{elementID faceID \\
 elementID faceID \\
@@ -420,6 +512,32 @@ elementID faceID \\
 
 Example:\\
 \\
+2 0.0\\
+\texttt{849\\
+2 2\\
+3 4\\
+5 1\\
+6 1\\
+7 1\\
+8 1\\
+9 1\\
+...\\
+...}\\
+
+\subsection{Fault slip files: \texttt{faultslipfile\_plus, faultslipfile\_minus}}
+
+This file contains information on the fault slip, and has the following format:\\
+\emph{slip vector}\\
+\emph{number of element faces}\\
+\emph{elementID faceID \\
+elementID faceID \\
+elementID faceID \\
+...\\
+...\\}
+
+Example:\\
+\\
+-5.0 0.0 0.0\\
 \texttt{849\\
 2 2\\
 3 4\\
@@ -483,6 +601,40 @@ The following data specify the two tractions: a uniformly distributed traction a
 ...\\
 ...}\\
 
+\subsection{Magnetic traction file: \texttt{trfile}}
+
+This file is necessary only for the magnetic anomalies simulations. This file contains the magnetic traction information on the model in the following format:\\
+
+\emph{traction type} (integer, 0 = inherit magnetization from the parent elements, 1 = define uniform magnetization)\\
+if \emph{traction type} = 0\\
+  Nothing to do\\
+if \emph{traction type} = 1\\
+  \emph{Magnetization, FlagForInclinationOrLatitude (0=inc or 1=lat),InclinationOrLatitudeAngle Declination, Azimuth} (SI unit but angle in degrees)\\
+\emph{number of entities} (points for point load or faces for distributed load)\\
+\emph{elementID entityID \\
+elementID entityID \\
+elementID entityID \\
+...\\
+...\\}
+
+This can be repeated as many times as there are tractions.\\
+
+Example:\\
+The following data specify the one traction: inherit magnetization from the parent elements.\\\\
+
+\texttt{0\\
+363\\
+56 1\\
+57 1\\
+58 1\\
+59 1\\
+60 1\\
+61 1\\
+62 1\\
+...\\
+...\\
+...}\\
+
 \subsection{Material list file: \texttt{matfile}}
 
 This file contains material properties of each material regions. Material properties must be listed in a sequential order of the unique material IDs. In addition, this data file optionally contains the information on the water condition of material regions. Material regions or material IDs must be consistent with the Material IDs (Element IDs) defined in \texttt{idfile}. The \texttt{matfile} has the following format:\\\\
@@ -500,7 +652,22 @@ submerged materialID\\
 ...\\
 ...\\}
 
-The \emph{materilID} must be in a sequential order starting from 1. The \emph{doaminID} represents the material domain (e.g., 1 = elastic or 11 = viscoelastic), and \emph{type} represents the type of material properties input (0 = Homogeneous material block $\Rightarrow$ define $\gamma$, $E$, $\nu$, $\phi$, $c$, and $\psi$; -1 = Tomographic model input defined on the structured grid $\Rightarrow$ define file name). Similarly, $\gamma$ represents the unit weight in kN/m\tsup{3}, $E$ the Young's modulus of elasticity in kN/m\tsup{2}, $\phi$ the angle of internal friction in degrees, $c$ the cohesion in kN/m\tsup{2}, and $\psi$ the angle of dilation in degrees. Finally, \emph{file} is the file name of the tomographic structured grid input.\\
+\begin{itemize}
+ \item The \emph{materialID} must be in a sequential order starting from 1.
+ \item The \emph{doaminID} represents the material domain (e.g., 1 = elastic or 11 = viscoelastic).
+ \item The \emph{type} represents the type of material properties input.
+ \begin{itemize}
+  \item \emph{type}=0: Homogeneous material block $\Rightarrow$ define $\gamma$, $E$, $\nu$, $\phi$, $c$, and $\psi$.
+  \item \emph{type}=-1: Tomographic model input defined on the structured grid $\Rightarrow$ define file name, \emph{file}.
+  \end{itemize}
+
+  \item The $\gamma$ represents the unit weight in N/m\tsup{3}.
+  \item The $E$ the Young's modulus of elasticity in N/m\tsup{2}.
+  \item The $\phi$ the angle of internal friction in degrees.
+  \item The $c$ the cohesion in N/m\tsup{2}.
+  \item The $\psi$ the angle of dilation in degrees.
+  \item The \emph{file} is the file name of the tomographic structured grid input.
+\end{itemize}
 
 Example:\\
 \\
@@ -549,6 +716,35 @@ $x_n$ $y_n$ $z_n$ $v_{pn}$ $v_{sn}$ $\rho_n$\\
 }\\
 
 where, $n=n_x \times n_y \times n_z$ is the total number of grid points. 
+\\
+\\
+For magnetic anomalies, add the following information in the material list file:\\
+\\
+\texttt{magnetization:}\\
+\emph{NumberOfMagnetizationBlocks\\
+materialID, Magnetization, FlagForInclinationOrLatitude (0=inc or 1=lat), InclinationOrLatitudeAngle, Declination, Azimuth} (SI unit but angle in degrees)\\
+...\\
+...\\
+\\
+\\
+For electrical potential due to electric current, add the following information in the material list file:\\
+\\
+\texttt{electrical\_conductivty:}\\
+\emph{NumberOfElectricalConductivityBlocks\\
+materialID, materialType, Conductivity1, Conductivity2, Conductivity3, $\alpha$, $\beta$, $\gamma$}\\
+...\\
+...\\
+\\
+
+\emph{materialType}=0: isotropic and \emph{materialType}=1: anisotropic. For isotropic material, only \emph{Conductivity1} is relevant.
+\\
+For electrical potential due to electric charge density, add the following information in the material list file:\\
+\\
+\texttt{charge\_density:}\\
+\emph{NumberOfChargeDensityBlocks\\
+materialID, Charge\_Density}\\
+...\\
+...\\
 
 \subsection{Water surface file: \texttt{wsfile}}
 
@@ -579,3 +775,61 @@ Following data specify the two water surfaces: a horizontal surface and an incli
 1\\
 1 0.0 42.7 12.2 6.1}\\
 
+
+
+
+\subsection{Sea Level file: \texttt{slfile}}
+
+This file contains details required for running a sea level simulation.
+In this file any lines beginning with a hashtag as the first character are considered
+to be comment lines and are ignored. The information format for this file (ignoring any comment lines) is: 
+
+
+\begin{adescription}{slfile format:}
+\item[line 1:]        \emph{cartesian or global}: integer value 1 = Cartesian, 2 = Global
+\item[line 2:]        \emph{type of initial SL}: integer value 0 = defined by constant Z value - only for cartesian SL simulation  
+\item[line 3:]        \emph{initial sea level} See full description below \\ 
+\end{adescription}
+
+
+
+\subsubsection{initial sea level (line 3):}
+Different formats are used based on the input: 
+
+if line 2 = 0 (Sea level is defined by constant Z value). In this case line 3 is the Z value for a cartesian simulation.
+
+
+\subsection{Ice file: \texttt{icefile}}
+
+This file contains details for ice parameters when running a sea level simulation.
+In this file any lines beginning with a hashtag as the first character are considered
+to be comment lines and are ignored. \\ 
+
+The user can add in as many ice 'objects' as they wish. Objects are defined by a type value and specific parameters. The maximum number of parameters is currently 5, and varies for each type of object. Objects can be: 
+
+\begin{table}[h!]
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llll}
+\hline
+\multicolumn{1}{|c|}{\textbf{Object type}} & \multicolumn{1}{c|}{\textbf{Typeval}} & \multicolumn{1}{l|}{\textbf{Parameters}} & \multicolumn{1}{l|}{\textbf{Description}} \\ \hline
+Delta (single point) & 1 & node  height & Adds ice of a given height (above the solid surface) to a specific node in the mesh \\
+Vertical cylinder & 2 & x, y, radius, height & Vertical cylinder of given height centred on x,y location
+\end{tabular}%
+}
+\end{table}
+
+
+\begin{adescription} {}
+\item[line 1:]        \emph{number of ice objects to add} 
+\item[line 2-:]       \emph{object1}  typeval params  
+\end{adescription}
+
+
+Example:\\
+Here we specify that there will be 2 single bits of ice, placed at nodes 410 and 414 with heights of 5 and 7 respectively, as well as and a cylinder placed at location (x = 4.5, y = 5.5) on the solid surface with a radius of 3.14 and a height of 10. \\\\
+\texttt{
+3\\
+1 414 7 \\
+2 4.5 5.5 3.14 10\\
+1 410 5 \\
+}

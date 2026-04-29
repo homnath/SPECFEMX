@@ -1,0 +1,3 @@
+- Might need to edit assemble_ghosts_gdof but not really sure what 
+  needs doing to it - speak to HNG about this
+  same with finalize gdof and modify_ghost_gdof

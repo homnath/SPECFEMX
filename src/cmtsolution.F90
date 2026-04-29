@@ -1,10 +1,13 @@
 module cmtsolution
+use set_precision
 implicit none
 ! Number of lines per CMT source in a CMTSOLUTION file
 integer,parameter :: nline_cmtsolution=13
 ! Number of CMT sources in a CMTSOLUTION file
 integer :: ncmt_source
-
+real(kind=kreal) :: current
+real(kind=kreal),allocatable :: source_tshift(:),source_hdur(:)
+real(kind=kreal),allocatable :: nu_source (:,:,:)
 contains
 !-------------------------------------------------------------------------------
 
@@ -17,7 +20,7 @@ contains
 !  HNG, Oct 04, 2018
 ! TODO
 subroutine count_cmtsolution(errcode,errtag)
-use global,only:inp_path,cmtfile
+use global,only:NDIM,inp_path,cmtfile,logunit
 implicit none
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
@@ -59,6 +62,8 @@ if(mod(nline,nline_cmtsolution).ne.0)then
 endif
 ncmt_source=nline/nline_cmtsolution
 
+allocate(source_tshift(ncmt_source),source_hdur(ncmt_source))
+allocate(nu_source(NDIM,NDIM,ncmt_source))
 errcode=0
 
 return
@@ -75,14 +80,16 @@ end subroutine count_cmtsolution
 !  HNG, Oct 04, 2018
 ! TODO
 subroutine read_cmtsolution(source_coord,M_cmt,errcode,errtag)
-use dimensionless
+use nondimensionpar
 use global
 use math_constants
 use conversion_constants
+use earth_constants
 use math_library,only:IsPointInPolygon
 use shape_library,only:shape_function_quad4p
 use map_location,only:map_point2naturalquad4
 use utmgeo
+use coordinate,only:lat_2_geocentric_colat_dble,reduce
 use free_surface
 use string_library
 #if (USE_MPI)
@@ -104,6 +111,7 @@ integer :: i_elmt,i_face,i_line,i_src,iface,iface_all,ind,ios,istat
 integer :: niter,nline
 integer :: nsrc
 
+real(kind=kreal) :: tshift,hdur
 real(kind=kreal) :: lat,long,depth,Mrr,Mtt,Mpp,Mrt,Mrp,Mtp
 real(kind=kreal),dimension(3,3) :: Mcmt
 
@@ -113,6 +121,13 @@ real(kind=kreal) :: coord(2,4),vx(4),vy(4),vz(4)
 real(kind=kreal) :: located_x(2),xip(2),errx
 real(kind=kreal) :: shape_quad4(4)
 real(kind=kreal) :: elevation
+
+integer :: iorientation
+real(kind=kreal) :: r_source
+real(kind=kreal) :: st,ct,sp,cp
+real(kind=kreal) :: stazi,stdip,thetan,phin,n(3)
+double precision :: r0,dcost,p20
+real(kind=kreal) :: theta,phi
 
 integer :: this_src_located,total_src_located
 integer,allocatable :: isrc_located(:)
@@ -124,7 +139,7 @@ character(len=80) :: fname
 character(len=80) :: data_path
 character(len=250) :: pfile
 
-logical :: islat,islong,isdepth,ismrr,ismtt,ismpp,ismrt,ismrp,ismtp
+logical :: istshift,ishdur,islat,islong,isdepth,ismrr,ismtt,ismpp,ismrt,ismrp,ismtp
 errtag="ERROR: unknown!"
 errcode=-1
 
@@ -149,7 +164,10 @@ endif
 allocate(isrc_located(ncmt_source))
 isrc_located=0
 nsrc=0
+! Loop through the CMT sources
 src:do i_src=1,ncmt_source
+  istshift=.false.
+  ishdur=.false.
   islat=.false.
   islong=.false.
   isdepth=.false.
@@ -159,6 +177,7 @@ src:do i_src=1,ncmt_source
   ismrt=.false.
   ismrp=.false.
   ismtp=.false.
+  ! Loop through lines of each CMT source
   do i_line=1,nline_cmtsolution
     read(11,'(a)',iostat=ios)line ! This will read a line and proceed to next line
     if (ios/=0)exit src
@@ -166,6 +185,42 @@ src:do i_src=1,ncmt_source
     tag=trim(line)
     call first_token(tag,token)
 
+    ! time shift
+    if (trim(token)=='time')then
+      if(islat)then
+        write(errtag,*)'WARNING: copy of time shift found! Copies are discarded!'
+        cycle
+      endif
+      ind=index(line,':')
+      if(ind.le.0)then
+        write(errtag,*)'ERROR: invalid "time" token!',trim(line)
+        return
+      endif
+      read(line(ind+1:len_trim(line)),*,iostat=istat)tshift
+      if(istat.ne.0)then
+        write(*,*)'ERROR: cannot read time shift!',ind,trim(line)
+        stop
+      endif
+      istshift=.true.
+    endif
+    ! half duration
+    if (trim(token)=='half')then
+      if(islat)then
+        write(errtag,*)'WARNING: copy of half duration! Copies are discarded!'
+        cycle
+      endif
+      ind=index(line,':')
+      if(ind.le.0)then
+        write(errtag,*)'ERROR: invalid "half" token!',trim(line)
+        return
+      endif
+      read(line(ind+1:len_trim(line)),*,iostat=istat)hdur
+      if(istat.ne.0)then
+        write(*,*)'ERROR: cannot read half duration!',ind,trim(line)
+        stop
+      endif
+      ishdur=.true.
+    endif
     ! latitude
     if (trim(token)=='latitude:')then
       if(islat)then
@@ -364,6 +419,14 @@ src:do i_src=1,ncmt_source
     endif
   enddo
   ! Check status
+  if(.not.istshift)then
+    write(errtag,*)'ERROR: cannot read time shift!'
+    return
+  endif
+  if(.not.ishdur)then
+    write(errtag,*)'ERROR: cannot read ihalf duration!'
+    return
+  endif
   if(.not.islat)then
     write(errtag,*)'ERROR: cannot read latitude!'
     return
@@ -402,95 +465,219 @@ src:do i_src=1,ncmt_source
   endif
   nsrc=nsrc+1
 
-  ! Nondimentionalize M
-  ! NOTE: unit of M is in CGS units. We should convert them to SI unit.
-  Mpp=NONDIM_MTENS*CGS2SI_MOMENT*Mpp
-  Mtt=NONDIM_MTENS*CGS2SI_MOMENT*Mtt
-  Mrr=NONDIM_MTENS*CGS2SI_MOMENT*Mrr
-  Mtp=NONDIM_MTENS*CGS2SI_MOMENT*Mtp
-  Mrt=NONDIM_MTENS*CGS2SI_MOMENT*Mrt
-  Mrp=NONDIM_MTENS*CGS2SI_MOMENT*Mrp
-  
-  !  Mrr =  Mzz
-  !  Mtt =  Myy
-  !  Mpp =  Mxx
-  !  Mrt = -Myz
-  !  Mrp =  Mxz
-  !  Mtp = -Mxy
+  source_tshift(i_src) = tshift
+  source_hdur(i_src) = hdur
+    call sync_process
 
-  ! Store 6 unique moment-tensor components in the order
-  ! 1: Mxx
-  ! 2: Myy
-  ! 3: Mzz
-  ! 4: Mxy
-  ! 5: Myz
-  ! 6: Mzx
-  M_cmt(1,i_src)= Mpp !Mxx
-  M_cmt(2,i_src)= Mtt !Myy
-  M_cmt(3,i_src)= Mrr !Mzz
-  M_cmt(4,i_src)=-Mtp !Mxy
-  M_cmt(5,i_src)=-Mrt !Myz
-  M_cmt(6,i_src)= Mrp !Mzx
- 
-  ! Compute UTM coordinates
-  call geodetic2utm(long,lat,utmx(1),utmx(2))
- 
-  ! Nondimentionalize coordinates
-  utmx=NONDIM_L*utmx
-  depth=NONDIM_L*KM2M*depth
+  if(trim(cmt_mapto).eq.'GLOBE')then
+    ! convert geographic latitude lat (degrees) to geocentric colatitude theta (radians)
+    call lat_2_geocentric_colat_dble(lat,theta)
 
-  source_coord(1,i_src)=utmx(1)
-  source_coord(2,i_src)=utmx(2)
-  !source_coord(3,i_src)=-depth
+    phi = long*DEG2RAD
+    call reduce(theta,phi)
 
-  ! Find Z coordinate
-  ! step 1: find elevation
-  ! NOTE: All the processors will try to find elevation, but only a single
-  ! processor or processors shared by the point will find the correct elevation.
-  ! Otherwise the elevation is set to ZERO.
-  call free_surface_elevation(utmx,elevation,isrc_located(i_src))
+    ! convert from a spherical to a Cartesian representation of 
+    ! the moment tensor
+    st = dsin(theta)
+    ct = dcos(theta)
+    sp = dsin(phi)
+    cp = dcos(phi)
+    
+    !M_cmt(1,i_src)= Mpp !Mxx
+    !M_cmt(2,i_src)= Mtt !Myy
+    !M_cmt(3,i_src)= Mrr !Mzz
+    !M_cmt(4,i_src)=-Mtp !Mxy
+    !M_cmt(5,i_src)=-Mrt !Myz
+    !M_cmt(6,i_src)= Mrp !Mzx
 
-  source_coord(3,i_src)=elevation-depth
-  
-  !iface=0
-  !do i_face=1,nelmt_fs
-  !  vx=g_coord(1,gnum4_fs(:,i_face))
-  !  vy=g_coord(2,gnum4_fs(:,i_face))
-  !  coord(1,:)=vx
-  !  coord(2,:)=vy
-  !  vz=g_coord(3,gnum4_fs(:,i_face))
-  !  isinside=IsPointInPolygon(vx,vy,utmx(1),utmx(2))
-  !  if(isinside)then
-  !    iface=iface+1
-  !    call  map_point2naturalquad4(coord,utmx,xip,located_x,niter,errx)
-  !    call shape_function_quad4p(4,xip(1),xip(2),shape_quad4)
-  !    elevation=sum(vz*shape_quad4)
-  !    
-  !    source_coord(3,i_src)=elevation-depth
-  !    isrc_located(i_src)=1
-  !  endif
-  !enddo
-  call sync_process
-  this_src_located=sumscal(isrc_located(i_src))
-  iface_all=sumscal(iface) 
-  if(this_src_located.lt.1)then
-    write(logunit,'(a,2(g0.6,1x),i0,1x,i0,1x,i0,1x,i0))')'WARNING: cmt source cannot be projected &
-                                   &on the free surface:',utmx,i_src,myrank,iface_all,this_src_located
-    flush(logunit)
+    M_cmt(1,i_src) = st*st*cp*cp*Mrr+ct*ct*cp*cp*Mtt+sp*sp*Mpp &
+        +2.0d0*st*ct*cp*cp*Mrt-2.0d0*st*sp*cp*Mrp-2.0d0*ct*sp*cp*Mtp
+    M_cmt(2,i_src) = st*st*sp*sp*Mrr+ct*ct*sp*sp*Mtt+cp*cp*Mpp &
+        +2.0d0*st*ct*sp*sp*Mrt+2.0d0*st*sp*cp*Mrp+2.0d0*ct*sp*cp*Mtp
+    M_cmt(3,i_src) = ct*ct*Mrr+st*st*Mtt-2.0d0*st*ct*Mrt
+    M_cmt(4,i_src) = st*st*sp*cp*Mrr+ct*ct*sp*cp*Mtt-sp*cp*Mpp &
+        +2.0d0*st*ct*sp*cp*Mrt+st*(cp*cp-sp*sp)*Mrp+ct*(cp*cp-sp*sp)*Mtp
+    M_cmt(5,i_src) = st*ct*sp*Mrr-st*ct*sp*Mtt &
+        +(ct*ct-st*st)*sp*Mrt+ct*cp*Mrp-st*cp*Mtp
+    M_cmt(6,i_src) = st*ct*cp*Mrr-st*ct*cp*Mtt &
+        +(ct*ct-st*st)*cp*Mrt-ct*sp*Mrp+st*sp*Mtp
+
+    ! record three components for each station
+    do iorientation = 1,3
+
+      !   North
+      if (iorientation == 1) then
+        stazi = 0.d0
+        stdip = 0.d0
+      !   East
+      else if (iorientation == 2) then
+        stazi = 90.d0
+        stdip = 0.d0
+      !   Vertical
+      else if (iorientation == 3) then
+        stazi = 0.d0
+        stdip = - 90.d0
+      else
+        write(errtag,*)'ERROR:incorrect orientation!'
+        return
+      endif
+
+      ! get the orientation of the seismometer
+      thetan = (90.0d0+stdip)*DEG2RAD
+      phin = stazi*DEG2RAD
+
+      ! we use the same convention as in Harvard normal modes for the orientation
+
+      ! vertical component
+      n(1) = dcos(thetan)
+      !   N-S component
+      n(2) = - dsin(thetan)*dcos(phin)
+      !   E-W component
+      n(3) = dsin(thetan)*dsin(phin)
+
+      ! get the Cartesian components of n in the model: nu
+      nu_source(iorientation,1,i_src) = n(1)*st*cp + n(2)*ct*cp - n(3)*sp
+      nu_source(iorientation,2,i_src) = n(1)*st*sp + n(2)*ct*sp + n(3)*cp
+      nu_source(iorientation,3,i_src) = n(1)*ct - n(2)*st
+
+    enddo
+
+    ! normalized source radius
+    r0 = R_UNIT_SPHERE
+
+    !! finds elevation of position
+    !if (TOPOGRAPHY) then
+    !  call get_topo_bathy(lat(i_src),long(i_src),elevation,ibathy_topo)
+    !  r0 = r0 + elevation/R_EARTH
+    !endif
+    !if (ELLIPTICITY) then
+    !  dcost = dcos(theta)
+    !  ! This is the Legendre polynomial of degree two, P2(cos(theta)), see the
+    !  ! discussion above eq (14.4) in Dahlen and Tromp (1998)
+    !  p20 = 0.5d0*(3.0d0*dcost*dcost-1.0d0)
+    !  radius = r0 - depth(i_src)*1000.0d0/R_EARTH
+    !  ! Get ellipticity using spline evaluation
+    !  call spline_evaluation(rspl,espl,espl2,nspl,radius,ell)
+    !  ! This is eq (14.4) in Dahlen and Tromp (1998)
+    !  r0 = r0*(1.0d0-(2.0d0/3.0d0)*ell*p20)
+    !endif
+
+    ! subtracts source depth (given in km)
+    r_source = r0 - depth*1000.0d0/R_EARTH
+
+    ! compute the Cartesian position of the source
+    source_coord(1,i_src) = r_source*dsin(theta)*dcos(phi)
+    source_coord(2,i_src) = r_source*dsin(theta)*dsin(phi)
+    source_coord(3,i_src) = r_source*dcos(theta)
+
+    ! Nondimensionalize
+    M_cmt(:,i_src)=NONDIM_MTENS*CGS2SI_MOMENT*M_cmt(:,i_src)
+    source_coord(:,i_src)=NONDIM_L*source_coord(:,i_src)
+  else !UTM or NONE
+    ! Nondimentionalize M
+    ! NOTE: unit of M is in CGS units. We should convert them to SI unit.
+    Mpp=NONDIM_MTENS*CGS2SI_MOMENT*Mpp
+    Mtt=NONDIM_MTENS*CGS2SI_MOMENT*Mtt
+    Mrr=NONDIM_MTENS*CGS2SI_MOMENT*Mrr
+    Mtp=NONDIM_MTENS*CGS2SI_MOMENT*Mtp
+    Mrt=NONDIM_MTENS*CGS2SI_MOMENT*Mrt
+    Mrp=NONDIM_MTENS*CGS2SI_MOMENT*Mrp
+    
+    !  Mrr =  Mzz
+    !  Mtt =  Myy
+    !  Mpp =  Mxx
+    !  Mrt = -Myz
+    !  Mrp =  Mxz
+    !  Mtp = -Mxy
+
+    ! Store 6 unique moment-tensor components in the order
+    ! 1: Mxx
+    ! 2: Myy
+    ! 3: Mzz
+    ! 4: Mxy
+    ! 5: Myz
+    ! 6: Mzx
+    M_cmt(1,i_src)= Mpp !Mxx
+    M_cmt(2,i_src)= Mtt !Myy
+    M_cmt(3,i_src)= Mrr !Mzz
+    M_cmt(4,i_src)=-Mtp !Mxy
+    M_cmt(5,i_src)=-Mrt !Myz
+    M_cmt(6,i_src)= Mrp !Mzx
+
+    if(trim(cmt_mapto).eq.'UTM')then
+      ! Compute UTM coordinates
+      call geodetic2utm(long,lat,utmx(1),utmx(2))
+    elseif(trim(cmt_mapto).eq.'NONE')then
+      utmx(1)=long
+      utmx(2)=lat
+    else
+      write(errtag,*)'ERROR: unrecgonized cmt_mapto option!'
+      return
+    endif
+    ! Nondimentionalize coordinates
+    utmx=NONDIM_L*utmx
+    depth=NONDIM_L*KM2M*depth
+
+    source_coord(1,i_src)=utmx(1)
+    source_coord(2,i_src)=utmx(2)
+    !source_coord(3,i_src)=-depth
+
+    ! Find Z coordinate
+    ! step 1: find elevation
+    ! NOTE: All the processors will try to find elevation, but only a single
+    ! processor or processors shared by the point will find the correct elevation.
+    ! Otherwise the elevation is set to ZERO.
+    ! NOTE: At the time of calling this routine, coordinates are
+    ! nondimensionalized. Therefore, the passing coordinates must also be
+    ! nondimensionalizaed.
+    call free_surface_elevation(utmx,elevation,isrc_located(i_src))
+    source_coord(3,i_src)=elevation-depth
+    !print*,depth,source_coord(3,i_src)  
+    !iface=0
+    !do i_face=1,nelmt_fs
+    !  vx=g_coord(1,gnum4_fs(:,i_face))
+    !  vy=g_coord(2,gnum4_fs(:,i_face))
+    !  coord(1,:)=vx
+    !  coord(2,:)=vy
+    !  vz=g_coord(3,gnum4_fs(:,i_face))
+    !  isinside=IsPointInPolygon(vx,vy,utmx(1),utmx(2))
+    !  if(isinside)then
+    !    iface=iface+1
+    !    call  map_point2naturalquad4(coord,utmx,xip,located_x,niter,errx)
+    !    call shape_function_quad4p(4,xip(1),xip(2),shape_quad4)
+    !    elevation=sum(vz*shape_quad4)
+    !    
+    !    source_coord(3,i_src)=elevation-depth
+    !    isrc_located(i_src)=1
+    !  endif
+    !enddo
+    call sync_process
+    this_src_located=sumscal(isrc_located(i_src))
+    iface_all=sumscal(iface) 
+    if(this_src_located.lt.1)then
+      write(logunit,'(a,2(g0.6,1x),i0,1x,i0,1x,i0,1x,i0)')'WARNING: cmt source &
+      &cannot be projected on the free surface:',utmx,i_src,myrank,iface_all,    &
+      this_src_located
+      flush(logunit)
+    endif
+
   endif
 
 enddo src
 close(11)
 call sync_process
 
-isrc_located=maxvec(isrc_located,ncmt_source)
-where(isrc_located.gt.1)isrc_located=1
-total_src_located=sum(isrc_located)
-if(myrank==0)then
-  write(logunit,'(a,i0,1x,a,i0)')'Total defined CMT sources: ',ncmt_source, &
-                           'Total projected CMT sources: ',total_src_located
-  flush(logunit)
+if(.not.trim(cmt_mapto).eq.'GLOBE')then
+  isrc_located=maxvec(isrc_located,ncmt_source)
+  where(isrc_located.gt.1)isrc_located=1
+  total_src_located=sum(isrc_located)
+  if(myrank==0)then
+    write(logunit,'(a,i0,1x,a,i0)')'Total defined CMT sources: ',ncmt_source, &
+                             'Total projected CMT sources: ',total_src_located
+    flush(logunit)
+  endif
 endif
+
 if(nsrc.ne.ncmt_source)then
   write(errtag,*)'ERROR: number of CMT sources mismatch!'
   return

@@ -1,14 +1,18 @@
 REVISION:
-  HNG, Nov 12,2018
+  HNG, Feb 11,2026
 TODO LIST
 URGENT:
+- Transition region must be meshed in the CUBIT for now, but it can be made builtin in the infinite_element.f90.
+- Infinite BC inherti option is functional only for elastic deformation. It must be fixed for others, such as magntic, elctric, etc.
+- builtin solver may not be working. It may be proably the assigining the result after the solution.
 - add - sign in computing 4\pi G \rho and in computing g overall results won't be affected
-- make sure of sing of forcing terms of magnetic anomalies
+- make sure of sign of forcing terms of magnetic anomalies
 - simulataneous runs are not possible due to write/read of identical files on tmp/ folder
 - properly nondimensionalize okada solution part
 - properly nondimensionalize traction/ubc conditions
 - replace block properties with elemental propertie for viscoelastic region
 NONURGENT
+ - Make okada benchmark independent, adding parameters directly in the benchmark line and if necessary add auto parameter determination option when slip source is used.
  - we can unify varible name elmt_finite
  - Robin boundary condition
  - need to consider ghost partitions for the averaging nodal quantities

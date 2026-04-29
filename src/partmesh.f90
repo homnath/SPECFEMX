@@ -9,6 +9,7 @@ program partmesh
 !use set_precision
 use string_library
 use global
+use shared
 use serial_library
 use partmesh_scotch!,only: npart,out_phead,read_mesh_files,check_valence,      &
 !scotch_partitioning,write_mesh_databases
@@ -44,7 +45,7 @@ if (istat /= 0)then
   stop
 endif
 call read_input(inp_fname,errcode,errtag,.true.)
-call control_error(errcode,errtag,stdout,myrank)
+call control_error(errcode,errtag,stdout)
 npart=nproc
 !bc_stat=-1
 !traction_stat=-1

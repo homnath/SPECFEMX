@@ -4,11 +4,10 @@
 !   HNG, Jul 12,2011; HNG, Apr 09,2010; HNG, Dec 08,2010
 ! TODO:
 !   partially saturated
-subroutine compute_pressure(ismpi,wpressure,submerged_node,errcode,errtag)
+subroutine compute_pressure(wpressure,submerged_node,errcode,errtag)
 use global
 use math_library,only:determinant
 implicit none
-logical,intent(in) :: ismpi
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 real(kind=kreal),dimension(nnode) :: wpressure ! water pressure
@@ -21,7 +20,7 @@ integer :: i,j,k,i1,i2,i3,i4,i5,i6,inod,i_elmt,i_face,i_node,ios
 ! water surface segments
 integer :: i_wsurf,nwsurf ! number of water table surfaces
 ! unit weight of water
-real(kind=kreal),parameter :: zero=0.0_kreal,gamw=9.81_kreal !KN/m3
+real(kind=kreal),parameter :: gamw=9.81_kreal !KN/m3
 
 character(len=20) :: format_str!,ptail
 character(len=250) :: fname

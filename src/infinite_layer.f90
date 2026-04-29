@@ -68,6 +68,15 @@ character(len=150) :: data_path
 
 errtag="ERROR: unknown!"
 errcode=-1
+
+! Check if the infinite element material type is correctly defined.
+if(trim(matinf_type).eq.'define')then
+  if(mat_domain(imat_inf).ne.ELASTIC_INFDOMAIN .and. &
+    mat_domain(imat_inf).ne.VISCOELASTIC_INFDOMAIN)then
+    write(errtag,*)'ERROR: "mat_domain" for "imat_inf" isn''t infinite!'
+    return
+  endif
+endif
 ! set data path
 if(ismpi .and. nproc.gt.1)then
   data_path=trim(part_path)
@@ -106,6 +115,7 @@ allocate(ismat(nmatblk),ismat_vis(nmatblk))
 ismat=.false.
 ismat_vis=.false.
 n1=1; n2=4
+
 do i_elpart=1,nelpart
   ! This will read a line and proceed to next line
   read(11,*)ielmt,iface
@@ -221,7 +231,7 @@ if(trim(matinf_type).eq.'inherit')then
       elseif(mdomain.eq.ELASTIC_TRINFDOMAIN)then
         mdomain=mdomain*10
       else
-        write(stdout,*)'ERROR: wrong material ID for inhertance!'
+        write(stdout,*)'ERROR: wrong material ID for inheritance!'
         stop
       endif
       ! inherit properties
@@ -323,7 +333,7 @@ do i=2,nsnode_all
   endif
 enddo
 deallocate(isnode)
-
+print*,'Infinite pole:',pole_coord0
 ! compute mirror nodes
 do i=1,nsnode
   ! pole specifies the reference point for the decaying functions
@@ -349,6 +359,10 @@ do i=1,nsnode
   r1=distance(x0,xs(:,i),ndim)
   if(rinf.le.r1)then
     write(errtag,*)'ERROR: reference infinite radius is smaller than the model!'
+    return
+  endif
+  if(abs(r1).eq.ZERO)then
+    write(errtag,*)'ERROR: infinite surface coincides with the pole!'
     return
   endif
   gaminf=r1/(rinf-r1)
@@ -398,11 +412,12 @@ do i=1,nelmtINF
   ! assign material ID
   if(trim(matinf_type).eq.'inherit')then
   ! inherit material block ID/s from the parent elements
-    imat=imat_INFS(i)
-    mat_id(ielmt)=imat_inherit(imat)
-  else
-  ! set specified material block ID/s
-    if(mat_domainINFS(i).eq.ELASTIC_TRINFDOMAIN)then
+    if(mat_domainINFS(i).eq.ELASTIC_DOMAIN .or. &
+       mat_domainINFS(i).eq.VISCOELASTIC_DOMAIN)then
+      imat=imat_INFS(i)
+      mat_id(ielmt)=imat_inherit(imat)
+    elseif(mat_domainINFS(i).eq.ELASTIC_TRINFDOMAIN .or. &
+           mat_domainINFS(i).eq.VISCOELASTIC_TRINFDOMAIN)then
       ! adjacent element is the transition element
       if(imat_trinf.lt.1)then
         write(*,'(a,i0)')'ERROR: invalid material ID for transition infinite elements! ',imat_trinf
@@ -414,8 +429,15 @@ do i=1,nelmtINF
       mat_id(ielmt)=imat_trinf
       nelmtTRINF=nelmtTRINF+1
     else
-      mat_id(ielmt)=imat_inf
+      write(*,'(a)')'ERROR: invalid "mat_domainINFS"!'
+      stop
     endif
+  elseif(trim(matinf_type).eq.'define')then
+  ! set specified material block ID/s
+    mat_id(ielmt)=imat_inf
+  else
+   write(*,'(a)')'ERROR: invalid "matinf_type"! It must be either "inherit" or "define"!'
+   stop
   endif
   n1=n2+1; n2=n1+3
 enddo
@@ -424,7 +446,6 @@ mat_domainINFS,imat_INFS)
 if(allocated(imat_inherit))deallocate(imat_inherit)
 write(logunit,*)'Number of transition infinite elements:',nelmtTRINF
 flush(logunit)
-
 ielmtINF1=nelmtOLD+1; ielmtINF2=nelmt
 ifaceINF=6
 

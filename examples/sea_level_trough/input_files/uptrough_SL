@@ -1,0 +1,6 @@
+# SL input file
+# CARTESIAN (1) or GLOBAL (2)
+1
+# SL defintion: constant z-value (0) - implement others later
+1
+1 10.0

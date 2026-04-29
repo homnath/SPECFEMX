@@ -6,7 +6,7 @@ contains
 ! mtraction file
 ! REVISION
 !   HNG, Jul 12,2011; HNG, Apr 09,2010; HNG, Dec 08,2010
-subroutine apply_mtraction(load,errcode,errtag)
+subroutine apply_mtraction(errcode,errtag)
 use global
 use math_constants
 use element,only:hexface,hexface_sign
@@ -16,7 +16,6 @@ use integration,only:dshape_quad4_xy,dshape_quad4_yz,dshape_quad4_zx,          &
 use math_library,only : angle,magnetic_unitvec
 use conversion_constants,only:DEG2RAD
 implicit none
-real(kind=kreal),intent(inout) :: load(0:neq)
 integer,intent(out) :: errcode
 character(len=250),intent(out) :: errtag
 integer :: lndofphi,lngdofu(ndim)
@@ -36,7 +35,7 @@ real(kind=kreal),allocatable :: ftracload(:) ! face mtraction load
 ! Magnetization
 ! magnetization properties type for the traction surface
 ! 'inherit': inherit the magnetization form the parent element
-! 'define': defien the magnetization
+! 'define': define the magnetization
 character(len=10) :: mag_type
 ! Inclination (0) or latitude (1). If latitude, the inclination is obtained
 ! using the relation: inclination = ATAN(2*TAN(latitude))
@@ -67,7 +66,7 @@ endif
 fname=trim(data_path)//trim(mtrfile)//trim(ptail_inp)
 open(unit=11,file=trim(fname),status='old',action='read',iostat=ios)
 if (ios /= 0)then
-  write(errtag,'(a)')'ERROR: input file "',trim(fname),'" cannot be opened!'
+  write(errtag,'(a)')'ERROR: input file "'//trim(fname)//'" cannot be opened!'
   return
 endif
 
@@ -105,7 +104,7 @@ mtraction: do
     azim=azim*DEG2RAD
     M=M0*magnetic_unitvec(inc,dec,azim)
   else
-    write(errtag,'(a)')'ERROR: mtraction type ',tractype,' not supported!'
+    write(errtag,'(a,i0,a)')'ERROR: mtraction type ',tractype,' not supported!'
     return
   endif
     
@@ -121,6 +120,7 @@ mtraction: do
     !  imatmag=imat_to_imatmag(imat)
     !  M=magnetization_blk(:,imatmag)
     !endif
+    nfgll=ngllxy
     if(iface==1 .or. iface==3)then
       nfgll=ngllzx
       lagrange_gll(1:nfgll,1:nfgll)=lagrange_gll_zx
@@ -151,7 +151,7 @@ mtraction: do
         Mgll(:,i_gll)=magnetization_elmt(:,hexface(iface)%node(i_gll),ielmt)
       enddo
     else
-      write(errtag,'(a)')'ERROR: unsupported mag_type ',trim(mag_type),'!'
+      write(errtag,'(a)')'ERROR: unsupported mag_type '//trim(mag_type)//'!'
       return
     endif
     nfdofphi=nfgll*nndofphi
@@ -177,7 +177,7 @@ mtraction: do
       ftracload(1:nfdofphi)=ftracload(1:nfdofphi)- &
       dot_product(M,face_normal)*lagrange_gll(i_gll,:)*detjac*gll_weights(i_gll)
     enddo ! i_gll
-    load(fgdof(1:nfdofphi))=load(fgdof(1:nfdofphi))+ftracload(1:nfdofphi)
+    extload(fgdof(1:nfdofphi))=extload(fgdof(1:nfdofphi))+ftracload(1:nfdofphi)
     deallocate(Mgll)
   enddo ! i_face
   trac_stat=.true.

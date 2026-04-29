@@ -462,7 +462,7 @@ integer,dimension(npart) :: mpart_icount,mpart_nelmt
 integer :: bc_nelmt ! number of BC elements
 integer,dimension(:,:),allocatable :: bc_elmt ! fist row = element ID, second row = entity ID
 integer :: ios,i_elmt,i_part,ipart,istat
-
+integer,allocatable :: itemp(:)
 logical :: ispart(npart)
 integer,allocatable :: temp_mat(:,:)
 type master_partition
@@ -523,7 +523,12 @@ do i_elmt=1,bc_nelmt
   mpart(ipart)%iloc(mpart_icount(ipart))=i_elmt
 enddo
 
-bc_elmt(1,:)=glob2loc_elmt(bc_elmt(1,:)) ! local element numbering in the partition
+! WARNING: this may not be allowed in recent compilers
+!bc_elmt(1,:)=glob2loc_elmt(bc_elmt(1,:)) ! local element numbering in the partition
+
+do i_elmt=1,bc_nelmt
+  bc_elmt(1,i_elmt)=glob2loc_elmt(bc_elmt(1,i_elmt)) ! local element numbering in the partition
+enddo
 
 ! format string for element ID and face ID
 write(format_str1,*)ceiling(log10(real(maxval(bc_elmt(1,:)))+1.))
@@ -656,7 +661,10 @@ bc: do ! ibc=1,nbc
     mpart(ipart)%iloc(mpart_icount(ipart))=i_elmt
   enddo
 
-  bc_elmt(1,:)=glob2loc_elmt(bc_elmt(1,:)) ! local element numbering in the partition
+  !bc_elmt(1,:)=glob2loc_elmt(bc_elmt(1,:)) ! local element numbering in the partition
+  do i_elmt=1,bc_nelmt
+    bc_elmt(1,i_elmt)=glob2loc_elmt(bc_elmt(1,i_elmt)) ! local element numbering in the partition
+  enddo
 
   ! format string for element ID and face ID
   write(format_str1,*)ceiling(log10(real(maxval(bc_elmt(1,:)))+1.))
@@ -821,7 +829,14 @@ do i_elmt=1,tr_nelmt
 enddo
 
 ! local element numbering in the partition
-tr_elmt(1,:)=glob2loc_elmt(tr_elmt(1,:))
+! statement below gives the "Shape mismatch" warning or error, for example,
+! "forrtl: warning (406): fort: (33): Shape mismatch: The extent of dimension 2
+! of array TR_ELMT is 1140 and the corresponding extent of array GLOB2LOC_ELMT
+! is 1"
+!tr_elmt(1,:)=glob2loc_elmt(tr_elmt(1,:))
+do i_elmt=1,tr_nelmt
+  tr_elmt(1,i_elmt)=glob2loc_elmt(tr_elmt(1,i_elmt))
+enddo
 
 ! format string for file name
 write(format_str,*)ceiling(log10(real(npart)+1.))

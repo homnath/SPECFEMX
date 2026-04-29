@@ -1,0 +1,60 @@
+name: Intel OneAPI build
+
+on:
+  push:
+    branches: [main, master, sea, actions_setup]
+  pull_request:
+    branches: [main, master, sea, actions_setup]
+jobs:
+  build_intel_champ_fparser:
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        shell: bash --noprofile --norc {0}
+    steps:
+    - uses: actions/checkout@v2
+    - name: setup repo and download intel key
+      run: |
+        wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+        sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+        rm GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+        sudo echo "deb https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+        sudo apt-get update
+
+
+    #- name: install intel compilers 
+    #  run: |
+    #    sudo apt-get install -y intel-oneapi-common-vars
+    #    sudo apt-get install -y intel-oneapi-compiler-fortran
+    #    sudo apt-get install -y intel-oneapi-mkl
+    #    sudo apt-get install -y intel-oneapi-mpi
+    #    sudo apt-get install -y intel-hpckit
+    #    sudo apt-get install -y intel-oneapi-mpi-devel
+
+    #- name: Test intel compilers
+    #  run: |
+    #    source /opt/intel/oneapi/setvars.sh 
+    #    printenv >> $GITHUB_ENV
+    #    icc ./tests/icc_compile_test.c -o icc_comptest && ./icc_comptest
+    #    ifort ./tests/fortran_comp_test.f90 -o f90comptest && ./f90comptest
+    #    mpiifort ./tests/fortran_comp_test.f90 -o mpitest && ./mpitest
+  
+    - name: Extract dependencies 
+      run: |
+        echo "Extracting dependencies tarballs" && ls && \
+        cd dependencies && ls && \
+        tar -xvf cmake-3.23.1.tar.gz   && mv cmake-3.23.1 cmake && rm cmake-3.23.1.tar.gz && \
+        tar -xvf petsc-3.16.4.tar.gz   && mv petsc-3.16.4 petsc && rm petsc-3.16.4.tar.gz && \
+        tar -xvf scotch-v6.1.3.tar.gz  && mv scotch-v6.1.3 scotch && rm scotch-v6.1.3.tar.gz  
+
+    - name: Build CMake 
+      run: | 
+        apt install -y make && \
+        apt install -y g++  && \ 
+        apt install -y libssl-dev && \ 
+        cd dependencies/cmake && \
+        ./bootstrap && \
+        make && \ 
+        make install
+
+

@@ -1,6 +1,6 @@
 ! collection of solvers
 ! REVISION
-!   HNG, Jul 12,2011; HNG, Apr 09,2010
+!   HNG, Jul 12,2011; HNG, Apr 09,2010; WE Jun 14 2022
 module solver
 use set_precision
 use global, only : g_num,nedof
@@ -8,6 +8,11 @@ use ksp_constants, only : KSP_MAXITER,KSP_RTOL
 use math_constants, only : zero,zerotol
 
 contains
+
+
+
+
+
 
 ! conjuate-gradient solver
 subroutine ksp_cg_solver(neq,nelmt,k,u,f,gdof_elmt,ksp_iter,errcode,errtag)
@@ -32,7 +37,6 @@ errtag="ERROR: unknown!"
 errcode=-1
 
 !---CG solver
-ksp_iter=0
 
 ! check if RHS is 0
 if(maxval(abs(f)).le.zerotol)then
@@ -106,7 +110,6 @@ errtag="ERROR: unknown!"
 errcode=-1
 
 !---PCG solver
-ksp_iter=0
 
 ! check if RHS is 0
 if(maxval(abs(f)).le.zerotol)then
@@ -132,7 +135,7 @@ p=z
 pcg: do ksp_iter=1,KSP_MAXITER
   kp=zero
   do i_elmt=1,nelmt
-    egdof=gdof_elmt(:,i_elmt) !reshape(gdof(:,g_num(:,i_elmt)),(/nedof/))
+    egdof=gdof_elmt(:,i_elmt)
     km=k(:,:,i_elmt)
     kp(egdof)=kp(egdof)+matmul(km,p(egdof))
   enddo

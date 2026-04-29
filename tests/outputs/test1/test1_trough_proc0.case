@@ -1,0 +1,17 @@
+FORMAT
+type:  ensight gold
+
+GEOMETRY
+model:    test1_trough_proc0.geo
+
+VARIABLE
+vector per node: 1 displacement test1_trough_step*_proc0.dis
+
+tensor symm per node: 1 strain test1_trough_step*_proc0.eps
+
+TIME
+time set: 1
+number of steps: 1
+filename start number: 0
+filename increment: 1
+time values:  0.00000E+00

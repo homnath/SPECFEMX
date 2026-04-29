@@ -5,7 +5,8 @@ contains
 subroutine prepare_sparse()
 use math_library,only:i_uniinv,i8_uniinv
 use math_library_mpi,only:maxscal,minscal
-use mpi_library,only:check_allocate,sync_process
+use shared,only:check_allocate
+use mpi_library,only:sync_process
 use global
 implicit none
 integer,parameter :: kint8=selected_int_kind(13)
@@ -38,10 +39,17 @@ character(len=500) :: errsrc
 errsrc=trim(myfname)//' => prepare_sparse'
 
 if(myrank==0) then
-  write(logunit,*) 'preparing sparse matrix...'
+  write(logunit,*) '++++++++++++++++++++++++++++++++++++++++'
+  write(logunit,*) '       preparing sparse matrix...'
 endif
 
 nmax=nelmt*(NEDOF*NEDOF)
+
+if(myrank.eq.0)then
+  write(logunit,*)'NEDOF : ', NEDOF
+  write(logunit,*)'nelmt : ', nelmt
+  write(logunit,*)'nmax  : ', nmax
+endif
 allocate(col0(nmax),row0(nmax),gcol0(nmax),grow0(nmax),stat=ierr)
 call check_allocate(ierr,errsrc)
 
@@ -52,7 +60,6 @@ if(nproc.eq.1)then
   ggdof=gdof
 else
   ! read global degrees of freedoms from DATABASE files
-  ! inner core
   write(spm,'(i10)')myrank
   fname='tmp/'//trim(file_head)//'_ggdof_proc'//trim(adjustl(spm))
   open(unit=10,file=trim(fname),access='stream',form='unformatted',    &
@@ -98,11 +105,15 @@ else
     'gnum NOT_EQUAL_TO gnum_read!',count(g_num-gnum_read.ne.0)
 endif
 
+
+
 ! total degrees of freedoms
 ngdof=maxscal(maxval(ggdof))
 
-if(myrank==0)write(logunit,'(a,i0)')'Total global degrees of freedom: ',ngdof
-flush(logunit)
+if(myrank==0)then
+  write(logunit,'(a,i0)')'Total global degrees of freedom: ',ngdof
+  flush(logunit)
+endif
 
 ! precompute ownership range OR partion layout
 ng1=ngdof/nproc
@@ -139,12 +150,22 @@ iseq=.false.
 ! stage 0: store all elements
 ncount=0
 
+
+
 do i_elmt=1,nelmt
+
   ielmt=i_elmt
+  ! Vector for single element of the DOFs GIDs for all nodes 
   egdof=reshape(gdof(:,g_num(:,ielmt)),(/NEDOF/))
+
   gegdof=reshape(ggdof(:,g_num(:,ielmt)),(/NEDOF/))
+
+
+
   iseq(egdof)=.true.
   idgdof=egdof; idggdof=gegdof
+  
+  ! Check no mismatch between egdof and gegdof
   where(idgdof.gt.0)idgdof=1
   where(idggdof.gt.0)idggdof=1
   if(any((idgdof-idggdof).ne.0))then
@@ -158,26 +179,39 @@ do i_elmt=1,nelmt
     print*,'matID:',mat_id(ielmt)
     stop
   endif
+
+
+  
   do i=1,NEDOF
     do j=1,NEDOF
+
       igdof=egdof(i)
       jgdof=egdof(j)
+ 
+
       if(igdof.gt.0.and.jgdof.gt.0)then
+
         ncount=ncount+1
+
         row0(ncount)=igdof
         col0(ncount)=jgdof
         grow0(ncount)=gegdof(i)
         gcol0(ncount)=gegdof(j)
+
       endif
     enddo
   enddo
 enddo
 call sync_process
 
+! Ncount now holds the number of matches (ie the number of times where)
+! two DOFIDs are not zero 
+
 if(count(.not.iseq).gt.1)then
   write(logunit,*)'ERRORSP: some degrees of freedoms missing!',myrank,count(.not.iseq),maxval(gdof)
 endif
 deallocate(iseq)
+
 neq_actual=maxval(gdof)
 call sync_process
 ! stage 1: assemble duplicates
@@ -190,8 +224,14 @@ do i=1,ncount
   if(ind0(i).lt.0)print*,'IMPOSSIBLE:',myrank,neq,row0(i),col0(i),ind0(i)
 enddo
 
+!ind0 is (row-1)*neq  + col 
+! I think it is a numbering of each of the dof elements within the matrix of
+! dof combinations where it goes through each element of a column and then 
+! onto the next row 
 call i8_uniinv(ind0,iorder)
-nsparse=maxval(iorder)
+
+nsparse=maxval(iorder) ! Number of non-zero elemnts in sparse matrix? 
+
 if(myrank==0)write(logunit,'(a,i0,a,i0)')' neq_local: ',neq,' nsparse_local: ',nsparse
 call sync_process
 allocate(krow_sparse(nsparse),kcol_sparse(nsparse),stat=ierr)

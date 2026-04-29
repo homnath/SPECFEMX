@@ -18,7 +18,7 @@ contains
 
 ! This subroutine computes 1D GLL points and weights in each direction
 subroutine precompute_gll1d()
-use global,only:ngllx,nglly,ngllz
+use global,only:ngllx,nglly,ngllz, logunit
 implicit none
 real(kind=kreal),parameter :: zero=0.0_kreal
 real(kind=kreal),parameter :: jacobi_alpha=0.0_kreal,jacobi_beta=0.0_kreal
@@ -26,6 +26,7 @@ real(kind=kreal),parameter :: jacobi_alpha=0.0_kreal,jacobi_beta=0.0_kreal
 ! get gll points
 ! for alpha=beta=0, jacobi polynomial is legendre polynomial
 ! for ngllx=nglly=ngllz=ngll, need to call only once
+
 
 ! X
 allocate(gllpx(ngllx),gllwx(ngllx))
@@ -61,6 +62,8 @@ end subroutine cleanup_gll1d
 ! This subroutine computes GLL quadrature points and weights for 3D
 subroutine gll_quadrature(ndim,ngllx,nglly,ngllz,ngll,gll_weights,  &
 lagrange_gll,dlagrange_gll)
+
+use global, only: logunit
 implicit none
 integer,intent(in) :: ndim,ngllx,nglly,ngllz,ngll
 real(kind=kreal),dimension(ngll),intent(out) :: gll_weights
@@ -75,6 +78,7 @@ real(kind=kreal),dimension(nglly) :: lagrange_y,lagrange_dy
 real(kind=kreal),dimension(ngllz) :: lagrange_z,lagrange_dz
 
 ! compute everything in indexed order
+
 
 n=0
 do k=1,ngllz
@@ -92,15 +96,25 @@ do k=1,ngllz
   enddo
 enddo
 
+
+
 do ii=1,ngll ! ngllx*nglly*ngllz
   xi=gll_points(1,ii)
   eta=gll_points(2,ii)
   zeta=gll_points(3,ii)
 
+
+  
+
   ! compute 1d lagrange polynomials
   call lagrange1d(ngllx,xi,lagrange_x,lagrange_dx)
+  
+
   call lagrange1d(nglly,eta,lagrange_y,lagrange_dy)
+  
   call lagrange1d(ngllz,zeta,lagrange_z,lagrange_dz)
+
+
 
   n=0
   do k=1,ngllz
@@ -108,13 +122,26 @@ do ii=1,ngll ! ngllx*nglly*ngllz
       do i=1,ngllx
         n=n+1
         lagrange_gll(ii,n)=lagrange_x(i)*lagrange_y(j)*lagrange_z(k)
+
+
         dlagrange_gll(1,ii,n)=lagrange_dx(i)*lagrange_y(j)*lagrange_z(k)
+        
+
+
         dlagrange_gll(2,ii,n)=lagrange_x(i)*lagrange_dy(j)*lagrange_z(k)
         dlagrange_gll(3,ii,n)=lagrange_x(i)*lagrange_y(j)*lagrange_dz(k)
+      
+        
+      
       enddo
     enddo
   enddo
 enddo
+
+
+
+
+
 
 return
 end subroutine gll_quadrature
@@ -173,6 +200,7 @@ end subroutine gll_lagrange3d_point
 ! this subroutine computes GLL quadrature points and weights for 2D
 subroutine gll_quadrature2d(ndim,ngllx,nglly,ngll,gll_points2d,gll_weights2d,  &
 lagrange_gll2d,dlagrange_gll2d)
+use global,only:logunit
 implicit none
 integer,intent(in) :: ndim,ngllx,nglly,ngll
 real(kind=kreal),dimension(ngll),intent(out) :: gll_weights2d
@@ -201,6 +229,8 @@ real(kind=kreal),dimension(nglly) :: lagrange_y,lagrange_dy
 !call zwgljd(gllpx,gllwx,ngllx,jacobi_alpha,jacobi_beta)
 !call zwgljd(gllpy,gllwy,nglly,jacobi_alpha,jacobi_beta)
 
+
+
 n=0
 do j=1,nglly
   do i=1,ngllx
@@ -213,6 +243,10 @@ do j=1,nglly
     gll_weights2d(n)=gllwx(i)*gllwy(j)
   enddo
 enddo
+
+
+
+
 
 do ii=1,ngll ! ngllx*nglly
   xi=gll_points2d(1,ii)
@@ -232,6 +266,8 @@ do ii=1,ngll ! ngllx*nglly
     enddo
   enddo
 enddo
+
+
 
 return
 end subroutine gll_quadrature2d
@@ -295,7 +331,7 @@ end subroutine gll_quadrature1d
 ! this subroutine computes the 1d lagrange interpolation functions and their
 ! derivatives at a given point xi.
 subroutine lagrange1d(nenode,xi,phi,dphi_dxi)
-implicit none
+implicit none 
 integer,intent(in) :: nenode ! number of nodes in an 1d element
 integer :: i,j,k
 real(kind=kreal),intent(in) :: xi ! point where to calculate lagrange function and

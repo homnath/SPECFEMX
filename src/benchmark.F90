@@ -9,7 +9,7 @@ use global,only:NDIM,nelmt,nnode,nndofu,g_coord,g_num,gdof_elmt, &
                 ym_blk,nu_blk,savedata,stdout, &
                 okada_aw1,okada_aw2,okada_al1,okada_al2,okada_origin, &
                 okada_depth,okada_dip,okada_disl1,okada_disl2,okada_disl3
-use dimensionless,only:DIM_L
+use nondimensionpar,only:DIM_L
 use element,only:hex8_gnode
 use okada_solution
 use postprocess

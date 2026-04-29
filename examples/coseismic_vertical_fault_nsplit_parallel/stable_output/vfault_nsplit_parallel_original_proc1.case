@@ -1,0 +1,6 @@
+FORMAT
+type:  ensight gold
+
+GEOMETRY
+model:    vfault_nsplit_parallel_original_proc1.geo
+
