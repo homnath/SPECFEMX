@@ -6,6 +6,7 @@ module serial_library
 use set_precision
 integer :: ngpart
 contains
+!-------------------------------------------------------------------------------
 
 subroutine start_process()
 use global,only:ismpi,myrank,nproc
@@ -15,27 +16,27 @@ myrank=0
 nproc=1
 return
 end subroutine start_process
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 subroutine close_process()
 implicit none
 stop
 return
 end subroutine close_process
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 subroutine sync_process()
 implicit none
 return
 end subroutine sync_process
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 subroutine prepare_ghost()
 use global,only:nnode,nndof
 implicit none
 return
 end subroutine prepare_ghost
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 subroutine prepare_ghost_gdof()
 
@@ -43,7 +44,7 @@ implicit none
 
 return
 end subroutine prepare_ghost_gdof
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 subroutine modify_ghost(isnode)
 use global,only:nnode
@@ -51,7 +52,7 @@ implicit none
 logical,intent(in) :: isnode(nnode)
 return
 end subroutine modify_ghost
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 subroutine assemble_ghosts(nndof,neq,array,array_g)
 implicit none
@@ -61,7 +62,7 @@ real(kind=kreal),dimension(0:neq),intent(out) :: array_g
 array_g=array
 return
 end subroutine assemble_ghosts
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! this subroutine assembles the contributions of all ghost partitions
 ! at gdof locations
@@ -75,7 +76,7 @@ real(kind=kreal),dimension(nndof,nnode),intent(out) :: array_g
 array_g=array
 return
 end subroutine assemble_ghosts_nodal
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! This subroutine assembles the contributions of all ghost partitions
 ! at nodal locations for the n-component vector.
@@ -86,11 +87,10 @@ integer,intent(in) :: ncomp
 real(kind=kreal),dimension(ncomp,nnode),intent(in) :: array
 real(kind=kreal),dimension(ncomp,nnode),intent(out) :: array_g
 
-
 array_g=array
 return
 end subroutine assemble_ghosts_nodal_vectorn
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! This subroutine assembles the contributions of all ghost partitions
 ! at nodal locations
@@ -103,7 +103,7 @@ real(kind=kreal),dimension(NDIM,nnode),intent(out) :: array_g
 array_g=array
 return
 end subroutine assemble_ghosts_nodal_vector
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! This subroutine assembles the contributions of all ghost partitions
 ! at nodal locations
@@ -116,7 +116,7 @@ integer,dimension(nnode),intent(out) :: array_g
 array_g=array
 return
 end subroutine assemble_ghosts_nodal_iscalar
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! This subroutine assembles the contributions of all ghost partitions
 ! at nodal locations
@@ -129,7 +129,7 @@ real(kind=kreal),dimension(nnode),intent(out) :: array_g
 array_g=array
 return
 end subroutine assemble_ghosts_nodal_fscalar
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! this subroutine assembles the contributions of all ghost partitions
 ! at gdof locations
@@ -143,7 +143,7 @@ integer,dimension(nndof,nnode),intent(out) :: array_g
 array_g=array
 return
 end subroutine assemble_ghosts_gdof
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! this subroutine assembles the contributions of all ghost partitions
 ! at gdof locations
@@ -154,7 +154,7 @@ real(kind=kreal),dimension(nndofu,nnode),intent(inout) :: bcnodalu
 ! for serial this is done in apply_bc()
 return
 end subroutine undo_unmatching_displacementBC
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! this subroutine counts the active ghost partitions for each node on the
 ! interfaces.
@@ -170,7 +170,7 @@ integer,dimension(nnode),intent(out) :: ngpart_node
 ngpart_node=0
 return
 end subroutine count_active_nghosts
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! this subroutine distributes the excavation loads discarded by a processors due
 ! to the special geoemtry partition. it will not distribute if the load is used
@@ -198,14 +198,108 @@ enddo
 array_g(0)=zero
 return
 end subroutine distribute2ghosts
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 ! deallocate ghost variables
 subroutine cleanup_ghost()
 implicit none
 return
 end subroutine cleanup_ghost
-!===============================================================================
+!-------------------------------------------------------------------------------
+
+subroutine bcast_all_i(buffer, countval)
+
+implicit none
+
+integer :: countval
+integer, dimension(countval) :: buffer
+integer(kind=4) :: unused_i4
+
+unused_i4 = buffer(1)
+
+end subroutine bcast_all_i
+!-------------------------------------------------------------------------------
+
+subroutine bcast_all_cr(buffer, countval)
+
+use set_precision, only: kreal
+
+implicit none
+
+integer :: countval
+real(kind=kreal), dimension(countval) :: buffer
+real(kind=kreal) :: unused_cr
+
+unused_cr = buffer(1)
+
+end subroutine bcast_all_cr
+!-------------------------------------------------------------------------------
+
+subroutine bcast_all_singlecr(buffer)
+
+use set_precision, only: kreal
+
+implicit none
+
+real(kind=kreal) :: buffer
+real(kind=kreal) :: unused_cr
+
+unused_cr = buffer
+
+end subroutine bcast_all_singlecr
+!-------------------------------------------------------------------------------
+
+subroutine bcast_all_dp(buffer, countval)
+
+implicit none
+
+integer :: countval
+double precision, dimension(countval) :: buffer
+double precision :: unused_dp
+
+unused_dp = buffer(1)
+
+end subroutine bcast_all_dp
+!-------------------------------------------------------------------------------
+
+subroutine bcast_all_singledp(buffer)
+
+implicit none
+
+double precision :: buffer
+double precision :: unused_dp
+
+unused_dp = buffer
+
+end subroutine bcast_all_singledp
+!-------------------------------------------------------------------------------
+
+subroutine bcast_all_r(buffer, countval)
+
+implicit none
+
+integer :: countval
+real, dimension(countval) :: buffer
+real :: unused_r
+
+unused_r = buffer(1)
+
+end subroutine bcast_all_r
+!-------------------------------------------------------------------------------
+
+subroutine bcast_all_ch_array(buffer,countval,STRING_LEN)
+
+  implicit none
+
+  integer :: countval,STRING_LEN
+
+  character(len=STRING_LEN), dimension(countval) :: buffer
+  character(len=STRING_LEN) :: unused_ch
+
+  unused_ch=buffer(1)
+
+end subroutine bcast_all_ch_array
+!-------------------------------------------------------------------------------
 
 end module serial_library
 !===============================================================================

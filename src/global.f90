@@ -24,7 +24,9 @@ real(kind=kreal),parameter :: PI=3.141592653589793_kreal,HALFPI=HALF*PI, &
 TWOPI=TWO*PI
 
 ! tolerance value for zero
-real(kind=kreal),parameter :: INFTOL=1.0e32_kreal,ZEROTOL = 1.0e-12_kreal
+double precision,parameter :: DHUGEVAL=1.0d30,DTINYVAL=1.0d-9
+real(kind=kreal),parameter :: HUGEVAL=1.0e32_kreal,TINYVAL=1.0e-9_kreal,       &
+INFTOL=1.0e32_kreal,ZEROTOL = 1.0e-12_kreal
 real(kind=kreal),parameter :: SMALL_VAL_ANGLE = 1.d-10
 ! Gravitational constant: G ( m^3 kg^{-1} s^{-2} )
 ! source: 2014 CODATA recommended values

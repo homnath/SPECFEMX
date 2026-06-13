@@ -20,6 +20,7 @@ use global
 use element,only:hex8_gnode
 use math_constants
 use conversion_constants
+use mesh_props
 use math_library,only:cross_product,determinant,sqdistance,invert,  &
 IsPointInHexahedron,norm,vector_rotateZ
 use string_library
@@ -32,10 +33,12 @@ use elastic,only:compute_cmat_elastic
 #if (USE_MPI)
 use mpi_library
 use math_library_mpi
+use locate_mpi_domain
 #else
 use serial_library
 use math_library_serial
 #endif
+use,intrinsic :: ieee_arithmetic
 implicit none
 integer,intent(in) :: lneq
 integer,intent(out) :: errcode
@@ -120,6 +123,38 @@ real(kind=kreal) :: gminerr_src,gmaxerr_src
 real(kind=kreal) :: all_minerr(1,0:nproc-1)
 integer :: ipass_strict,nfail_strict
 logical :: isinside
+integer :: nsource_located
+integer, dimension(:), allocatable :: iproc_source,ielmt_source
+double precision, dimension(:), allocatable :: xi_source,eta_source,gamma_source
+! positioning
+double precision, dimension(:), allocatable :: x_found,y_found,z_found
+!double precision, dimension(:), allocatable :: elevation
+double precision, dimension(:), allocatable :: final_distance
+double precision, dimension(:), allocatable :: x_target,y_target,z_target
+
+double precision, external :: get_cmt_scalar_moment
+double precision, external :: get_cmt_moment_magnitude
+
+! location search
+integer :: ispec_found
+real(kind=kreal) :: distance_min_glob,distance_max_glob
+real(kind=kreal) :: elemsize_min_glob,elemsize_max_glob
+real(kind=kreal) :: x_min_glob,x_max_glob
+real(kind=kreal) :: y_min_glob,y_max_glob
+real(kind=kreal) :: z_min_glob,z_max_glob
+
+double precision :: x,y,z,x_new,y_new,z_new
+double precision :: xi,eta,gamma,final_distance_squared
+double precision, dimension(NDIM,NDIM) :: nu_found
+
+! subset arrays
+integer,parameter :: NSOURCES_SUBSET_MAX = 200 
+integer :: nsource_subset_current,isource_in_this_subset,nsource_already_done
+integer, dimension(NSOURCES_SUBSET_MAX) :: ielmt_source_subset
+double precision, dimension(NSOURCES_SUBSET_MAX) :: xi_source_subset,eta_source_subset,gamma_source_subset
+double precision, dimension(NSOURCES_SUBSET_MAX) :: x_found_subset,y_found_subset,z_found_subset
+double precision, dimension(NSOURCES_SUBSET_MAX) :: final_distance_subset
+!double precision, dimension(NDIM,NDIM,NSOURCES_SUBSET_MAX) :: nu_subset
 
 character(len=1) :: tchar
 character(len=250) :: line,tag
@@ -511,29 +546,31 @@ if(eqsource_type==0)then
     source_coord(:,i_p)=0.5_kreal*(p_coord(:,i1)+p_coord(:,i3))
   enddo
   ! plot VTK file: source locations
-  pfile=trim(out_path)//trim(file_head)//'_sources'//trim(ptail)//'.vtk'
-  open(100,file=trim(pfile),action='write',status='replace')
+  if(myrank==0)then
+    pfile=trim(out_path)//trim(file_head)//'_sources'//'.vtk'
+    open(100,file=trim(pfile),action='write',status='replace')
 
-  write(100,'(a)')'# vtk DataFile Version 2.0'
-  write(100,'(a)')'Unstructured Grid Example'
-  write(100,'(a)')'ASCII'
-  write(100,'(a)')'DATASET UNSTRUCTURED_GRID'
-  write(100,'(a,i5,a)')'POINTS',npatch,' float'
-  do i_p=1,npatch
-    write(100,'(3(f14.6,1x))')DIM_L*source_coord(:,i_p)
-  enddo
-  write(100,*)
-  write(100,'(a,i5,a,i5)')'CELLS',npatch,' ',2*npatch
-  do i_p=1,npatch
-    ! VTK format indexing starts from 0
-    write(100,'(5(i5,1x))')1,i_p-1
-  enddo
-  write(100,*)
-  write(100,'(a,i5)')'CELL_TYPES',npatch
-  do i_p=1,npatch
-    write(100,'(i1)')1
-  enddo
-  close(100)
+    write(100,'(a)')'# vtk DataFile Version 2.0'
+    write(100,'(a)')'Unstructured Grid Example'
+    write(100,'(a)')'ASCII'
+    write(100,'(a)')'DATASET UNSTRUCTURED_GRID'
+    write(100,'(a,i5,a)')'POINTS',npatch,' float'
+    do i_p=1,npatch
+      write(100,'(3(f14.6,1x))')DIM_L*source_coord(:,i_p)
+    enddo
+    write(100,*)
+    write(100,'(a,i5,a,i5)')'CELLS',npatch,' ',2*npatch
+    do i_p=1,npatch
+      ! VTK format indexing starts from 0
+      write(100,'(5(i5,1x))')1,i_p-1
+    enddo
+    write(100,*)
+    write(100,'(a,i5)')'CELL_TYPES',npatch
+    do i_p=1,npatch
+      write(100,'(i1)')1
+    enddo
+    close(100)
+  endif
 
   pfac=one/real(npatch,kreal) ! patch factor
 
@@ -1173,12 +1210,15 @@ endif
 !stop
 !-------------------------------------------------------------------------------
 
+! TODO: Better to create separate file for the code segment below.
 ! Get derivatives of shape functions for 8-noded hex.
 allocate(dshape_hex8(ngnode,ndim))
 allocate(lagrange_gll(ngll),dlagrange_gll(ndim,ngll))
 
 imid=(ngll+1)/2
-
+!-------------------------------------------------------------------------------
+! LOCATE SOURCES
+!-------------------------------------------------------------------------------
 allocate(isrc_located(nsource))
 isrc_located=0
 ! Compute contribution of the earthquake source/s to the elemental loads.
@@ -1186,186 +1226,315 @@ allocate(isnode(nnode),iselmt(nelmt))
 gminerr_src=INFTOL
 gmaxerr_src=ZERO
 nfail_strict=0
-source: do i_src=1,nsource
-  sload=zero
-  source_x=source_coord(:,i_src)
-  ! Find the element which contains this earthquake source.
-  is_located=.false.
-  
-  !print*,myrank, source_x(1),pmodel_minx,pmodel_maxx
-  !print*,myrank, source_x(2),pmodel_miny,pmodel_maxy
-  !print*,myrank, source_x(3),pmodel_minz,pmodel_maxz
+allocate(iproc_source(nsource),ielmt_source(nsource))
+allocate(xi_source(nsource),eta_source(nsource),gamma_source(nsource))
+iproc_source=-1
+ielmt_source=0
+xi_source(:) = 0.d0 
+eta_source(:) = 0.d0 
+gamma_source(:) = 0.d0
+allocate(x_found(nsource),y_found(nsource),z_found(nsource), &
+         final_distance(nsource))
+x_found(:) = 0.d0; y_found(:) = 0.d0; z_found(:) = 0.d0
+final_distance_subset(:) = DHUGEVAL
+errx = HUGEVAL
+!final_distance_subset = HUGEVAL
+if(myrank==0)then
+  write(logunit,'(a,i0)')'Total original sources: ',nsource
+  flush(logunit)
+endif
+! loop on all the sources
+source_all: do nsource_already_done = 0, nsource, NSOURCES_SUBSET_MAX
 
-  ! Check if the source is within the model range.
-  prange:if(source_x(1).lt.NONDIM_L*pmodel_minx .or. source_x(1).gt.NONDIM_L*pmodel_maxx .or. & 
-     source_x(2).lt.NONDIM_L*pmodel_miny .or. source_x(2).gt.NONDIM_L*pmodel_maxy .or. & 
-     source_x(3).lt.NONDIM_L*pmodel_minz .or. source_x(3).gt.NONDIM_L*pmodel_maxz)then
-    nelmt_srctry=0
-    ! NOTE: we cannot cycle the loop here otherwise the process hangs for ever
-    ! because inbetween there are some statements which require all procesors!
-  else
+  ! the size of the subset can be the maximum size, or less (if we are in the last subset,
+  ! or if there are fewer sources than the maximum size of a subset)
+  nsource_subset_current = min(NSOURCES_SUBSET_MAX, nsource - nsource_already_done)
+  ! loop over sources within this subset
+  source_subset: do isource_in_this_subset = 1,nsource_subset_current
+
+    ! mapping from source number in current subset to real source number in all the subsets
+    i_src = isource_in_this_subset + nsource_already_done
+    sload=zero
+    source_x=source_coord(:,i_src)
+    ! Find the element which contains this earthquake source.
+    is_located=.false.
+    
+    !print*,myrank, source_x(1),pmodel_minx,pmodel_maxx
+    !print*,myrank, source_x(2),pmodel_miny,pmodel_maxy
+    !print*,myrank, source_x(3),pmodel_minz,pmodel_maxz
+
+    ! Check if the source is within the model range.
+    prange:if(source_x(1).lt.NONDIM_L*pmodel_minx .or. source_x(1).gt.NONDIM_L*pmodel_maxx .or. & 
+       source_x(2).lt.NONDIM_L*pmodel_miny .or. source_x(2).gt.NONDIM_L*pmodel_maxy .or. & 
+       source_x(3).lt.NONDIM_L*pmodel_minz .or. source_x(3).gt.NONDIM_L*pmodel_maxz)then
+      nelmt_srctry=0
+      ! NOTE: we cannot cycle the loop here otherwise the process hangs for ever
+      ! because inbetween there are some statements which require all procesors!
+    else
  
-    ! First, find the element which is not too far and has the nearest GLL point
-    ! from the target point.
-    ielmt_min=1
-    inode_min=g_num(1,ielmt_min)
-    minsqdist=INFTOL
-    do i_elmt=1,nelmt
-      ! Do not locate sources in transition or infinite elements.
-      mdomain=mat_domain(mat_id(i_elmt))
-      if(mdomain==ELASTIC_TRINFDOMAIN .or.      &
-         mdomain==ELASTIC_INFDOMAIN   .or.      &
-         mdomain==VISCOELASTIC_TRINFDOMAIN .or. &
-         mdomain==VISCOELASTIC_INFDOMAIN)cycle
-      ! Preliminary test. Discard far enough elements.
-      num=g_num(:,i_elmt)
-      xp=g_coord(:,num(imid))
-      if(sqdistance(source_x,xp,ndim).gt.sqmaxsize_elmt)cycle
+      ! First, find the element which is not too far and has the nearest GLL point
+      ! from the target point.
+      ielmt_min=1
+      inode_min=g_num(1,ielmt_min)
+      minsqdist=INFTOL
+      do i_elmt=1,nelmt
+        ! Do not locate sources in transition or infinite elements.
+        mdomain=mat_domain(mat_id(i_elmt))
+        if(mdomain==ELASTIC_TRINFDOMAIN .or.      &
+           mdomain==ELASTIC_INFDOMAIN   .or.      &
+           mdomain==VISCOELASTIC_TRINFDOMAIN .or. &
+           mdomain==VISCOELASTIC_INFDOMAIN)cycle
+        ! Preliminary test. Discard far enough elements.
+        num=g_num(:,i_elmt)
+        xp=g_coord(:,num(imid))
+        if(sqdistance(source_x,xp,ndim).gt.sqmaxsize_elmt)cycle
 
-      do i_gll=1,ngll
-        xp=g_coord(:,num(i_gll))
-        sqdist=sqdistance(source_x,xp,ndim)
-        if(sqdist.lt.minsqdist)then
-          minsqdist=sqdist
-          ielmt_min=i_elmt
-          inode_min=num(i_gll)
+        do i_gll=1,ngll
+          xp=g_coord(:,num(i_gll))
+          sqdist=sqdistance(source_x,xp,ndim)
+          if(sqdist.lt.minsqdist)then
+            minsqdist=sqdist
+            ielmt_min=i_elmt
+            inode_min=num(i_gll)
+          endif
+        enddo
+      enddo
+
+      ! Count the number of and tag elements that share the GLL point just found.
+      isnode=.false.
+      isnode(g_num(hex8_gnode,ielmt_min))=.true.
+      iselmt=.false.
+      iselmt(ielmt_min)=.true.
+      nelmt_srctry=1
+      do i_elmt=1,nelmt
+        if(i_elmt.eq.ielmt_min)cycle
+        if(any(isnode(g_num(hex8_gnode,i_elmt))))then
+          nelmt_srctry=nelmt_srctry+1
+          iselmt(i_elmt)=.true.
         endif
       enddo
-    enddo
-
-    ! Count the number of and tag elements that share the GLL point just found.
-    isnode=.false.
-    isnode(g_num(hex8_gnode,ielmt_min))=.true.
-    iselmt=.false.
-    iselmt(ielmt_min)=.true.
-    nelmt_srctry=1
-    do i_elmt=1,nelmt
-      if(i_elmt.eq.ielmt_min)cycle
-      if(any(isnode(g_num(hex8_gnode,i_elmt))))then
-        nelmt_srctry=nelmt_srctry+1
-        iselmt(i_elmt)=.true.
-      endif
-    enddo
-    ! Find and assign the list of elements to try.
-    allocate(ielmt_srctry(nelmt_srctry))
-    ielmt_srctry=-9999
-    inum=0
-    do i_elmt=1,nelmt
-      if(iselmt(i_elmt))then
-        inum=inum+1
-        ielmt_srctry(inum)=i_elmt
-      endif
-    enddo
-    if(inum.ne.nelmt_srctry)then
-      write(*,*)'ERROR: nelmt_srctry mismatch!'
-      stop
-    endif
-  endif prange
-  !print*,'try elements:',i_src,myrank,nelmt_srctry,count(iselmt) 
-  !print*,'TEST:',source_x,maxval(g_coord(1,:)),maxval(g_coord(2,:)),maxval(g_coord(3,:))
-  n_felmt=0
-  minerr=INFTOL
-  ! Find the actual element that contains the source.
-  ! Loop through the list of elements
-  ! STRICT TEST: Element must be a proper hexagon, i.e., must have six faces. 
-  ipass_strict=0
-  element_try1: do i_elmt=1,nelmt_srctry
-    ielmt=ielmt_srctry(i_elmt)
-
-    num=g_num(:,ielmt)
-    coord=g_coord(:,num(hex8_gnode))
-    ! Check if the source is in this element.
-    call IsPointInHexahedron(coord,source_x,isinside)
-    if(isinside)then
-      n_felmt=n_felmt+1
-      ! Map source location to natural coordinates.
-      call  map_point2naturalhex8(coord,source_x,xip,located_x,niter,errx)
-      errxd=errx*DIM_L
-      if(n_felmt==1)then
-        ! Initialize errors
-        minerr=errxd
-        ! Set source element 
-        ielmt_src=ielmt
-      elseif(n_felmt.gt.1)then
-        if(errxd.lt.minerr)then
-          minerr=errxd 
-          ! Reset source element 
-          ielmt_src=ielmt
+      ! Find and assign the list of elements to try.
+      allocate(ielmt_srctry(nelmt_srctry))
+      ielmt_srctry=-9999
+      inum=0
+      do i_elmt=1,nelmt
+        if(iselmt(i_elmt))then
+          inum=inum+1
+          ielmt_srctry(inum)=i_elmt
         endif
+      enddo
+      if(inum.ne.nelmt_srctry)then
+        write(*,*)'ERROR: nelmt_srctry mismatch!'
+        stop
       endif
-      ipass_strict=1
-    endif !(isinside)
-  enddo element_try1 ! i_elmt
-  
-  ipass_strict=sumscal(ipass_strict)
-  ! FLEXIBLE TEST: Element may be a proper hexagon, i.e., may have more than 
-  !                six faces. 
-  ! There will be a WARNING in the log file. 
-  ! This test will be performed only if the STRICT TEST fails.
-  if(ipass_strict.lt.1)then
-  ! Source point was not located on the element list
-    nfail_strict=nfail_strict+1
-    element_try2: do i_elmt=1,nelmt_srctry
+    endif prange
+    !print*,'try elements:',i_src,myrank,nelmt_srctry,count(iselmt) 
+    !print*,'TEST:',source_x,maxval(g_coord(1,:)),maxval(g_coord(2,:)),maxval(g_coord(3,:))
+    n_felmt=0
+    minerr=INFTOL
+    ! Find the actual element that contains the source.
+    ! Loop through the list of elements
+    ! STRICT TEST: Element must be a proper hexagon, i.e., must have six faces. 
+    ipass_strict=0
+    ielmt_src=-9999
+    element_try1: do i_elmt=1,nelmt_srctry
       ielmt=ielmt_srctry(i_elmt)
 
       num=g_num(:,ielmt)
       coord=g_coord(:,num(hex8_gnode))
-      n_felmt=n_felmt+1
-      ! map source location to natural coordinates
-      call  map_point2naturalhex8(coord,source_x,xip,located_x,niter,errx)
-      errxd=errx*DIM_L
-      if(n_felmt==1)then
-        ! initialize errors
-        minerr=errxd
-        ! Set source element 
-        ielmt_src=ielmt
-      elseif(n_felmt.gt.1)then
-        if(errxd.lt.minerr)then
-          minerr=errxd 
-          ! Reset source element 
+      ! Check if the source is in this element.
+      call IsPointInHexahedron(coord,source_x,isinside)
+      if(isinside)then
+        n_felmt=n_felmt+1
+        ! Map source location to natural coordinates.
+        call  map_point2naturalhex8(coord,source_x,xip,located_x,niter,errx)
+        errxd=errx*DIM_L
+        if(n_felmt==1)then
+          ! Initialize errors
+          minerr=errxd
+          ! Set source element 
           ielmt_src=ielmt
+        elseif(n_felmt.gt.1)then
+          if(errxd.lt.minerr)then
+            minerr=errxd 
+            ! Reset source element 
+            ielmt_src=ielmt
+          endif
         endif
+        ipass_strict=1
+      endif !(isinside)
+    enddo element_try1 ! i_elmt
+    
+    ipass_strict=sumscal(ipass_strict)
+    ! FLEXIBLE TEST: Element may be a proper hexagon, i.e., may have more than 
+    !                six faces. 
+    ! There will be a WARNING in the log file. 
+    ! This test will be performed only if the STRICT TEST fails.
+    if(ipass_strict.lt.1)then
+    ! Source point was not located on the element list
+      nfail_strict=nfail_strict+1
+      element_try2: do i_elmt=1,nelmt_srctry
+        ielmt=ielmt_srctry(i_elmt)
+
+        num=g_num(:,ielmt)
+        coord=g_coord(:,num(hex8_gnode))
+        n_felmt=n_felmt+1
+        ! map source location to natural coordinates
+        call  map_point2naturalhex8(coord,source_x,xip,located_x,niter,errx)
+        errxd=errx*DIM_L
+        if(n_felmt==1)then
+          ! initialize errors
+          minerr=errxd
+          ! Set source element 
+          ielmt_src=ielmt
+        elseif(n_felmt.gt.1)then
+          if(errxd.lt.minerr)then
+            minerr=errxd 
+            ! Reset source element 
+            ielmt_src=ielmt
+          endif
+        endif
+      enddo element_try2 ! i_elmt
+    endif !(ipass_strict.lt.1)
+    if(allocated(ielmt_srctry))deallocate(ielmt_srctry)
+    ! Only the element with the least error was chosen
+    n_felmt=sumscal(n_felmt)
+    if(n_felmt.lt.1)then
+      if(myrank==0)then
+        write(logunit,'(a,3(g0.6,1x))')'WARNING: source cannot be located: ',i_src,DIM_L*source_x
+        flush(logunit)
       endif
-    enddo element_try2 ! i_elmt
-  endif !(ipass_strict.lt.1)
-  if(allocated(ielmt_srctry))deallocate(ielmt_srctry)
-  ! Only the element with the least error was chosen
-  n_felmt=sumscal(n_felmt)
-  if(n_felmt.lt.1)then
+      cycle source_subset
+    else
+      isrc_located(i_src)=1
+    endif
+    ! Set located source parameters
+    if(ielmt_src.ge.1)then 
+      ! sets found position in this slice
+      ielmt_source_subset(isource_in_this_subset) = ielmt_src
+
+      x_found_subset(isource_in_this_subset) = located_x(1)
+      y_found_subset(isource_in_this_subset) = located_x(2)
+      z_found_subset(isource_in_this_subset) = located_x(3)
+
+      xi_source_subset(isource_in_this_subset) = xip(1)
+      eta_source_subset(isource_in_this_subset) = xip(2)
+      gamma_source_subset(isource_in_this_subset) = xip(3)
+      final_distance_subset(isource_in_this_subset) = errx
+    endif
+    gminerr=minscal(minerr)
+
+    if(gminerr.lt.gminerr_src)gminerr_src=gminerr
+    if(gminerr.gt.gmaxerr_src)gmaxerr_src=gminerr
+
     if(myrank==0)then
-      write(logunit,'(a,3(g0.6,1x))')'WARNING: source cannot be located: ',i_src,DIM_L*source_x
-      flush(logunit)
+      if(gminerr.gt.DIM_L*maxsize_elmt)then
+        write(logunit,'(a)')'WARNING: this source location may be inaccurate!'
+        write(logunit,'(3(g0.6,1x))')xip
+        write(logunit,'(2(g0.6,1x))')gminerr,maxsize_elmt
+        flush(logunit)
+      endif
     endif
-    cycle source
-  else 
-    isrc_located(i_src)=1
-  endif
-  gminerr=minscal(minerr)
 
-  if(gminerr.lt.gminerr_src)gminerr_src=gminerr
-  if(gminerr.gt.gmaxerr_src)gmaxerr_src=gminerr
-
-  if(myrank==0)then
-    if(gminerr.gt.DIM_L*maxsize_elmt)then
-      write(logunit,'(a)')'WARNING: this source location may be inaccurate!'
-      write(logunit,'(3(g0.6,1x))')xip
-      write(logunit,'(2(g0.6,1x))')gminerr,maxsize_elmt
-      flush(logunit)
+    ! Determine the processor this source belongs to.
+    all_minerr=allgather_scal(minerr)
+    !if(myrank==0)write(*,'(g0)')all_minerr
+    indmin=minloc(all_minerr,2)
+    ! NOTE: minloc gives the position starting from 1
+    src_inrank=indmin(1)-1
+    !print*,i_src,src_inrank
+    ! Compute source contribution in the appropriate rank
+    if(myrank==src_inrank)then
+      !print*,'myrank:',myrank,i_src,minerr,gminerr
+      f_elmt=ielmt_src
+      source_xi=xip
+      is_located=.true.
+      isrc_located(i_src)=1
     endif
-  endif
+  enddo source_subset
+  ! main process locates best location in all slices
+  call locate_MPI_slice(nsource_subset_current,nsource_already_done, &
+                        ielmt_source_subset, &
+                        x_found_subset,y_found_subset,z_found_subset, &
+                        xi_source_subset,eta_source_subset,gamma_source_subset,&
+                        final_distance_subset, &
+                        nsource,ielmt_source,iproc_source, &
+                        x_found,y_found,z_found, &
+                        xi_source,eta_source,gamma_source, &
+                        final_distance)
+enddo source_all
+deallocate(isnode,iselmt)
 
-  ! Determine the processor this source belongs to.
-  all_minerr=allgather_scal(minerr)
-  !if(myrank==0)write(*,'(g0)')all_minerr
-  indmin=minloc(all_minerr,2)
-  ! NOTE: minloc gives the position starting from 1
-  src_inrank=indmin(1)-1
-  !print*,i_src,src_inrank
+! bcast from main process
+call bcast_all_i(iproc_source,NSOURCE)
+call bcast_all_i(ielmt_source,NSOURCE)
+
+call bcast_all_dp(xi_source,NSOURCE)
+call bcast_all_dp(eta_source,NSOURCE)
+call bcast_all_dp(gamma_source,NSOURCE)
+
+call bcast_all_dp(x_found,NSOURCE)
+call bcast_all_dp(y_found,NSOURCE)
+call bcast_all_dp(z_found,NSOURCE)
+
+!call bcast_all_dp(nu_source,NDIM*NDIM*NSOURCE)
+call bcast_all_dp(final_distance,NSOURCE)
+
+! Total located sources
+nsource_located=count(isrc_located.gt.0)
+if(myrank==0)then
+  write(logunit,'(a,i0)')'Total located sources: ',nsource_located
+  flush(logunit)
+endif
+
+! Save the located sources in VTK file
+if(myrank==0)then
+! plot VTK file: CMT sources
+  pfile=trim(out_path)//trim(file_head)//'_located_sources'//'.vtk'
+  open(100,file=trim(pfile),action='write',status='replace')
+
+  write(100,'(a)')'# vtk DataFile Version 2.0'
+  write(100,'(a)')'Unstructured Grid Example'
+  write(100,'(a)')'ASCII'
+  write(100,'(a)')'DATASET UNSTRUCTURED_GRID'
+  write(100,'(a,1x,i0,1x,a)')'POINTS',nsource_located,' float'
+  do i_p=1,nsource_located
+    if(isrc_located(i_p).gt.0)then
+      write(100,'(3(f18.6,1x))')DIM_L*x_found(i_p),DIM_L*y_found(i_p),DIM_L*z_found(i_p)
+    endif
+  enddo
+  write(100,*)
+  write(100,'(a,1x,i0,1x,i0)')'CELLS',nsource_located,2*nsource_located
+  do i_p=0,nsource_located-1 ! VTK format indexing starts from 0
+    if(isrc_located(i_p+1).gt.0)then
+      write(100,'(5(i5,1x))')1,i_p
+    endif
+  enddo
+  write(100,*)
+  write(100,'(a,i0)')'CELL_TYPES ',nsource_located
+  do i_p=1,nsource_located
+    write(100,'(i0)')1
+  enddo
+  close(100)
+endif !myrank
+
+! TODO: It is better to split this into separate file
+!-------------------------------------------------------------------------------
+! COMPUTE LOAD
+!-------------------------------------------------------------------------------
+! Loop throught the sources
+! If the source process is myrank, compute the load
+source_load: do i_src=1,nsource
+  sload=zero
   ! Compute source contribution in the appropriate rank
-  if(myrank==src_inrank)then
+  if(myrank==iproc_source(i_src))then
     !print*,'myrank:',myrank,i_src,minerr,gminerr
-    f_elmt=ielmt_src
-    source_xi=xip
+    f_elmt=ielmt_source(i_src) !ielmt_src
+    num=g_num(:,f_elmt)
+    coord=g_coord(:,num(hex8_gnode))
+    source_xi(1)=xi_source(i_src)
+    source_xi(2)=eta_source(i_src)
+    source_xi(3)=gamma_source(i_src)
     is_located=.true.
     isrc_located(i_src)=1
     ! compute load
@@ -1373,8 +1542,8 @@ source: do i_src=1,nsource
     call dshape_function_hex8p(ngnode,source_xi(1),source_xi(2), &
                                source_xi(3),dshape_hex8)
 
-    ! compute jacobian
-    !WAARNING: need to double check jacobian
+    ! compute Jacobian
+    !WARNING: need to double check Jacobian
     jac=matmul(transpose(dshape_hex8),transpose(coord))
     !jac=matmul(coord,dshape_hex8)
     detjac=determinant(jac)
@@ -1478,7 +1647,7 @@ source: do i_src=1,nsource
     !exit element ! this will place the source in only one element
   endif !(myrank==src_inrank)
   
-  call sync_process
+  !call sync_process
   ! NOTE: We allow only a single element to have the source point. 
   ! Therefore, no averaging is necessary.
   ! However, this may have to be modified for the instance where
@@ -1490,8 +1659,8 @@ source: do i_src=1,nsource
   !else
     eqload0=eqload0+sload
   !endif
-enddo source ! i_src
-deallocate(isnode,iselmt)
+enddo source_load ! i_src
+!-------------------------------------------------------------------------------
 
 call sync_process
 isrc_located=maxvec(isrc_located,nsource)
@@ -1534,7 +1703,7 @@ errcode=0
 return
 
 end subroutine earthquake_load
-!===============================================================================
+!-------------------------------------------------------------------------------
 
 end module earthquake
 !===============================================================================

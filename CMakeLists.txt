@@ -37,8 +37,8 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES Intel)
 endif()
 
 if(CMAKE_Fortran_COMPILER_ID MATCHES GNU)
-    set(CMAKE_Fortran_FLAGS         "${CMAKE_Fortran_FLAGS} -std=f2008 -fimplicit-none -fmax-errors=10 -pedantic -pedantic-errors -ffree-line-length-none -Waliasing -Wampersand -Wsurprising -Wno-tabs -Wunderflow -ffpe-trap=invalid,zero,overflow")
-    set(CMAKE_Fortran_FLAGS_DEBUG   "-g -O0 -fbacktrace -fbounds-check -frange-check")
+    set(CMAKE_Fortran_FLAGS         "${CMAKE_Fortran_FLAGS} -std=f2008 -fcheck=all -fbacktrace -Wimplicit-interface -Warray-temporaries -fimplicit-none -fmax-errors=10 -pedantic -pedantic-errors -ffree-line-length-none -Waliasing -Wampersand -Wuninitialized -Wsurprising -Wno-tabs -Wunderflow -finit-real=snan ")
+    set(CMAKE_Fortran_FLAGS_DEBUG   "-g -O0 -fbacktrace -fcheck=bounds -frange-check")
     set(CMAKE_Fortran_FLAGS_RELEASE "-O3 -finline-functions")
 endif()
 ## Optionally, print flags to check if they are being applied correctly

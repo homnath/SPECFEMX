@@ -34,6 +34,7 @@ SET(srcsem
   math_library.f90
   shape_library.f90
   element.f90
+  mesh_props.f90
   degrees_of_freedom.f90
   elastic.f90
   infinite_layer.f90
@@ -75,6 +76,7 @@ IF(ISPARALLEL)
      mpi_library.f90
      math_library_mpi.f90
      ghost_library_mpi.f90
+     locate_MPI_slice.f90
      prepare_sparse.f90
      parsolver.f90)
      # If using PETSC then add relevant f90 to the list srcparsem
