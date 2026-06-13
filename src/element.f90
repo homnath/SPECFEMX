@@ -566,7 +566,7 @@ hexface_edge(iface,iedge)%node=hexface(iface)%node(indy)
 deallocate(indx,indy,indz)
 
 if(myrank.eq.0)then
-  write(logunit, *)'✓ Finished preparing hexahedra faces'
+  write(logunit, *)'[OK] Finished preparing hexahedra faces'
   write(logunit, *)
 endif 
 errcode=0

@@ -343,7 +343,7 @@ if(infbc)then
 endif
 
 if(myrank.eq.0)then
-  write(logunit,*)' ✓  Applied boundary conditions'
+  write(logunit,*)'[OK] Applied boundary conditions'
   write(logunit,*)
 endif
 errcode=0

@@ -29,10 +29,6 @@ subroutine calc_jacdet2d(i_gll, coord, dshape_quad4, detjac)
     detjac=sqrt(dot_product(face_normal,face_normal))
 end subroutine  calc_jacdet2d
 
-
-
-
-
 ! ####################### FUNCS FOR GETTING FS DETAILS #########################
 subroutine get_fs_details(i_elmt, iface, nfgll, gw, dsq4)
     use global 
@@ -271,7 +267,7 @@ implicit none
     endif
 
     if(myrank.eq.0.and.verbose_save_var)then
-        write(*,'(a,i6)')'  ✓ Saved nodal sea level for step ', i_step
+        write(*,'(a,i6)')'[OK] Saved nodal sea level for step ', i_step
         write(*,*)
     endif 
     end subroutine write_SL_to_ensight
@@ -302,7 +298,7 @@ subroutine write_OF_to_ensight(i_step)
 
 
     if(myrank.eq.0.and.verbose_save_var)then
-        write(*,'(a,i6)')'  ✓ Saved ocean function for step ', i_step
+        write(*,'(a,i6)')'[OK] Saved ocean function for step ', i_step
         write(*,*)
     endif 
 end subroutine write_OF_to_ensight
@@ -370,7 +366,7 @@ subroutine prepare_sea_level(nodalsl, nodalslrate)
     endif
 
     if(myrank.eq.0.and.verbose_bool)then
-        write(*,*)'  ✓ Prepared sea level.'
+        write(*,*)'[OK] Prepared sea level.'
         write(*,*)
     endif 
 
@@ -525,7 +521,7 @@ subroutine add_sl_gll(i_elmtfs, i_gll, height, overwrite_int, nodalsl)
     endif 
 
     if(myrank.eq.0.and.verbose_bool)then
-        write(*,*)' ✓ Injected at GLL point'
+        write(*,*)'[OK] Injected at GLL point'
     endif 
 
 end subroutine add_sl_gll
@@ -586,7 +582,7 @@ do i_elmt=1, nelmt_fs
 enddo
 
 if(myrank.eq.0.and.verbose)then 
-    write(*,*)'  ✓ Updated ocean function'
+    write(*,*)'[OK] Updated ocean function'
     write(*,*)
 endif 
 end subroutine update_ocean_function

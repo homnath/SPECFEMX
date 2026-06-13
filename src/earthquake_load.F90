@@ -1667,8 +1667,8 @@ isrc_located=maxvec(isrc_located,nsource)
 where(isrc_located.gt.1)isrc_located=1
 total_src_located=sum(isrc_located)
 if(myrank==0)then
-  write(logunit,'(a,i0,1x,a,i0)')'Total defined sources: ',nsource, &
-                           'Total located sources: ',total_src_located
+  !write(logunit,'(a,i0,1x,a,i0)')'Total defined sources: ',nsource, &
+  !                         'Total located sources: ',total_src_located
   write(logunit,'(a,i0)')'Total sources fail strict test: ',nfail_strict
   if(nfail_strict.gt.0)then
     write(logunit,'(a,i0)')'NOTE: failed strict test indicates that some of &

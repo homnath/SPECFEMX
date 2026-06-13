@@ -112,7 +112,7 @@ use serial_library
 
     ! write original meshes
     if(myrank.eq.0)then 
-        write(logunit,*)'✓ Original mesh written to files' 
+        write(logunit,*)'[OK] Original mesh written to files' 
         write(logunit,*) 
     endif
 end subroutine write_original_mesh
@@ -352,8 +352,6 @@ spart_fs(1)='free_surface'
 call write_ensight_geocoord_part1(fsgeo_file,ipart,spart_fs,1, &
 nnode_fs,gnode_fs,nnode,real(g_coord),iounit_fs)
 
-
-
 ! Writes element information.
 buffer=ensight_quad4
 write(iounit_fs)buffer
@@ -361,24 +359,22 @@ write(iounit_fs)buffer
 ! It must be modified for unequal GLL points along different axes.
 write(iounit_fs)nelmt_fs*(ngllx-1)*(nglly-1)
 
-
-
 ! Do not substract 1 for ensight file
 do i_elmt=1,nelmt_fs
-do j=1,nglly-1
-do i=1,ngllx-1
-! Corner nodes in a sequential numbering
-node_quad4(1)=(j-1)*ngllx+i
-node_quad4(2)=node_quad4(1)+1
+  do j=1,nglly-1
+    do i=1,ngllx-1
+      ! Corner nodes in a sequential numbering
+      node_quad4(1)=(j-1)*ngllx+i
+      node_quad4(2)=node_quad4(1)+1
 
-node_quad4(3)=node_quad4(1)+ngllx
-node_quad4(4)=node_quad4(3)+1
+      node_quad4(3)=node_quad4(1)+ngllx
+      node_quad4(4)=node_quad4(3)+1
 
-! Map to exodus/cubit numbering and write
-gnum_quad4=rgnum_fs(node_quad4(map2exodus_quad4),i_elmt)
-write(iounit_fs)gnum_quad4
-enddo
-enddo
+      ! Map to exodus/cubit numbering and write
+      gnum_quad4=rgnum_fs(node_quad4(map2exodus_quad4),i_elmt)
+      write(iounit_fs)gnum_quad4
+    enddo
+  enddo
 enddo
 close(iounit_fs)
 endif

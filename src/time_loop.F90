@@ -128,7 +128,7 @@ else ! TIMESTEPPING
       endif
       call compute_stiffness_elastic(errcode,errtag)
       if(myrank.eq.0.and.verbose_bool)then
-          write(*,*)' ✓ Done'
+          write(*,*)'[OK] Done'
           write(*,*)
       endif
   endif 
@@ -180,7 +180,7 @@ else ! TIMESTEPPING
     endif
 
     if(myrank.eq.0.and.verbose_bool)then
-        write(*,*)' ✓ Done'
+        write(*,*)'[OK] Done'
         write(*,*)
     endif
 
@@ -192,7 +192,7 @@ else ! TIMESTEPPING
     !    endif
     !    call compute_stiffness_elastic(storekmat,rhoload,errcode,errtag)
     !    if(myrank.eq.0)then
-    !        write(*,*)' ✓ Done'
+    !        write(*,*)'[OK] Done'
     !        write(*,*)
     !    endif
 
@@ -206,7 +206,7 @@ else ! TIMESTEPPING
     !    endif
 
     !    if(myrank.eq.0)then
-    !        write(*,*)' ✓ Done'
+    !        write(*,*)'[OK] Done'
     !        write(*,*)
     !    endif
 

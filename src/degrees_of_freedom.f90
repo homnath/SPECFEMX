@@ -283,13 +283,11 @@ if(ISSL_DOF)then
 endif
 
 if(myrank.eq.0)then
-  write(logunit,*)' ✓  Activated DOF'
+  write(logunit,*)'[OK] Activated DOF'
   write(logunit,*)
 endif
 
 errcode=0
-
-
 
 end subroutine activate_dof
 !===============================================================================
@@ -379,7 +377,7 @@ write(22)g_num
 close(22)
 
 if(myrank.eq.0)then
-  write(logunit,*)' ✓ Finalised DOFs'
+  write(logunit,*)'[OK] Finalised DOFs'
   write(logunit,*)
 endif
 ! Compute nodal to global

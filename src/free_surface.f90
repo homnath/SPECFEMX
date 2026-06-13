@@ -208,11 +208,6 @@ subroutine check_surface_normals()
   allocate(gw(maxngll2d))
   allocate(dshape4(2,4,maxngll2d))
 
-
-  if(myrank.eq.0)then
-    write(*,*)'* checking surface normal'
-  endif 
-
   vertical    = zero
   vertical(3) = one
 
@@ -285,17 +280,14 @@ subroutine check_surface_normals()
     enddo 
   enddo 
 
-
   if(myrank.eq.0)then
-    write(*,*)' ✓ Done'
-  endif
+    write(*,*)'[OK] check surface normal'
+  endif 
 
   deallocate(gw)
   deallocate(dshape4)
 end subroutine check_surface_normals
-
-
-
+!-------------------------------------------------------------------------------
 
 end module free_surface
 !===============================================================================

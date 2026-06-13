@@ -38,7 +38,7 @@ if(savedata%gpot)then
   endif
   ! Print confirmation
   if(myrank.eq.0.and.verbose_save_var)then
-    write(*,'(a,i6)')'  ✓ Saved gravity potential for step ', i_step
+    write(*,'(a,i6)')'[OK] Saved gravity potential for step ', i_step
     write(*,*)
   endif 
 endif
@@ -55,7 +55,7 @@ if(savedata%mpot)then
   endif
   ! Print confirmation
   if(myrank.eq.0.and.verbose_save_var)then
-    write(*,'(a,i6)')'  ✓ Saved magnetic potential for step ', i_step
+    write(*,'(a,i6)')'[OK] Saved magnetic potential for step ', i_step
     write(*,*)
   endif 
 endif
@@ -98,7 +98,7 @@ if(savedata%agrav)then
   endif
   ! Print confirmation
   if(myrank.eq.0.and.verbose_save_var)then
-    write(*,'(a,i6)')'  ✓ Saved grav. acceleration for step ', i_step
+    write(*,'(a,i6)')'[OK] Saved grav. acceleration for step ', i_step
     write(*,*)
   endif 
 endif
@@ -171,7 +171,7 @@ if(savedata%disp)then
   endif
   ! Print confirmation
   if(myrank.eq.0.and.verbose_save_var)then
-    write(*,'(a,i6)')'  ✓ Saved displacement for step ', i_step
+    write(*,'(a,i6)')'[OK] Saved displacement for step ', i_step
     write(*,*)
   endif
 endif
@@ -259,7 +259,7 @@ endif
 !  endif
 !  ! Print confirmation
 !  if(myrank.eq.0.and.verbose_save_var)then
-!    write(*,'(a,i6)')'  ✓ Saved stress for step ', i_step
+!    write(*,'(a,i6)')'[OK] Saved stress for step ', i_step
 !    write(*,*)
 !  endif
 !endif
@@ -286,7 +286,7 @@ if(savedata%strain)then
   endif
   ! Print confirmation
   if(myrank.eq.0.and.verbose_save_var)then
-    write(*,'(a,i6)')'  ✓ Saved strain for step ', i_step
+    write(*,'(a,i6)')'[OK] Saved strain for step ', i_step
     write(*,*)
   endif
   if(trim(devel_example).eq.'axial_rod')then

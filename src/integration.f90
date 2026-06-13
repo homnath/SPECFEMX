@@ -53,7 +53,7 @@ errcode=0
 
 
 if(myrank.eq.0)then
-    write(logunit, *)'✓ Finished preparing integration'
+    write(logunit, *)'[OK] Finished preparing integration'
     write(logunit, *)
   endif 
 

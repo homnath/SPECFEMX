@@ -5,7 +5,7 @@ module ice
     implicit none 
 
     contains 
-
+!-------------------------------------------------------------------------------
 
     
 
@@ -60,7 +60,7 @@ subroutine write_ice_to_ensight(nodalice, i_step)
     endif
 
     if(myrank.eq.0.and.verbose_save_var)then
-        write(*,'(a,i6)')'  ✓ Saved nodal ice for step ', i_step
+        write(*,'(a,i6)')'[OK] Saved nodal ice for step ', i_step
         write(*,*)
     endif 
 end subroutine write_ice_to_ensight
@@ -89,7 +89,7 @@ subroutine write_icerate_to_ensight(nodalicerate, i_step)
 
 
     if(myrank.eq.0.and.verbose_bool)then
-        write(*,'(a,i6)')'  ✓ Saved ice rate for step ', i_step
+        write(*,'(a,i6)')'[OK] Saved ice rate for step ', i_step
         write(*,*)
     endif 
 
@@ -167,7 +167,7 @@ subroutine prepare_ice(nodalice, nodalicerate)
     if(myrank.eq.0)then
         write(*,*)
         write(*,*)'-  Using ice rate: ', icerate
-        write(*,*)'  ✓ Prepared ice '
+        write(*,*)'[OK] Prepared ice '
         write(*,*)
     endif 
 
@@ -241,7 +241,7 @@ use serial_library
     ! update log file with results: 
     if(myrank.eq.0)then 
         write(*,*)
-        write(*,*)'✓ Finished setting original ice level '
+        write(*,*)'[OK] Finished setting original ice level '
         write(*,'(a,i6)')'  -->  Number of ice objects added   : ', nice_obj
         write(*,'(a,g0.6)')'  -->  Min ice level                 : ', minvalue
         write(*,'(a,g0.6)')'  -->  Max ice level                 : ', maxvalue
@@ -284,7 +284,7 @@ subroutine add_ice_gll(i_elmtfs, i_gll, height, nodalice)
     nodalice(rgnum_fs(i_gll, i_elmtfs)) = height
 
     if(myrank.eq.0.and.verbose_bool)then
-        write(*,*)' ✓ Injected at GLL point'
+        write(*,*)'[OK] Injected at GLL point'
         write(*,*)
     endif 
 end subroutine add_ice_gll
@@ -359,7 +359,7 @@ subroutine add_ice_cylinder(params, nodalice)
     enddo 
 
     if(myrank.eq.0.and.verbose_bool)then
-        write(*,*)' ✓ Injected cylinder at ', node_ctr, 'nodal points'
+        write(*,*)'[OK] Injected cylinder at ', node_ctr, 'nodal points'
     endif
 end subroutine add_ice_cylinder
 
@@ -437,7 +437,7 @@ subroutine add_ice_sqcuboid(params, nodalice)
     enddo 
 
     if(myrank.eq.0)then
-        write(*,*)' ✓ Injected square-based cuboid at ', node_ctr, 'nodal points'
+        write(*,*)'[OK] Injected square-based cuboid at ', node_ctr, 'nodal points'
     endif
 end subroutine add_ice_sqcuboid
 
@@ -514,7 +514,7 @@ subroutine add_ice_gaussian(params, nodalice)
     enddo 
 
     if(myrank.eq.0)then
-        write(*,*)' ✓ Overwritten with gaussian'
+        write(*,*)'[OK] Overwritten with gaussian'
         write(*,*)
     endif
     
@@ -600,7 +600,7 @@ use serial_library
     enddo !inode_fs
 
     !if(myrank.eq.0)then
-    !    write(*,*)' ✓ Finished setting ice rate/change'
+    !    write(*,*)'[OK] Finished setting ice rate/change'
     !    write(*,*)'-----------------------------------------------------'
     !    write(*,*)
     !endif 
@@ -689,18 +689,11 @@ use serial_library
 
 
     if(myrank.eq.0.and.verbose_bool)then
-        write(*,*)' ✓ Finished setting ice rate/change'
+        write(*,*)'[OK] Finished setting ice rate/change'
         write(*,*)'-----------------------------------------------------'
         write(*,*)
     endif
 end subroutine set_ice_rate_slice
-
-
-
-
-
-
-
 
 subroutine calculate_ice_change_volume(nodalicerate)
     ! Simple integration of icerate change over the FS 
@@ -944,7 +937,7 @@ use serial_library
 
     if(myrank.eq.0.and.verbose_bool)then
         write(*,*)
-        write(*,*)'✓ Calculated ice load:'
+        write(*,*)'[OK] Calculated ice load:'
         write(*,'(a, g0.6)')'  -->  Min value of iceload     : ', miniceload
         write(*,'(a, g0.6)')'  -->  Max value of iceload     : ', maxiceload
         if(devel_nondim)then
@@ -1022,7 +1015,7 @@ subroutine write_iceload_to_ensight(i_step)
     endif
 
     if(myrank.eq.0.and.verbose_bool)then
-        write(*,'(a,i6)')'  ✓ Saved ice load for step ', i_step
+        write(*,'(a,i6)')'[OK] Saved ice load for step ', i_step
         write(*,*)
     endif 
 
@@ -1070,11 +1063,7 @@ subroutine calc_iceload_epsilon(epsilon, gw, dshape4, num4, coord, nodalicerate)
     enddo 
 
 end subroutine calc_iceload_epsilon
-
-
-
-
-
+!-------------------------------------------------------------------------------
 
 subroutine summarise_ice_vol_change()
     use global 
@@ -1104,7 +1093,7 @@ use math_library_serial
       write(*,*)
     endif   
 end subroutine
+!-------------------------------------------------------------------------------
 
-
-
-end module
+end module ice
+!===============================================================================

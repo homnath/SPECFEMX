@@ -189,7 +189,7 @@ enddo
 deallocate(iglob,xstore,ystore,zstore)
 
 if(myrank.eq.0)then 
-  write(logunit,*)'✓ Finished hexahedra --> spectral elements' 
+  write(logunit,*)'[OK] Finished hexahedra --> spectral elements' 
   write(logunit,*) 
 endif
 

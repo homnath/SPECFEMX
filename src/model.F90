@@ -97,7 +97,7 @@ endif
 errcode=0
 
 if(myrank==0)then
-  write(logunit,*)'✓ Completed model initialisation'
+  write(logunit,*)'[OK] Completed model initialisation'
   write(logunit,*) 
 endif 
 end subroutine initialize_model
