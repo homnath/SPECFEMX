@@ -526,36 +526,62 @@ if(savedata%model)then
   ! Compute nodal values.
   ! This plot is not exact since the values have to be interpolated on the 
   ! nodes for the exact plot we may have to define multiblk data.
+  
+  ! find nodal valency
   allocate(nvalency(nnode))
   nvalency=0
-  bulkmod_node=ZERO
-  shearmod_node=ZERO
-  rho_node=ZERO
   do i_elmt=1,nelmt
-    ! Skip transition and infinite elements
     imat=mat_id(i_elmt)
-    ! The statement below makes some nvalncy 0 causing the 
+    ! The statement below makes some nvalency 0 causing the 
     ! "Floating-point exception - erroneous arithmetic operation" when divided by nvalency!
     ! if(mat_domain(imat).ge.ELASTIC_TRINFDOMAIN)cycle
-
     num=g_num(:,i_elmt)
-    bulkmod_node(num) = bulkmod_node(num) + bulkmod_elmt(:,i_elmt)
-    shearmod_node(num) = shearmod_node(num) + shearmod_elmt(:,i_elmt)
-    rho_node(num) = rho_node(num) + massdens_elmt(:,i_elmt)
     nvalency(num)=nvalency(num) + 1
   enddo
   ! Assemble across the processors.
   call assemble_ghosts_nodal_iscalar(nvalency,nvalency)
-  call assemble_ghosts_nodal_fscalar(bulkmod_node,bulkmod_node)
-  call assemble_ghosts_nodal_fscalar(shearmod_node,shearmod_node)
-  call assemble_ghosts_nodal_fscalar(rho_node,rho_node)
   
-  bulkmod_node = bulkmod_node/nvalency
-  shearmod_node = shearmod_node/nvalency
-  rho_node = rho_node/nvalency
-  !print*,myrank,minval(nvalency),maxval(massdens_elmt),maxval(rho_node)
-  !print*,myrank,minval(nvalency),maxval(bulkmod_elmt),maxval(bulkmod_node)
-  !print*,myrank,minval(nvalency),maxval(shearmod_elmt),maxval(shearmod_node)
+  ! bulkmod
+  if(isbulkmod)then
+    bulkmod_node=ZERO
+    do i_elmt=1,nelmt
+      imat=mat_id(i_elmt)
+      num=g_num(:,i_elmt)
+      bulkmod_node(num) = bulkmod_node(num) + bulkmod_elmt(:,i_elmt)
+    enddo
+    ! Assemble across the processors.
+    call assemble_ghosts_nodal_fscalar(bulkmod_node,bulkmod_node)
+    bulkmod_node = bulkmod_node/nvalency
+    !print*,myrank,minval(nvalency),maxval(bulkmod_elmt),maxval(bulkmod_node)
+  endif
+  
+  ! shearmod
+  if(isshearmod)then  
+    shearmod_node=ZERO
+    do i_elmt=1,nelmt
+      imat=mat_id(i_elmt)
+      num=g_num(:,i_elmt)
+      shearmod_node(num) = shearmod_node(num) + shearmod_elmt(:,i_elmt)
+    enddo
+    ! Assemble across the processors.
+    call assemble_ghosts_nodal_fscalar(shearmod_node,shearmod_node)
+    shearmod_node = shearmod_node/nvalency
+    !print*,myrank,minval(nvalency),maxval(shearmod_elmt),maxval(shearmod_node)
+  endif
+
+  ! rho
+  if(ismassdens)then
+    rho_node=ZERO
+    do i_elmt=1,nelmt
+      imat=mat_id(i_elmt)
+      num=g_num(:,i_elmt)
+      rho_node(num) = rho_node(num) + massdens_elmt(:,i_elmt)
+    enddo
+    ! Assemble across the processors.
+    call assemble_ghosts_nodal_fscalar(rho_node,rho_node)
+    rho_node = rho_node/nvalency
+    !print*,myrank,minval(nvalency),maxval(massdens_elmt),maxval(rho_node)
+  endif
   deallocate(nvalency)
 
   if(infbc)then
@@ -571,30 +597,45 @@ if(savedata%model)then
     spart(1)='finite region'
   endif
   if(infbc)then
-    write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.kappa'
-    call write_ensight_pernodeSCALAS_part1(out_fname,ipart,spart,1, &
-    nnode_finite,node_finite,nnode,real(bulkmod_node))
-    write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.mu'
-    call write_ensight_pernodeSCALAS_part1(out_fname,ipart,spart,1, &
-    nnode_finite,node_finite,nnode,real(shearmod_node))
-
-    write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.rho'
-    call write_ensight_pernodeSCALAS_part1(out_fname,ipart,spart,1, &
-    nnode_finite,node_finite,nnode,real(rho_node))
+    if(isbulkmod)then
+      write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.kappa'
+      call write_ensight_pernodeSCALAS_part1(out_fname,ipart,spart,1, &
+      nnode_finite,node_finite,nnode,real(bulkmod_node))
+    endif
+    
+    if(isshearmod)then
+      write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.mu'
+      call write_ensight_pernodeSCALAS_part1(out_fname,ipart,spart,1, &
+      nnode_finite,node_finite,nnode,real(shearmod_node))
+    endif
+   
+    if(ismassdens)then
+      write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.rho'
+      call write_ensight_pernodeSCALAS_part1(out_fname,ipart,spart,1, &
+      nnode_finite,node_finite,nnode,real(rho_node))
+    endif
   else
-    write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.kappa'
-    call write_ensight_pernodeSCALAS(out_fname,ipart,spart, &
-    nnode,real(bulkmod_node))
+    if(isbulkmod)then
+      write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.kappa'
+      call write_ensight_pernodeSCALAS(out_fname,ipart,spart, &
+      nnode,real(bulkmod_node))
+    endif
+    
+    if(isshearmod)then
+      write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.mu'
+      call write_ensight_pernodeSCALAS(out_fname,ipart,spart, &
+      nnode,real(shearmod_node))
+    endif
 
-    write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.mu'
-    call write_ensight_pernodeSCALAS(out_fname,ipart,spart, &
-    nnode,real(shearmod_node))
-
-    write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.rho'
-    call write_ensight_pernodeSCALAS(out_fname,ipart,spart, &
-    nnode,real(rho_node))
+    if(ismassdens)then
+      write(out_fname,'(a)')trim(out_path)//trim(file_head)//trim(ptail)//'.rho'
+      call write_ensight_pernodeSCALAS(out_fname,ipart,spart, &
+      nnode,real(rho_node))
+    endif
   endif
-  deallocate(bulkmod_node,shearmod_node,rho_node)
+  if(isbulkmod)deallocate(bulkmod_node)
+  if(isshearmod)deallocate(shearmod_node)
+  if(ismassdens)deallocate(rho_node)
 endif
 
 if(myrank.eq.0)write(logunit, *)'Completed set_model_properties...'

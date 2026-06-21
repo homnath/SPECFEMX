@@ -73,7 +73,8 @@ end subroutine write_ensight_casefile
 
 subroutine write_ensight_casefile_long(case_file,geo_file,add_tag,isgeo_change,&
 ts,ns,fs,fi,twidth,errcode,errtag,freesurf,isplane)
-use global,only:file_head,ptail,savedata,benchmark_okada,dstep,step0
+use global,only:file_head,ptail,savedata,benchmark_okada,dstep,step0, &
+isbulkmod,isshearmod,ismassdens
 implicit none
 character(len=250),intent(in) :: case_file,geo_file
 character(len=60),intent(in) :: add_tag 
@@ -127,12 +128,18 @@ endif
 
 ! Do not plot model for the free surface
 if(savedata%model .and. .not.isfreesurf)then
-  write(11,'(a/)')'scalar per node: bulk_modulus '//trim(file_tag)//   &
-  trim(ptail)//'.kappa'
-  write(11,'(a/)')'scalar per node: shear_modulus '//trim(file_tag)//  &
-  trim(ptail)//'.mu'
-  write(11,'(a/)')'scalar per node: mass_density '//trim(file_tag)//   &
-  trim(ptail)//'.rho'
+  if(isbulkmod)then
+    write(11,'(a/)')'scalar per node: bulk_modulus '//trim(file_tag)//   &
+    trim(ptail)//'.kappa'
+  endif
+  if(isshearmod)then
+    write(11,'(a/)')'scalar per node: shear_modulus '//trim(file_tag)//  &
+    trim(ptail)//'.mu'
+  endif
+  if(ismassdens)then
+    write(11,'(a/)')'scalar per node: mass_density '//trim(file_tag)//   &
+    trim(ptail)//'.rho'
+  endif
 endif
 
 if(savedata%disp)then
